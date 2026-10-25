@@ -15,6 +15,9 @@ const L = {
   party: ['WOOO!', 'DANCE PARTY!', 'yeah yeah YEAH!', 'go go go!'],
   bully: ["dance?! i'll show you a dance!", 'you serious?! c\'mere!', 'DANCE THIS!'],
   stink: ['UGH!', 'who did that?!', 'my eyes!!', 'dude...', 'WHAT DID YOU EAT?!', '*gag*', 'it burns!!'],
+  cheer: ['WOOO!', '👏', '👏👏', 'GO GO GO!', 'WOOO!'],
+  bullyWatch: ['nerds.', 'pfft.', '...'],
+  bullyLaugh: ['lol. weak.', 'HAHAHA', 'was that a push?', 'cute.', 'tickles.'],
   faint: ['my eyes!!', '*gasp*', 'so... green...'],
   mad: ['you nasty little-', 'oh you\'re gonna PAY', 'that\'s it!!'],
 };
@@ -90,6 +93,10 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   }
 
   // ---- DANCE-OFF ----
+  // ---- DANCE-OFF + street party ----
+  const PARTY_R = 9, CROWD_MIN = 5;
+  const canJoin = (o) => !o.down && !o.mode && !o.stagger && o.special !== 'bully' && o.special !== 'giver' && !(missions.active && o.special);
+  const crowdAt = (c, n) => getNPCs().list.filter((o) => o !== n && canJoin(o) && Math.hypot(o.root.position.x - c.x, o.root.position.z - c.z) < PARTY_R);
   function danceOff(n) {
     const npcs = getNPCs(), ch = charOf();
     if (n.down) return;
@@ -100,17 +107,26 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     const tag = { n };
     const myDance = pick(MY_DANCES);
     ch?.dance?.(myDance);
-    dialogue.showIcon(player, 'note', DANCE_SECS * 1000);
     if (n.c.dancing) n.c.stopDance(0.1);
     if (n.mode) n.mode = null;                       // even someone fleeing stops for a dance battle
     n.talkT = 1.4; n.talkTo = player.position;        // stop and size up the challenger
     const theirs = SIGNATURE[n.special] || pick(SILLY.filter((d) => d !== myDance));
+    const center = new THREE.Vector3().copy(player.position).lerp(n.root.position, 0.5);
+    const crowd = crowdAt(center, n);
+    const big = crowd.length >= CROWD_MIN;           // enough people around: the street ALWAYS joins in
+    state.lastCrowd = crowd.length;
+    dialogue.showIcon(player, 'note', (big ? DANCE_SECS + 2.6 : DANCE_SECS) * 1000);
     later(1.1, () => {                                 // they answer the challenge
       if (getNPCs().danceAny(n, theirs, player.position)) dialogue.showIcon(n, 'note', (DANCE_SECS - 1.1) * 1000);
     }, tag);
     const stopAll = () => { ch?.stopDance?.(0.2); if (!n.party) n.c.stopDance(0.25); n.talkT = 0; };
-    combat.hold(DANCE_SECS, n.root.position, () => { cancelTag(tag); stopAll(); dialogue.clear(player); });
-    later(DANCE_SECS, () => {
+    combat.hold(big ? DANCE_SECS + 2.6 : DANCE_SECS, n.root.position, () => { cancelTag(tag); stopAll(); dialogue.clear(player); });
+    if (big) {
+      state.lastOutcome = 'mayhem';
+      later(1.7, () => { if (!n.down && !n.mode) startParty(n, crowd, center, DANCE_SECS + 2.6 - 1.7); }, tag);
+      later(DANCE_SECS, () => { if (!charOf()?.dancing) charOf()?.dance?.('flail'); }, tag);
+      later(DANCE_SECS + 2.6, () => ch?.stopDance?.(0.3), tag);
+    } else later(DANCE_SECS, () => {
       ch?.stopDance?.(0.25);
       const r = force.outcome || (Math.random() < 0.22 ? 'mayhem' : Math.random() < 0.5 ? 'concede' : 'mock');
       state.lastOutcome = r;
@@ -119,26 +135,64 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     }, tag);
     state.lastDance = { me: myDance, them: theirs, npc: n };
   }
-  function party(n) {   // the street joins in: nearby people dance and cheer for a few seconds
-    const npcs = getNPCs(), p = player.position, crew = [];
-    for (const o of npcs.list) {
-      if (o === n || o.down || o.mode || o.special === 'bully' || o.special === 'giver') continue;
-      if (o.root.position.distanceTo(p) < 13 && crew.length < 6) crew.push(o);
-    }
-    const all = [n, ...crew], PARTY = 4.4;
-    dialogue.shout(n, pick(L.party));
-    all.forEach((o, i) => later(0.18 * i, () => {
-      if (o.down || o.mode) return;
-      const d = SIGNATURE[o.special] || pick(SILLY);
-      o.talkT = 0; o.danceTo = p; o.c.dance(d); o.party = true;
-      if (i && Math.random() < 0.5) dialogue.shout(o, pick(L.party), 1500); else dialogue.showIcon(o, 'note', (PARTY - 0.3) * 1000);
-      later(PARTY - 0.18 * i, () => { o.party = false; o.c.stopDance(0.3); });
-    }));
+  function party(n) {   // small-crowd mayhem: whoever's around joins in for a few seconds
+    const c = new THREE.Vector3().copy(player.position).lerp(n.root.position, 0.5), PARTY = 4.4;
+    startParty(n, crowdAt(c, n).slice(0, 8), c, PARTY);
     const ch = charOf(); ch?.dance?.('flail');
     combat.hold(PARTY, null, () => ch?.stopDance?.(0.2));
     later(PARTY, () => ch?.stopDance?.(0.3));
     dialogue.showIcon(player, 'note', PARTY * 1000);
-    state.lastParty = all.length;
+  }
+
+  // party state: dancers (crew), late-comers clap (spect), the bully watches with arms crossed (watch)
+  let P = null;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(PARTY_R - 0.18, PARTY_R, 72, 1),
+    new THREE.MeshBasicMaterial({ color: '#FFCC3F', transparent: true, opacity: 0, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.renderOrder = 1; ring.visible = false; scene.add(ring);
+  const danceFor = (o) => SIGNATURE[o.special] || pick(SILLY);
+  function startParty(n, crew, center, dur) {
+    if (P) endParty();
+    P = { n, center: center.clone(), t: dur, T: dur, crew: new Set([n]), spect: new Set(), watch: new Set(), clapT: 0, wooT: 1.2 };
+    ring.position.set(center.x, player.position.y + 0.03, center.z); ring.visible = true; ring.material.opacity = 0;
+    dialogue.shout(n, pick(L.party));
+    n.party = true; n.talkT = 0; n.danceTo = player.position;
+    if (!n.c.dancing) n.c.dance(danceFor(n));
+    crew.forEach((o, i) => later(0.15 * i, () => {
+      if (!P || !canJoin(o)) return;
+      P.crew.add(o); o.party = true; o.talkT = 0; o.danceTo = P.center; o.c.dance(danceFor(o));
+      if (Math.random() < 0.4) dialogue.shout(o, pick(L.party), 1500); else dialogue.showIcon(o, 'note', Math.max(500, (P.t - 0.3) * 1000));
+    }));
+    state.lastParty = crew.length + 1; state.parties++;
+  }
+  function release(o) { o.party = false; o.spectator = false; if (!o.down && !o.mode && o.c.dancing) o.c.stopDance(0.3); o.talkT = 0; }
+  function endParty() {
+    if (!P) return;
+    for (const s of [P.crew, P.spect, P.watch]) for (const o of s) release(o);
+    P = null; ring.visible = false;
+  }
+  function stepParty(dt) {
+    if (!P) return;
+    P.t -= dt;
+    ring.material.opacity = 0.45 * Math.min(1, (P.T - P.t) / 0.4, P.t / 0.5);
+    if (P.t <= 0) { endParty(); return; }
+    const inR = (o) => Math.hypot(o.root.position.x - P.center.x, o.root.position.z - P.center.z) < PARTY_R;
+    for (const o of getNPCs().list) {
+      const busy = o.down || o.mode || o.stagger;
+      if (P.crew.has(o)) {
+        if (busy) { P.crew.delete(o); o.party = false; }
+        else if (!o.c.dancing) { o.danceTo = o === P.n ? player.position : P.center; o.c.dance(danceFor(o)); }   // keep it going
+        continue;
+      }
+      if (P.spect.has(o) || P.watch.has(o)) { if (busy) { P.spect.delete(o); P.watch.delete(o); o.spectator = false; } continue; }
+      if (busy || (missions.active && o.special) || !inR(o)) continue;
+      o.talkT = 0; o.danceTo = P.center; o.spectator = true;
+      if (o.special === 'bully') { P.watch.add(o); o.c.dance('crossed'); if (Math.random() < 0.5) dialogue.shout(o, pick(L.bullyWatch), 1600); }
+      else { P.spect.add(o); o.c.dance('clap'); state.claps++; }
+    }
+    if (P.spect.size) {
+      if ((P.clapT -= dt) <= 0) { P.clapT = 0.16 + Math.random() * 0.14; combat.audio.clap(0.5 + Math.random() * 0.5); }
+      if ((P.wooT -= dt) <= 0) { P.wooT = 1.1 + Math.random() * 1.4; dialogue.shout(pick([...P.spect]), pick(L.cheer), 1200); }
+    }
   }
 
   // ---- PUSH ----
@@ -151,9 +205,28 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
       if (p.distanceTo(q) > REACH.push + 0.9 || n.down) { combat.audio.whoosh(0.5); return; }
       tmp.copy(p).lerp(q, 0.6); tmp.y = q.y + 1.4; combat.burstAt(tmp, 'SHOVE!');
       combat.audio.whoosh(1); combat.audio.smack(); combat.shakeIt(0.25);
+      if (n.special === 'bully') { bullyBonk(n); return; }
       dialogue.clear(n);
       npcs.shove(n, p, n.special ? 6.5 : 7.5);
       npcs.emit('push', n);
+    });
+  }
+
+  // the bully doesn't budge: you bounce off and land on your butt, he laughs and flexes
+  function bullyBonk(n) {
+    const npcs = getNPCs(), p = player.position, q = n.root.position;
+    tmp.copy(p).lerp(q, 0.6); tmp.y = q.y + 1.5; combat.burstAt(tmp, Math.random() < 0.5 ? 'BONK' : 'SHOVE?');
+    combat.audio.smack(); combat.shakeIt(0.12);
+    n.c.stopDance?.(0.05);
+    n.sway = 0.35;                                    // barely sways
+    combat.bounce(q);
+    state.bonks++;
+    npcs.emit('bonk', n, null);
+    later(0.35, () => dialogue.shout(n, pick(L.bullyLaugh), 2000));
+    later(1.0, () => {
+      if (n.down) return;
+      if (missions.active) { npcs.provoke(n, 0.1); return; }
+      n.mode = null; npcs.danceAny(n, 'flex', p);
     });
   }
 
@@ -276,10 +349,16 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
       state.lands++;
     });
     npcs.on('domino', () => { state.dominoes++; });
+    npcs.on('bonk', (o, flier) => {                  // someone got thrown into the bully: they bounce off
+      if (!flier) return;
+      state.bonks++; o.sway = 0.35; combat.audio.smack();
+      tmp.copy(o.root.position); tmp.y += 1.5; combat.burstAt(tmp, 'BONK');
+      later(0.3, () => dialogue.shout(o, pick(L.bullyLaugh), 1800));
+    });
   }
 
   const ACT = { dance: danceOff, push, fart };
-  const state = { clouds: 0, stunk: 0, faints: 0, lands: 0, dominoes: 0, lastOutcome: null, lastParty: 0, lastDance: null };
+  const state = { clouds: 0, stunk: 0, faints: 0, lands: 0, dominoes: 0, lastOutcome: null, lastParty: 0, lastDance: null, bonks: 0, parties: 0, claps: 0, lastCrowd: 0 };
   let last = performance.now();
   const prev = scene.onBeforeRender;
   scene.onBeforeRender = (...a) => {
@@ -288,6 +367,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     wire(getNPCs());
     for (const x of timers.slice()) { x.t -= dt; if (x.t <= 0) { timers.splice(timers.indexOf(x), 1); x.fn(); } }
     stepClouds(dt);
+    stepParty(dt);
     if (open) {
       const n = open.npc, p = n.root.position;
       if (n.down || p.distanceTo(player.position) > MENU_FAR || Math.hypot(p.x - open.at.x, p.z - open.at.z) > MENU_DRIFT) closeMenu();
@@ -295,5 +375,5 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     }
   };
 
-  return { openMenu, closeMenu, choose, get open() { return open; }, menu, force, state, clouds, cloud, danceOff, push, fart };
+  return { openMenu, closeMenu, choose, get open() { return open; }, menu, force, state, clouds, cloud, danceOff, push, fart, get party() { return P; }, endParty, PARTY_R };
 }

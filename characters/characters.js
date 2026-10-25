@@ -1356,6 +1356,29 @@ Object.assign(DANCES, {
         { dip: 0.17 + q, lean: 0.38, hz: -0.07, roll: q * 3, head: [-0.45, 0, 0], stance: 0.14 });
     },
   },
+  clap: {   // spectator: clap in front of the chest, little bounce (loops until stopped)
+    dur: 60, blendIn: 0.15, blendOut: 0.25,
+    pose(t) {
+      const o = 0.04 + 0.13 * Math.abs(Math.sin(t * 7.5)), b = 0.03 * Math.abs(Math.sin(t * 7.5));
+      return SIL(arm([o, 1.42 + b, 0.33], [0.36, 1.22, 0.06], 0.9, 0), arm([-o, 1.42 + b, 0.33], [-0.36, 1.22, 0.06], -0.9, 0),
+        { dip: 0.03 + b * 0.6, lean: 0.04, head: [0.05, 0.12 * Math.sin(t * 2.1), 0], stance: 0.1 });
+    },
+  },
+  crossed: {   // bully watching: arms crossed, slow unimpressed head shake (loops until stopped)
+    dur: 60, blendIn: 0.2, blendOut: 0.3,
+    pose(t) {
+      return SIL(arm([-0.14, 1.3, 0.21], [0.3, 1.24, 0.12], 1.3, 0), arm([0.15, 1.33, 0.19], [-0.3, 1.25, 0.12], -1.3, 0),
+        { lean: -0.08, dip: 0.02, head: [-0.08, 0.18 * Math.sin(t * 1.3), 0], stance: 0.16 });
+    },
+  },
+  flex: {   // bully taunt: double-biceps flex, chest out, little bounce
+    dur: 1.7, blendIn: 0.12, blendOut: 0.3,
+    pose(t) {
+      const b = Math.abs(Math.sin(t * 7)) * 0.04, f = 0.9 + 0.3 * Math.sin(t * 7);
+      return SIL(arm([0.36, 1.82 + b, 0.04], [0.52, 1.5, -0.02], 0.3, f), arm([-0.36, 1.82 + b, 0.04], [-0.52, 1.5, -0.02], -0.3, f),
+        { lean: -0.12, dip: 0.05 - b, head: [-0.15, 0.2 * Math.sin(t * 3.5), 0], stance: 0.16 });
+    },
+  },
   shove: {   // two-handed shove: draw back, thrust both palms forward
     dur: 0.6, blendIn: 0.05, blendOut: 0.25,
     pose(t) {

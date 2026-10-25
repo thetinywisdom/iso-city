@@ -185,6 +185,7 @@ export class NPCs {
   shove(n, from, power = 7.5, depth = 0) {
     const p = n.root.position;
     const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
+    if (n.special === 'bully') return 0;      // an immovable object
     if (!this.knockdown(n, from, 1.5 + Math.random() * 0.6, 'push')) return 0;
     n.fly = { vx: dx / d * power, vz: dz / d * power, vy: 4.2 + power * 0.25, t: 0, power, depth };
     return n.down.t;
@@ -362,6 +363,8 @@ export class NPCs {
     for (const n of this.list) {
       const p = n.root.position;
       let speed = 0;
+      if (n.bonkT > 0) n.bonkT -= dt;
+      if (n.sway > 0) { n.sway = Math.max(0, n.sway - dt); n.root.rotation.x = 0.07 * Math.sin(n.sway * 28) * n.sway / 0.35; }
       if (n.down && n.fly) {                   // shoved: airborne arc, then a thud
         const f = n.fly; f.t += dt;
         this._move(p, f.vx * dt, f.vz * dt);
@@ -370,6 +373,12 @@ export class NPCs {
           if (o === n || o.down || f.depth > 5) continue;
           const q = o.root.position;
           if ((q.x - p.x) ** 2 + (q.z - p.z) ** 2 < 0.8 * 0.8) {
+            if (o.special === 'bully') {          // bounces right off him
+              if (o.bonkT > 0) continue;
+              const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz) || 1, s = Math.max(2.5, Math.hypot(f.vx, f.vz) * 0.45);
+              f.vx = dx / d * s; f.vz = dz / d * s; f.vy = Math.max(f.vy, 2.5); f.depth = 99;
+              o.bonkT = 0.6; this.emit('bonk', o, n); continue;
+            }
             if (this.shove(o, p, Math.max(4, f.power * 0.75), f.depth + 1)) { o.down.t += 0.2 * (f.depth + 1); this.emit('domino', o, n); }
           }
         }

@@ -96,6 +96,18 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     }, 300);
     npcs.emit('playerTrip', n);
   }
+  /** Bounced off something immovable: fly back a bit and land on your butt. */
+  function bounce(from, power = 3.2) {
+    interrupt();
+    const p = player.position, dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
+    player.heading = Math.atan2(-dx, -dz);            // still facing them, falling backwards
+    player.vel.set(dx / d * power, 0, dz / d * power);
+    const lie = 0.9 + Math.random() * 0.4;
+    const tp = charOf()?.knockdown(-1, lie) ?? lie + 0.9;
+    stun = downT = tp; slapping = null; target = null;
+    setTimeout(() => { audio.thud(); shake = 0.14; tmp.copy(p); tmp.y += 0.25; dustAt(tmp); }, 330);
+    return tp;
+  }
   function checkTrip(npcs) {
     if (!npcs || !player.airborne || stun > 0) return;
     const p = player.position;
@@ -197,7 +209,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   };
 
   return {
-    control, audio, approach, hold, interrupt, burstAt, dustAt, shakeIt: (s) => { shake = Math.max(shake, s); },
+    control, audio, approach, hold, interrupt, bounce, burstAt, dustAt, shakeIt: (s) => { shake = Math.max(shake, s); },
     get locked() { return lockT > 0; },
     get target() { return target; }, get slapping() { return slapping; }, get stun() { return stun; }, get down() { return downT > 0; }, trip,
     slap: (npc) => dialogue.onLongPress(npc),      // debug / tests
@@ -275,6 +287,12 @@ class SlapAudio {
   whoosh(vol = 1) {
     if (this.muted || !this.ctx) return;
     this._noise(this.ctx.currentTime, 0.16, 'bandpass', 500, 2600, 0.25 * vol, 1.4);
+  }
+  clap(vol = 1) {   // one hand clap: two quick bright noise ticks
+    if (this.muted || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._noise(t, 0.045, 'bandpass', 2200, 1300, 0.16 * vol, 1.1);
+    this._noise(t + 0.011, 0.035, 'bandpass', 1500, 900, 0.1 * vol, 1.1);
   }
   thud() {   // body hitting the pavement: low sine drop + muffled noise
     if (this.muted || !this.ctx) return;
