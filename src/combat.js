@@ -79,6 +79,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   }
   function trip(n) {
     const npcs = getNPCs();
+    if (n.special === 'cop') { bounce(n.root.position, 2.4); npcs.emit('copPoked', n, 'trip'); return; }   // he doesn't go down
     const tn = npcs.knockdown(n, player.position);
     if (!tn) return;
     interrupt();

@@ -1282,11 +1282,35 @@ export function createBully(opts = {}) {
   return ch;
 }
 
+// The cop: blue uniform + cap, donut belly, moustache, gold badge, a donut in hand
+export function createCop(opts = {}) {
+  const C = PALETTE;
+  const ch = createNPC({ seed: 9110, outfit: 'sweater', hair: 'buzz', hairColor: C.black, glasses: false, hat: 'cap', hatColor: COMIC.blues[0],
+    colors: { top: COMIC.blues[1], inner: COMIC.blues[1], bottom: COMIC.blues[0], shoe: C.black, accent: C.black, shorts: false },
+    accessories: [], height: 1.02, build: 1.5, ...opts, name: 'cop', special: 'cop' });
+  const hc = ch.parts.headCenter, T = ch.parts.torso;
+  mesh(new THREE.BoxGeometry(0.11, 0.028, 0.02), C.black, hc, { pos: [0, -0.04, 0.128] });                    // moustache
+  for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.03, 0.02, 0.018), C.black, hc, { pos: [sx * 0.06, -0.05, 0.122] });
+  mesh(new THREE.BoxGeometry(0.04, 0.04, 0.012), COMIC.yellows[1], hc, { pos: [0, 0.135, 0.128], rot: [-0.3, 0, 0] });   // cap badge
+  mesh(new THREE.BoxGeometry(0.05, 0.06, 0.014), COMIC.yellows[1], T, { pos: [0.075, 1.52, 0.16], rot: [0.1, 0, 0] });   // chest badge
+  mesh(new THREE.TorusGeometry(0.205, 0.022, 3, 12), C.black, T, { pos: [0, 0.95, 0], rot: [Math.PI / 2, 0, 0], scale: [1, 0.86, 1] });   // belt
+  mesh(new THREE.BoxGeometry(0.05, 0.04, 0.02), COMIC.yellows[1], T, { pos: [0, 0.95, 0.18] });                 // buckle
+  mesh(new THREE.BoxGeometry(0.05, 0.12, 0.06), C.black, T, { pos: [0.2, 0.9, 0.02] });                         // radio on the belt
+  const wr = ch.parts.wristR;   // a pink-iced donut in the right hand
+  if (wr) {
+    mesh(new THREE.TorusGeometry(0.045, 0.022, 4, 8), COMIC.warm[2], wr, { pos: [-0.02, -0.1, 0.03], rot: [0, Math.PI / 2, 0] });
+    mesh(new THREE.TorusGeometry(0.045, 0.012, 3, 8), COMIC.pinks[2], wr, { pos: [-0.034, -0.1, 0.03], rot: [0, Math.PI / 2, 0] });
+  }
+  ch.update(0, 0);
+  return ch;
+}
+
 export const SPECIALS = {
   mbappe: { create: createMbappe, tag: 'MBAPPÉ', dance: 'mbappe', icon: 'note' },
   syoya: { create: createSyoya, tag: 'SYOYA', dance: 'hula', icon: 'heart' },
   giver: { create: createGiver, tag: '???', dance: null, role: 'giver' },
   bully: { create: createBully, tag: 'BULLY', dance: null, role: 'bully', temper: 'aggressive' },
+  cop: { create: createCop, tag: 'OFFICER DOUGH', dance: null, role: 'cop', temper: 'timid' },
 };
 export function createSpecial(key, opts) { return SPECIALS[key].create(opts); }
 

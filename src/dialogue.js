@@ -37,7 +37,8 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
       return;
     }
     let line = api.pickLine?.(npc) || null;   // missions may bias the line
-    if (!line) do line = LINES[Math.floor(Math.random() * LINES.length)]; while (line === npc.lastLine && LINES.length > 1);
+    const pool = npc.lines && Math.random() < 0.65 ? npc.lines : LINES;   // named people have their own lines
+    if (!line) do line = pool[Math.floor(Math.random() * pool.length)]; while (line === npc.lastLine && pool.length > 1);
     npc.lastLine = line;
     show(npc, line, SHOW_MS, false);
     getNPCs().talk(npc, SHOW_MS / 1000, player.position);
@@ -190,6 +191,14 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   const prev = scene.onBeforeRender;
   scene.onBeforeRender = (...a) => { prev.apply(scene, a); place(); };
   function clear(npc) { const b = bubbles.get(npc); if (b) { b.el.remove(); bubbles.delete(npc); } }
-  const api = { say, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n) { hoverNPC = n; tagEl.textContent = n ? n.tag : ''; tagEl.style.display = n ? 'block' : 'none'; if (n) tagEl.style.marginLeft = -Math.round(tagEl.offsetWidth / 2 / 3) * 3 + 'px'; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false) => { show(n, t, ms, sh); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
+  // idle small-talk (chatter.js): small, quiet bubble; never replaces a real one
+  function chat(npc, line, ms) {
+    const b = bubbles.get(npc);
+    if (b && !b.chat) return false;
+    show(npc, line, ms, false);
+    const nb = bubbles.get(npc); nb.chat = true; nb.el.classList.add('chat');
+    place(); return true;
+  }
+  const api = { say, chat, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n) { hoverNPC = n; tagEl.textContent = n ? n.tag : ''; tagEl.style.display = n ? 'block' : 'none'; if (n) tagEl.style.marginLeft = -Math.round(tagEl.offsetWidth / 2 / 3) * 3 + 'px'; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false) => { show(n, t, ms, sh); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
   return api;
 }

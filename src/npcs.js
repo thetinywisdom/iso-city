@@ -24,6 +24,38 @@ const IDLERS = [
   { seed: 1010, pos: [-24.4, 22.7], face: [-21.5, 21.5] }, // watching the fountain (west side of the plaza)
   { seed: 1111, pos: [13.4, -6.1], face: [16, -6.1] },     // waiting at the bus stop
 ];
+// The women of the neighbourhood: modular NPC looks (blue-grey base, palette clothes), names on hover, own lines.
+const WOMEN = [
+  { seed: 1201, name: 'BRENDA', walk: { path: loop(33, 33, 7.15), start: 0, dir: -1, speed: 1.3, along: 0.5 },
+    look: { outfit: 'dress', hair: 'ponytail', hairColor: '#292C2E', colors: { top: '#FF5491', accent: '#292C2E', shoe: '#292C2E' }, accessories: ['tote'], accColor: '#FFCC3F' },
+    lines: ['ew.', 'my husband is a cop. sort of.', 'not today, sweaty.', 'do i KNOW you?', 'move it, b*tch.'] },
+  { seed: 1202, name: 'TIFF', walk: { path: loop(33, 0), start: 1, dir: 1, speed: 1.25, along: 0.5 },
+    look: { outfit: 'blouse', hair: 'longStraight', hairColor: '#93616B', glasses: false, hat: 'none', accessories: ['headphones'] },
+    lines: ['literally who are you', 'ugh. peasants.', "i'm on a call.", 'this is SO random', 'babe, no.'] },
+  { seed: 1203, name: 'MRS. ITO', walk: { path: loop(0, 0), start: 1, dir: 1, speed: 1.1, along: 0.2 },
+    look: { outfit: 'cardigan', hair: 'bob', hairColor: '#363E47', glasses: true, colors: { top: '#A7BFA4', inner: '#F0F2F4', bottom: '#363E47', shoe: '#292C2E' }, height: 0.94 },
+    lines: ['kids these days...', 'pull your pants up.', 'i knew your mother. sadly.', 'shoo. SHOO.'] },
+  { seed: 1204, name: 'LINDA', pos: [15.2, -6.2], face: [13.4, -6.1],
+    look: { outfit: 'apron', hair: 'bun', hairColor: '#363E47', glasses: false },
+    lines: ['i will speak to your MANAGER.', 'who raised you?', 'the bus is LATE again', 'step back, sweetie.'] },
+  { seed: 1205, name: 'GRANDMA FUMIKO', pos: [-23.6, 23.5], face: [-24.4, 22.7],
+    look: { outfit: 'cardigan', hair: 'bun', hairColor: '#F0F2F4', glasses: true, colors: { top: '#F8C0C5', inner: '#F0F2F4', bottom: '#292C2E', shoe: '#292C2E' }, height: 0.88, build: 0.95 },
+    lines: ["i'll hit you with my purse.", 'back in my day we slapped HARDER', 'eat something, you look like a noodle', 'speak up, dummy!'] },
+  { seed: 1206, name: 'KIKO', pos: [-18.6, 27.5], face: [-19.2, 26.6],
+    look: { outfit: 'dress', hair: 'bob', hairColor: '#292C2E', colors: { top: '#00B4BC', accent: '#FFCC3F', shoe: '#F0F2F4' }, height: 0.95 },
+    lines: ['is that your face or a dare?', 'lol no.', 'ok boomer', 'blocked.'] },
+  { seed: 1207, name: 'ROSA', pos: [-6.4, -14.9], face: [-8, -14.9],
+    look: { outfit: 'blazer', hair: 'curlyLong', hairColor: '#4C3F42', colors: { top: '#FF7DAF', inner: '#F0F2F4', bottom: '#292C2E' } },
+    lines: ['i bite.', 'call me never.', 'nice shoes. NOT.', "don't make me take my earrings off"] },
+  { seed: 1208, name: 'DORIS', pos: [-13.4, 19.6], face: [-12.6, 20.2],
+    look: { outfit: 'coat', hair: 'braids', hairColor: '#4C3F42', glasses: false },
+    lines: ["i've buried two husbands.", 'move, pumpkin.', 'what are YOU looking at?', 'h*ll no.'] },
+  { seed: 1209, name: 'BIG DEB', pos: [-12.6, 20.2], face: [-13.4, 19.6],
+    look: { outfit: 'sweater', hair: 'ponytail', hairColor: '#292C2E', colors: { top: '#FFE166', bottom: '#2A5B94', shoe: '#F0F2F4' }, build: 1.3, height: 1.03 },
+    lines: ['wanna arm wrestle? no? coward.', 'i eat guys like you for brunch', 'beat it, shrimp.', 'oh h*ll naw.'] },
+];
+// The cop walks a big beat around four blocks (outer sidewalk lane).
+const COP_BEAT = { path: [[-7.15, -7.15], [10.4, -7.15], [10.9, -5.0], [17.0, -5.0], [17.3, -7.15], [40.15, -7.15], [40.15, 40.15], [-7.15, 40.15], [-7.15, 17.2], [-4.6, 16.7], [-4.6, 12.6], [-7.15, 12.1]], start: 0, dir: 1, speed: 1.2, along: 0.15 };   // detours round the bus shelter and the bench
 // Named easter-egg NPCs (characters.js SPECIALS): stand idle, dance when clicked, always timid.
 const SPECIAL_SPOTS = [
   { key: 'mbappe', pos: [-8.5, 2.2], face: [-5.5, 5.0], ball: [0.14, 0.42] },    // quiet west arm of the spawn crossing: clear sightline, kit reads on dark asphalt
@@ -81,6 +113,21 @@ export class NPCs {
       n.walker = false; n.idleT = Math.random() * 3;
       this.list.push(n);
     }
+    for (const w of WOMEN) {
+      const n = this._wrap(charMod.createNPC({ seed: w.seed, ...w.look }), w.seed);
+      Object.assign(n, { tag: w.name, lines: w.lines, woman: true });
+      if (w.walk) {
+        const W = w.walk, a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4], t = W.along || 0;
+        n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
+        Object.assign(n, { path: W.path, idx: (W.start + W.dir + 4) % 4, dir: W.dir, speed: W.speed, walker: true });
+      } else {
+        n.root.position.set(w.pos[0], 0, w.pos[1]);
+        n.heading = Math.atan2(w.face[0] - w.pos[0], w.face[1] - w.pos[1]);
+        n.home = { x: w.pos[0], z: w.pos[1], heading: n.heading };
+        n.walker = false; n.idleT = Math.random() * 3;
+      }
+      this.list.push(n);
+    }
     if (charMod.createSpecial) for (const s of SPECIAL_SPOTS) {
       const n = this._wrap(charMod.createSpecial(s.key), 0);
       const sp = charMod.SPECIALS[s.key];
@@ -94,6 +141,15 @@ export class NPCs {
         b.position.y = city.groundHeight(b.position.x, b.position.z) + 0.11;
         this.group.add(b); n.ball = b; n.ballHome = b.position.clone();
       }
+      this.list.push(n);
+    }
+    if (charMod.SPECIALS?.cop) {
+      const n = this._wrap(charMod.createSpecial('cop'), 0), sp = charMod.SPECIALS.cop, W = COP_BEAT;
+      Object.assign(n, { special: 'cop', tag: sp.tag, role: 'cop', temper: 'timid', idleT: 0,
+        lines: ['move along.', "i've got my eye on you, punk.", '*munch munch*', 'nothing to see here.', 'is that a donut? no? then beat it.'] });
+      const a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4];
+      n.root.position.set(a[0] + (b[0] - a[0]) * W.along, 0, a[1] + (b[1] - a[1]) * W.along);
+      Object.assign(n, { path: W.path, idx: (W.start + W.dir + 4) % 4, dir: W.dir, speed: W.speed, walker: true });
       this.list.push(n);
     }
     for (const n of this.list) n.root.position.y = city.groundHeight(n.root.position.x, n.root.position.z);
@@ -141,6 +197,18 @@ export class NPCs {
     n.chaseCfg = cfg; n.talkT = 0;
     n.mode = 'react'; n.modeT = cfg.react ?? TUNE.reactDelay; n.chaseT = 0; n.chaseV = 0;
   }
+  /** Walk to (x,z) to watch something (emits 'gathered' on arrival). */
+  gatherTo(n, x, z) {
+    if (n.down || n.mode || n.stagger) return false;
+    if (n.c.dancing) n.c.stopDance(0.1);
+    n.talkT = 0; n.mode = 'gather'; n.gather = { x, z }; n.gatherT = 0; n.modeT = 99;
+    return true;
+  }
+  /** Walk back to the route / home spot (after being pulled away). */
+  goHome(n, standFor = 0.2) {
+    if (n.down) return;
+    n.chaseCfg = null; n.stagger = null; n.mode = 'return'; n.modeT = standFor; n.target = this._nearestWaypoint(n);
+  }
   /** Calm an NPC down: stop chasing/fleeing and walk back to their route/spot. */
   calm(n, standFor = 0.6) {
     n.chaseCfg = null; n.pendingHit = -1;
@@ -152,6 +220,7 @@ export class NPCs {
   slapped(n, from) {
     const p = n.root.position;
     const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
+    if (n.special === 'cop') { this.emit('copPoked', n, 'slap'); return; }   // you don't slap a cop. he just gets mad.
     if (n.down) { this.emit('slap', n); return; }   // kicking them while they're down: no stagger/state changes
     if (n.c.dancing) n.c.stopDance(0.12);     // a slap cuts a dance short
     n.c.hit(-1);                               // player's right hand -> head snaps to the NPC's right
@@ -171,7 +240,7 @@ export class NPCs {
   /** Jumped into by the player: falls onto their back (facing the jumper), lies, gets up, complains.
    *  Chasers resume the chase; aggressive ones start one (like a slap). Returns the down time in s. */
   knockdown(n, from, lie = 1.2 + Math.random() * 0.6, post = null) {
-    if (n.down || !n.c.knockdown) return 0;
+    if (n.down || !n.c.knockdown || n.special === 'cop') return 0;
     const p = n.root.position;
     n.root.rotation.y = n.targetHeading = Math.atan2(from.x - p.x, from.z - p.z);
     const t = n.c.knockdown(-1, lie);              // also cancels a dance cleanly
@@ -185,7 +254,7 @@ export class NPCs {
   shove(n, from, power = 7.5, depth = 0) {
     const p = n.root.position;
     const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
-    if (n.special === 'bully') return 0;      // an immovable object
+    if (n.special === 'bully' || n.special === 'cop') return 0;      // an immovable object
     if (!this.knockdown(n, from, 1.5 + Math.random() * 0.6, 'push')) return 0;
     n.fly = { vx: dx / d * power, vz: dz / d * power, vy: 4.2 + power * 0.25, t: 0, power, depth };
     return n.down.t;
@@ -339,11 +408,21 @@ export class NPCs {
       this._move(p, sx * TUNE.fleeSpeed * dt, sz * TUNE.fleeSpeed * dt);
       return TUNE.fleeSpeed;
     }
+    if (n.mode === 'gather') {              // walking over to watch a dance-off (spectator); arrives -> 'gathered'
+      const t = n.gather, tx = t.x - p.x, tz = t.z - p.z, td = Math.hypot(tx, tz);
+      n.gatherT = (n.gatherT || 0) + dt;
+      if (td < 0.2 || n.gatherT > 9) { n.mode = null; n.gatherT = 0; this.emit('gathered', n); return 0; }
+      const [sx, sz] = this._steer(n, tx / td, tz / td, Math.min(1.1, td));
+      n.targetHeading = Math.atan2(sx, sz);
+      const spd = 3.4, step = Math.min(spd * dt, td);
+      this._move(p, sx * step, sz * step);
+      return spd;
+    }
     if (n.mode === 'return') {              // calm down, walk back to the route and carry on
       if (n.modeT > 0) { if (n.temper === 'aggressive') faceP(); return 0; }
       const t = n.target, tx = t.x - p.x, tz = t.z - p.z, td = Math.hypot(tx, tz);
       n.returnT = (n.returnT || 0) + dt;
-      if (td < 0.15 || n.returnT > 12) {
+      if (td < 0.15 || n.returnT > 25) {
         n.mode = null; n.returnT = 0;
         if (n.walker) { n.idx = t.i; n.wait = 0.5; }
         else { if (td < 1.5) { p.x = t.x; p.z = t.z; } n.heading = n.home.heading; n.idleT = 0; }

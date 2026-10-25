@@ -150,3 +150,27 @@ canvas { image-rendering: pixelated; }
 #npc-menu .nm-item:hover::before { content: '>\00a0'; }
 #npc-menu .nm-item[data-act="mission"] { color: #A92D59; }
 #npc-menu .nm-item[data-act="mission"]:hover { color: #FF5491; }
+
+/* ---- idle small-talk bubbles (chatter.js): smaller, cool tint, sit under real bubbles ---- */
+.bubble { z-index: 1; }
+.bubble.chat { z-index: 0; }
+.bubble.chat > span { font-size: 8px; line-height: 8px; padding: 6px 6px 3px; background: #DBF5FE; color: #363E47;
+  box-shadow: 0 -3px 0 0 #5B6A7B, 0 3px 0 0 #5B6A7B, -3px 0 0 0 #5B6A7B, 3px 0 0 0 #5B6A7B, 0 6px 0 0 #A7BFA4; bottom: 12px; }
+.bubble.chat > span::after { left: calc(50% - 6px); width: 12px; height: 15px; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='5' shape-rendering='crispEdges'><rect x='1' y='0' width='1' height='1' fill='%23DBF5FE'/><rect x='2' y='0' width='1' height='1' fill='%23DBF5FE'/><rect x='0' y='1' width='1' height='1' fill='%235B6A7B'/><rect x='1' y='1' width='1' height='1' fill='%23DBF5FE'/><rect x='2' y='1' width='1' height='1' fill='%23DBF5FE'/><rect x='3' y='1' width='1' height='1' fill='%235B6A7B'/><rect x='1' y='2' width='1' height='1' fill='%235B6A7B'/><rect x='2' y='2' width='1' height='1' fill='%23DBF5FE'/><rect x='3' y='2' width='1' height='1' fill='%235B6A7B'/><rect x='2' y='3' width='1' height='1' fill='%235B6A7B'/><rect x='3' y='3' width='1' height='1' fill='%235B6A7B'/><rect x='3' y='4' width='1' height='1' fill='%235B6A7B'/></svg>") 0 0 / 12px 15px no-repeat; }
+
+/* ---- police: WANTED badge + GAME OVER (police.js) ---- */
+#wanted { position: fixed; right: 15px; top: 15px; z-index: 8; display: none; pointer-events: none;
+  font: 16px/16px 'PressStart2P', monospace; -webkit-font-smoothing: none; color: #F0F2F4; background: #292C2E; padding: 9px 12px 6px;
+  box-shadow: 0 -3px 0 0 #FF5491, 0 3px 0 0 #FF5491, -3px 0 0 0 #FF5491, 3px 0 0 0 #FF5491, 0 9px 0 0 #2A5B94; white-space: nowrap; }
+#wanted.on { display: block; animation: bubble-pop .22s steps(4, end) backwards; }
+#wanted > span { color: #FF5491; animation: siren .5s steps(1, end) infinite; }
+#wanted.losing > span { animation-duration: .25s; }
+@keyframes siren { 0% { color: #FF5491; } 50% { color: #B0E9FF; } }
+#game-over { position: fixed; inset: 0; z-index: 20; display: none; background: rgba(41, 44, 46, .72); pointer-events: auto;
+  font-family: 'PressStart2P', monospace; -webkit-font-smoothing: none; }
+#game-over.on { display: flex; align-items: center; justify-content: center; }
+#game-over .go-box { text-align: center; background: #292C2E; padding: 24px 30px 21px; animation: bubble-pop .3s steps(4, end) backwards;
+  box-shadow: 0 -6px 0 0 #F0F2F4, 0 6px 0 0 #F0F2F4, -6px 0 0 0 #F0F2F4, 6px 0 0 0 #F0F2F4, 0 15px 0 0 #FF5491; }
+#game-over .go-title { font-size: 48px; line-height: 48px; color: #FFCC3F; text-shadow: 6px 6px 0 #A92D59; margin-bottom: 18px; }
+#game-over .go-sub { font-size: 16px; line-height: 16px; color: #B0E9FF; margin-bottom: 24px; }
+#game-over .go-btn { font-size: 16px; padding: 9px 12px 6px; }
