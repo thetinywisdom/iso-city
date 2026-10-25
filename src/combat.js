@@ -14,12 +14,17 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   const layer = document.getElementById('bubbles');
   const audio = new SlapAudio();
   let target = null, approachT = 0, bestD = Infinity, stuckT = 0, slapping = null, stun = 0, shake = 0;
+  // menu actions (actions.js): walk up to `target`, then run actCb instead of a slap; `hold` freezes input for a clip
+  let actCb = null, actReach = 0, lockT = 0, lockFace = null, lockCancel = null;
   const bursts = [];
   const tmp = new THREE.Vector3();
   const charOf = () => player.model?.userData?.character || null;
 
   // ---- wiring ----
-  dialogue.onLongPress = (npc) => { audio.unlock(); target = npc; approachT = 0; bestD = Infinity; stuckT = 0; };
+  dialogue.onLongPress = (npc) => { audio.unlock(); interrupt(); target = npc; actCb = null; approachT = 0; bestD = Infinity; stuckT = 0; };
+  function approach(npc, reach, cb) { audio.unlock(); interrupt(); target = npc; actCb = cb; actReach = reach; approachT = 0; bestD = Infinity; stuckT = 0; }
+  function hold(sec, face = null, onCancel = null) { lockT = sec; lockFace = face; lockCancel = onCancel; }
+  function interrupt() { const f = lockCancel; lockT = 0; lockCancel = null; f?.(); }
   let wired = null;
   function wire(npcs) {
     if (!npcs || wired === npcs) return;
@@ -38,11 +43,11 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   });
 
   // ---- impacts ----
-  function burstAt(pos) {
+  function burstAt(pos, text = 'SLAP!') {
     const el = document.createElement('div'); el.className = 'impact';
     const inner = document.createElement('div');
     inner.appendChild(starCanvas());
-    const b = document.createElement('b'); b.textContent = 'SLAP!'; inner.appendChild(b);
+    const b = document.createElement('b'); b.textContent = text; inner.appendChild(b);
     el.appendChild(inner); layer.appendChild(el);
     bursts.push({ el, pos: pos.clone(), until: performance.now() + 520 });
     placeBursts();
@@ -56,6 +61,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   function hitPlayer(n) {
     const p = player.position, q = n.root.position;
     const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz) || 1;
+    interrupt(); charOf()?.stopDance?.(0.1);
     impact(n.root, player.root);
     charOf()?.hit(-1);
     stun = Math.max(stun, PLAYER_STUN); slapping = null; target = null;
@@ -75,6 +81,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     const npcs = getNPCs();
     const tn = npcs.knockdown(n, player.position);
     if (!tn) return;
+    interrupt();
     const p = player.position, q = n.root.position;
     const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz) || 1;
     player.heading = Math.atan2(dx, dz);              // face-plant toward them
@@ -111,6 +118,13 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
       if (stun === 0) { player.vel.set(0, 0, 0); if (!player.airborne) player.antic = -1; }   // got up: clean slate
       return { lock: true };
     }
+    if (lockT > 0) {                                  // a menu action clip is playing (dance-off, shove, fart)
+      if (keyMoving && lockCancel) { interrupt(); return null; }   // WASD walks out of a dance-off
+      lockT = Math.max(0, lockT - dt);
+      if (lockFace) turnToward(lockFace, dt, 12);
+      if (lockT === 0) lockCancel = null;
+      return { lock: true };
+    }
     if (slapping) {
       const n = slapping.npc, ch = charOf();
       slapping.t += dt;
@@ -129,7 +143,13 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     approachT += dt;
     const p = player.position, q = target.root.position;
     const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
-    if (d <= TUNE.reach) {
+    if (actCb && d <= actReach) {
+      const cb = actCb, n = target; actCb = null; target = null;
+      player.vel.multiplyScalar(0.2);
+      cb(n);
+      return { lock: true };
+    }
+    if (!actCb && d <= TUNE.reach) {
       const ch = charOf();
       const hitAt = ch ? ch.slap() : 0.25;
       slapping = { npc: target, t: 0, hitAt, done: false };
@@ -177,7 +197,8 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   };
 
   return {
-    control, audio,
+    control, audio, approach, hold, interrupt, burstAt, dustAt, shakeIt: (s) => { shake = Math.max(shake, s); },
+    get locked() { return lockT > 0; },
     get target() { return target; }, get slapping() { return slapping; }, get stun() { return stun; }, get down() { return downT > 0; }, trip,
     slap: (npc) => dialogue.onLongPress(npc),      // debug / tests
   };
@@ -263,6 +284,28 @@ class SlapAudio {
     o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.2);
     g.gain.setValueAtTime(0.7, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.26);
+  }
+  // cartoon fart: wobbling low sawtooth through a resonant lowpass, flutter gated, plus a puff of noise.
+  // Random length and pitch every time; silent when muted.
+  fart() {
+    if (this.muted || !this.ctx) return 0;
+    const c = this.ctx, t = c.currentTime, dur = 0.35 + Math.random() * 0.85, f0 = 48 + Math.random() * 62;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0 * (1.1 + Math.random() * 0.4), t);
+    o.frequency.exponentialRampToValueAtTime(f0 * (0.6 + Math.random() * 0.3), t + dur);
+    const wob = c.createOscillator(), wg = c.createGain(); wob.frequency.value = 7 + Math.random() * 9; wg.gain.value = f0 * 0.3;
+    wob.connect(wg).connect(o.frequency);
+    const am = c.createGain(); am.gain.value = 0.6;
+    const flut = c.createOscillator(), fg = c.createGain(); flut.type = 'square'; flut.frequency.value = 22 + Math.random() * 18; fg.gain.value = 0.4;
+    flut.connect(fg).connect(am.gain);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 4; lp.frequency.setValueAtTime(380 + Math.random() * 320, t); lp.frequency.exponentialRampToValueAtTime(160, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.55, t + 0.025);
+    g.gain.setValueAtTime(0.55, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(am).connect(lp).connect(g).connect(c.destination);
+    for (const x of [o, wob, flut]) { x.start(t); x.stop(t + dur + 0.05); }
+    this._noise(t, dur * 0.8, 'lowpass', 700, 150, 0.22, 1.5);
+    return dur;
   }
   smack() {
     if (this.muted || !this.ctx) return;

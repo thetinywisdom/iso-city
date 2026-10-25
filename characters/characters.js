@@ -1289,3 +1289,81 @@ export const SPECIALS = {
   bully: { create: createBully, tag: 'BULLY', dance: null, role: 'bully', temper: 'aggressive' },
 };
 export function createSpecial(key, opts) { return SPECIALS[key].create(opts); }
+
+// ---- generic silly dances (dance-off, mayhem) + tiny gesture clips (gag, squat, shove) ----
+// Procedural poses in the same body space as the keyed dances (x = character's left, y up, z forward).
+const SIL = (L, R, o = {}) => pose({ L, R, ...o });
+const arm = (w, e, r = 0, f = 0) => ({ w, e, r, f });
+const qstep = (t, rate, n) => Math.floor(t * rate) % n;            // robot: snap between held poses
+Object.assign(DANCES, {
+  flail: {   // the main character: wild windmill arm flail, bouncing, head banging
+    dur: 6.6, blendIn: 0.2, blendOut: 0.35,
+    pose(t) {
+      const a = t * 10.5, b = t * 8.3 + 1.7;
+      return SIL(
+        arm([0.42 + 0.3 * Math.sin(a), 1.55 + 0.6 * Math.sin(a * 1.3), 0.12 + 0.2 * Math.cos(a)], [0.6, 1.5, -0.2], Math.sin(a) * 0.8),
+        arm([-0.42 - 0.3 * Math.sin(b), 1.55 + 0.6 * Math.cos(b * 1.1), 0.12 + 0.2 * Math.sin(b)], [-0.6, 1.5, -0.2], -Math.cos(b) * 0.8),
+        { dip: 0.07 + 0.06 * Math.abs(Math.sin(t * 7.5)), yaw: 0.4 * Math.sin(t * 3.7), roll: 0.12 * Math.sin(t * 5.1), lean: 0.06 * Math.sin(t * 7.5),
+          stance: 0.12, fz: [0.05 * Math.sin(t * 7.5), -0.05 * Math.sin(t * 7.5)], head: [0.3 * Math.sin(t * 15), 0.25 * Math.sin(t * 3.7), 0.2 * Math.sin(t * 6)] });
+    },
+  },
+  robot: {   // stiff 90° arms, snapping torso and head between held poses
+    dur: 6.6, blendIn: 0.15, blendOut: 0.3,
+    pose(t) {
+      const k = qstep(t, 2.6, 4), up = arm([0.32, 1.95, 0.12], [0.45, 1.55, -0.05], 0, 0), out = arm([0.3, 1.42, 0.38], [0.42, 1.42, -0.12], 0, 0);
+      const dn = arm([0.32, 1.05, 0.34], [0.42, 1.42, -0.1], 0, 0);
+      const L = [up, out, dn, out][k], R = mirror([out, up, out, dn][k]);
+      return SIL(L, R, { dip: 0.04 + (k % 2) * 0.04, ty: [0.45, 0, -0.45, 0][k], head: [0, [-0.5, 0, 0.5, 0][k], 0], stance: 0.1 });
+    },
+  },
+  sprinkler: {   // hand behind the head, other arm out front ratcheting round, then a fast sweep back
+    dur: 6.6, blendIn: 0.2, blendOut: 0.35,
+    pose(t) {
+      const c = (t * 0.9) % 1, ratchet = c < 0.8 ? Math.floor(c / 0.8 * 6) / 6 : 1 - (c - 0.8) / 0.2;
+      return SIL(arm([0.13, 1.86, -0.06], [0.5, 1.82, 0.02], 0.3, 0.2), arm([-0.55, 1.48, 0.42], [-0.45, 1.6, 0.0], 0, 0),
+        { dip: 0.08, yaw: -0.7 + 1.4 * ratchet, ty: 0.1, stance: 0.14, head: [0.05, 0.15, 0], fz: [0.08, -0.06] });
+    },
+  },
+  chicken: {   // flapping elbow wings, pecking head, knees bent
+    dur: 6.6, blendIn: 0.2, blendOut: 0.35,
+    pose(t) {
+      const fl = Math.sin(t * 15), pk = Math.max(0, Math.sin(t * 6.5));
+      return SIL(arm([0.14, 1.5, 0.08], [0.55 + 0.25 * fl, 1.42 + 0.1 * fl, -0.2], 0.5, 0.4), arm([-0.14, 1.5, 0.08], [-0.55 - 0.25 * fl, 1.42 + 0.1 * fl, -0.2], -0.5, 0.4),
+        { dip: 0.13 + 0.03 * Math.abs(fl), lean: 0.15 + 0.15 * pk, hz: 0.05 * pk, head: [0.45 * pk - 0.15, 0, 0], stance: 0.16, fz: [0.05 * Math.sin(t * 3.2), -0.05 * Math.sin(t * 3.2)] });
+    },
+  },
+  disco: {   // the point: up-right, down-left, hand on hip, hips swinging
+    dur: 6.6, blendIn: 0.2, blendOut: 0.35,
+    pose(t) {
+      const u = (Math.sin(t * 4.6) + 1) / 2, s = Math.sin(t * 4.6);
+      const R = arm([-0.25 + 0.42 * (1 - u), 0.98 + 1.3 * u, 0.12 + 0.2 * (1 - u)], [-0.45, 1.55, 0.05], 0, 0);
+      return SIL(arm([0.3, 1.05, -0.06], [0.5, 1.25, -0.1], 0, 0.3), R,
+        { dip: 0.06 + 0.04 * Math.abs(s), hx: 0.06 * s, roll: -0.1 * s, ty: -0.25 * s, yaw: 0.15 * s, head: [-0.2 * u + 0.05, -0.3 * u, 0.1 * s], stance: 0.12 });
+    },
+  },
+  gag: {     // stink reaction: lean back, fan the nose fast, other hand on the belly
+    dur: 1.15, blendIn: 0.08, blendOut: 0.2,
+    pose(t) {
+      return SIL(arm([0.08, 1.24, 0.24], [0.4, 1.25, 0.05], 0.6, 0), arm([-0.06 + 0.09 * Math.sin(t * 34), 1.76, 0.25], [-0.4, 1.45, 0.08], -0.4, 0),
+        { lean: -0.2, dip: 0.04, head: [-0.3, 0.25 * Math.sin(t * 9), 0.15], stance: 0.08, hz: -0.04 });
+    },
+  },
+  squat: {   // the main character's fart: butt out, hands on knees, little quiver
+    dur: 1.0, blendIn: 0.12, blendOut: 0.3,
+    pose(t) {
+      const q = t > 0.3 && t < 0.75 ? 0.015 * Math.sin(t * 70) : 0;
+      return SIL(arm([0.2, 0.98, 0.3], [0.45, 1.25, -0.05], 0.3, 0), arm([-0.2, 0.98, 0.3], [-0.45, 1.25, -0.05], -0.3, 0),
+        { dip: 0.17 + q, lean: 0.38, hz: -0.07, roll: q * 3, head: [-0.45, 0, 0], stance: 0.14 });
+    },
+  },
+  shove: {   // two-handed shove: draw back, thrust both palms forward
+    dur: 0.6, blendIn: 0.05, blendOut: 0.25,
+    pose(t) {
+      const u = t < 0.15 ? 0 : Math.min(1, (t - 0.15) / 0.08);
+      const z = 0.05 + 0.5 * u, y = 1.45;
+      return SIL(arm([0.2, y, z], [0.5, 1.3, -0.2], 0, -1.2 * u), arm([-0.2, y, z], [-0.5, 1.3, -0.2], 0, -1.2 * u),
+        { lean: -0.1 + 0.35 * u, hz: 0.08 * u, dip: 0.05, stance: 0.1, fz: [0.12 * u, -0.1 * u], head: [0.1 * u, 0, 0] });
+    },
+  },
+});
+export const SILLY_DANCES = ['robot', 'chicken', 'disco', 'sprinkler'];

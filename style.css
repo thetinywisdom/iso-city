@@ -137,3 +137,16 @@ canvas { image-rendering: pixelated; }
   60% { transform: scale(1.15) translateY(-3px); opacity: 1; }
   100% { transform: scale(1.3) translateY(-8px); opacity: 0; }
 }
+/* ---- right-click NPC action menu (same pixel look as the mission panel) ---- */
+#npc-menu { position: fixed; left: 0; top: 0; z-index: 8; display: none; will-change: transform; pointer-events: auto;
+  font-family: 'PressStart2P', ui-monospace, monospace; -webkit-font-smoothing: none; color: #292C2E; background: #F0F2F4; padding: 6px 3px 3px;
+  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E, 0 9px 0 0 #5B6A7B;
+  animation: bubble-pop .16s steps(3, end) backwards; user-select: none; }
+#npc-menu .nm-head { font-size: 16px; line-height: 16px; color: #F0F2F4; background: #A92D59; padding: 3px 6px; margin: 0 3px 6px; white-space: nowrap; }
+#npc-menu .nm-item { display: block; width: 100%; text-align: left; font: 16px/16px 'PressStart2P', monospace; color: #292C2E; background: transparent;
+  border: 0; padding: 6px 9px; cursor: pointer; white-space: nowrap; -webkit-font-smoothing: none; }
+#npc-menu .nm-item::before { content: '\00a0\00a0'; }
+#npc-menu .nm-item:hover { background: #292C2E; color: #FFCC3F; }
+#npc-menu .nm-item:hover::before { content: '>\00a0'; }
+#npc-menu .nm-item[data-act="mission"] { color: #A92D59; }
+#npc-menu .nm-item[data-act="mission"]:hover { color: #FF5491; }

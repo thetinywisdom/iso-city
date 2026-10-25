@@ -46,6 +46,9 @@ export const TUNE = {
   staggerDist: 0.7, staggerTime: 0.28,
 };
 export const TRIP_LINES = ['ow!!', 'watch it!', 'what the h*ll', 'my back...'];
+export const PUSH_CRY = ['MOMMY!!', 'WAAAAH!', "i'm telling!!", 'my spine!!'];
+export const PUSH_MAD = ["you're DEAD!", 'oh it is ON!', 'big mistake, pal!'];
+export const FAINT_LINES = ['wha... what happened', '*cough* *cough*', 'i saw the light...', 'never again...'];
 export const SHOUTS = { chase: 'you motherf**ker!', giveUp: 'yeah run away p**sy!', help: 'help!' };
 const hash01 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const forced = new URLSearchParams(location.search).get('temper');   // ?temper=aggressive|timid
@@ -167,19 +170,56 @@ export class NPCs {
 
   /** Jumped into by the player: falls onto their back (facing the jumper), lies, gets up, complains.
    *  Chasers resume the chase; aggressive ones start one (like a slap). Returns the down time in s. */
-  knockdown(n, from) {
+  knockdown(n, from, lie = 1.2 + Math.random() * 0.6, post = null) {
     if (n.down || !n.c.knockdown) return 0;
     const p = n.root.position;
     n.root.rotation.y = n.targetHeading = Math.atan2(from.x - p.x, from.z - p.z);
-    const lie = 1.2 + Math.random() * 0.6;
     const t = n.c.knockdown(-1, lie);              // also cancels a dance cleanly
-    n.down = { t, wasChasing: n.mode === 'chase' || n.mode === 'react', cfg: n.chaseCfg };
+    n.down = { t, wasChasing: n.mode === 'chase' || n.mode === 'react', cfg: n.chaseCfg, post };
     n.talkT = 0; n.stagger = null; n.pendingHit = -1; n.chaseV = 0; n.curSpeed = 0;
     this.emit('trip', n);
     return t;
   }
+  /** Cartoon shove: knocked off their feet, short airborne arc, flailing; lands with a thud (emits 'land').
+   *  Anyone they sail into goes down too (domino, emits 'domino'). */
+  shove(n, from, power = 7.5, depth = 0) {
+    const p = n.root.position;
+    const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
+    if (!this.knockdown(n, from, 1.5 + Math.random() * 0.6, 'push')) return 0;
+    n.fly = { vx: dx / d * power, vz: dz / d * power, vy: 4.2 + power * 0.25, t: 0, power, depth };
+    return n.down.t;
+  }
+  /** Get angry right now: glare, slap, chase (like an aggressive NPC that was slapped, minus the stagger). */
+  provoke(n, react = 0.4) {
+    if (n.down) return;
+    if (n.c.dancing) n.c.stopDance(0.12);
+    n.talkT = 0;
+    if (n.mode !== 'chase') { n.mode = 'react'; n.modeT = react; }
+    n.chaseT = 0; n.shoutT = 0.9;
+  }
+  /** Run away from the player for a few seconds. */
+  flee(n, secs = 3 + Math.random() * 2) {
+    if (n.down) return;
+    if (n.c.dancing) n.c.stopDance(0.12);
+    n.talkT = 0; n.mode = 'flee'; n.modeT = secs;
+  }
+  /** Any NPC: start a named dance facing `to` (generic or signature). Returns the duration, 0 if busy. */
+  danceAny(n, name, to) {
+    if (n.mode || n.stagger || n.down) return 0;
+    n.talkT = 0; n.danceTo = to;
+    return n.c.dance(name);
+  }
   _getUp(n) {
     const d = n.down; n.down = null;
+    if (d.post === 'push' || d.post === 'faint') {
+      const L = d.post === 'push' ? (n.temper === 'aggressive' ? PUSH_MAD : PUSH_CRY) : FAINT_LINES;
+      this.onShout?.(n, L[Math.floor(Math.random() * L.length)]);
+      if (d.wasChasing && n.chaseCfg === d.cfg && n.mode) { n.mode = 'react'; n.modeT = 0.25; n.shoutT = 1.2; }
+      else if (n.temper === 'aggressive') { n.mode = 'react'; n.modeT = 0.5; n.chaseT = 0; n.shoutT = 1.4; }
+      else if (d.post === 'push') { n.mode = 'flee'; n.modeT = 3.5 + Math.random() * 1.5; }
+      this.emit('getUp', n, d.post);
+      return;
+    }
     this.onShout?.(n, TRIP_LINES[Math.floor(Math.random() * TRIP_LINES.length)]);
     if (d.wasChasing && n.chaseCfg === d.cfg && n.mode) { n.mode = 'react'; n.modeT = 0.25; n.chaseT = n.chaseT || 0; n.shoutT = 1.2; }
     else if (n.temper === 'aggressive' && !n.mode) { n.mode = 'react'; n.modeT = 0.6; n.chaseT = 0; n.shoutT = 1.2; }
@@ -322,6 +362,23 @@ export class NPCs {
     for (const n of this.list) {
       const p = n.root.position;
       let speed = 0;
+      if (n.down && n.fly) {                   // shoved: airborne arc, then a thud
+        const f = n.fly; f.t += dt;
+        this._move(p, f.vx * dt, f.vz * dt);
+        f.vy -= 30 * dt; p.y += f.vy * dt;
+        for (const o of this.list) {           // domino: whoever they sail into goes down too
+          if (o === n || o.down || f.depth > 5) continue;
+          const q = o.root.position;
+          if ((q.x - p.x) ** 2 + (q.z - p.z) ** 2 < 0.8 * 0.8) {
+            if (this.shove(o, p, Math.max(4, f.power * 0.75), f.depth + 1)) { o.down.t += 0.2 * (f.depth + 1); this.emit('domino', o, n); }
+          }
+        }
+        const gy = this.city.groundHeight(p.x, p.z);
+        if ((f.vy < 0 && p.y <= gy + 0.02) || f.t > 1.5) { p.y = gy + 0.02; n.fly = null; this.emit('land', n); }
+        n.down.t -= dt; n.talkT = 0; n.curSpeed = 0;
+        n.c.update(dt, 0);
+        continue;
+      }
       if (n.down) {                            // knocked over: lie still, then get up
         n.down.t -= dt; n.talkT = 0; n.curSpeed = 0;
         if (n.down.t <= 0) this._getUp(n);
