@@ -149,6 +149,7 @@ export class NPCs {
   slapped(n, from) {
     const p = n.root.position;
     const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
+    if (n.down) { this.emit('slap', n); return; }   // kicking them while they're down: no stagger/state changes
     if (n.c.dancing) n.c.stopDance(0.12);     // a slap cuts a dance short
     n.c.hit(-1);                               // player's right hand -> head snaps to the NPC's right
     n.stagger = { t: TUNE.staggerTime, x: dx / d, z: dz / d };

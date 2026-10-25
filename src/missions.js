@@ -13,8 +13,8 @@ export const TUNING = {
   slapTour: { count: 5, time: 60 },
   rejected: { time: 90, bias: 0.6 },
   bully: { speed: 6.65, accel: 9, react: 0.55, safe: { x: -11.0, z: 21.5, r: 1.8 } },
-  ball: { speed: 5.7, accel: 7, react: 0.75, escapeDist: 15, surviveTime: 12, pickup: 0.75 },
-  cap: { time: 90, spot: { x: 12.8, y: 2.8, z: -6.3 }, reach: 1.35, jumpMin: 0.6, giveBack: 2.4, clickGive: 4.5 },
+  ball: { speed: 5.7, accel: 7, react: 0.75, escapeDist: 15, surviveTime: 12, pickup: 0.95, clickPx: 30 },
+  cap: { time: 90, spot: { x: 12.8, y: 2.8, z: -6.3 }, under: { x: 12.8, z: -6.0 }, reach: 1.8, jumpMin: 0.05, clickPx: 46, giveBack: 2.4, clickGive: 4.5 },
 };
 const RUDE = ['f**k off', 'go away', 'not interested', 'excuse me?', 'who are you?'];
 const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -110,6 +110,12 @@ export const MISSIONS = [
       S.m = g.special('mbappe'); S.ball = S.m.ball; S.phase = 'grab'; S.t = 0;
       g.resetBall(); S.dir = new THREE.Vector3(0, 0, 1);
     },
+    onPointer(S, x, y, g) {                // clicking the ball walks you to it (instead of slapping Mbappe behind it)
+      if (S.phase !== 'grab' || !g.nearScreen(S.ball.position, 0.05, x, y, TUNING.ball.clickPx)) return false;
+      const b = S.ball.position, m = S.m.root.position, dx = b.x - m.x, dz = b.z - m.z, d = Math.hypot(dx, dz) || 1;
+      g.player.walkTo(b.x + dx / d * 0.35, b.z + dz / d * 0.35);
+      return true;
+    },
     update(S, dt, g) {
       const p = g.player.position, T = TUNING.ball;
       if (S.phase === 'grab') {
@@ -169,6 +175,9 @@ export const MISSIONS = [
       S.s.c.cap.visible = false;
       S.cap = g.spawnCap(S.s.c.cap);
       const c = TUNING.cap.spot; S.cap.position.set(c.x, c.y, c.z);
+      S.spark = g.sparkle(); S.cap.add(S.spark);
+      S.onKey = (e) => { if (e.code === 'KeyE') S.eT = 0.35; };
+      window.addEventListener('keydown', S.onKey);
       g.later(0.2, () => g.dialogue.shout(S.s, 'MY CAP?! it\'s on the bus stop!!', 2600));
     },
     update(S, dt, g) {
@@ -177,8 +186,13 @@ export const MISSIONS = [
       if (S.phase === 'find') {
         S.cap.rotation.y += dt * 1.5; S.bob = (S.bob || 0) + dt;
         S.cap.position.y = T.spot.y + Math.abs(Math.sin(S.bob * 3)) * 0.12;   // hop so it reads as 'pick me up'
-        const lift = p.y - g.city.groundHeight(p.x, p.z);
-        if (flat(p, S.cap.position) < T.reach && lift > T.jumpMin) { S.phase = 'carry'; g.toast('GOT THE CAP!'); }
+        S.spark.material.opacity = 0.65 + Math.sin(S.bob * 9) * 0.35; S.spark.material.rotation = S.bob * 2;
+        // forgiving grab: anywhere near the shelter front, then jump (any height), press E, or click the cap
+        const lift = p.y - g.city.groundHeight(p.x, p.z), near = flat(p, T.under) < T.reach;
+        if (S.eT > 0) S.eT -= dt;
+        if (near && (lift > T.jumpMin || g.player.airborne || S.eT > 0 || S.want)) {
+          S.phase = 'carry'; S.spark.visible = false; g.toast('GOT THE CAP!');
+        }
       } else if (S.phase === 'carry') {
         S.cap.position.set(p.x, p.y + 2.05, p.z); S.cap.rotation.y = g.player.heading + Math.PI;
         if (flat(p, S.s.root.position) < T.giveBack) this.handOver(S, g);
@@ -195,8 +209,14 @@ export const MISSIONS = [
       if (S.phase === 'carry' && flat(g.player.position, n.root.position) < TUNING.cap.clickGive) { this.handOver(S, g); return true; }
       g.dialogue.shout(n, S.phase === 'carry' ? 'come closer!!' : 'where\'s my cap?!', 1600); return true;
     },
-    cleanup(S, g) { S.s.c.cap.visible = true; S.cap.removeFromParent(); },
-    hud: (S) => ({ progress: S.phase === 'find' ? 'FIND THE CAP (JUMP!)' : 'BRING IT TO SYOYA', timer: S.t }),
+    onPointer(S, x, y, g) {                // click on/near the cap: walk under it and grab it on arrival
+      if (S.phase !== 'find') return false;
+      S.want = g.nearScreen(S.cap.position, 0.1, x, y, TUNING.cap.clickPx);
+      if (S.want) g.player.walkTo(TUNING.cap.under.x, TUNING.cap.under.z);
+      return S.want;
+    },
+    cleanup(S, g) { S.s.c.cap.visible = true; S.cap.removeFromParent(); window.removeEventListener('keydown', S.onKey); },
+    hud: (S) => ({ progress: S.phase === 'find' ? 'GET THE CAP (JUMP / E / CLICK)' : 'BRING IT TO SYOYA', timer: S.t }),
     target: (S) => (S.phase === 'find' ? S.cap.position : S.s.root.position),
   },
 ];
@@ -261,9 +281,19 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     resetBall() { const m = g.special('mbappe'); if (m?.ball && m.ballHome) { m.ball.position.copy(m.ballHome); m.ball.rotation.set(0, 0, 0); } },
     spawnCap(src) {   // world copy of a cap mesh group (same toon materials)
       const cap = src.clone(true); cap.visible = true; cap.rotation.set(0, 0, 0); cap.position.set(0, 0, 0);
-      const holder = new THREE.Group(); holder.add(cap); cap.scale.setScalar(1.6); cap.position.y = -0.02;
+      const holder = new THREE.Group(); holder.add(cap); cap.scale.setScalar(2.1); cap.position.y = -0.02;
       holder.traverse((o) => { if (o.isMesh) o.castShadow = true; });
       scene.add(holder); pixel.toonify?.(holder); return holder;
+    },
+    project: (p, dy) => project(p, dy),
+    nearScreen(p, dy, x, y, px) { const q = project(p, dy), r = canvas.getBoundingClientRect(); return Math.hypot(x - r.left - q.x, y - r.top - q.y) < px; },
+    sparkle() {       // bright pulsing 4-point star sprite (unlit, always on top) so pickups are easy to spot
+      const c = document.createElement('canvas'); c.width = c.height = 16; const x = c.getContext('2d');
+      x.fillStyle = '#fff6a0'; x.fillRect(7, 1, 2, 14); x.fillRect(1, 7, 14, 2); x.fillStyle = '#ffffff'; x.fillRect(6, 6, 4, 4);
+      x.fillStyle = '#ffd23a'; x.fillRect(7, 3, 2, 1); x.fillRect(7, 12, 2, 1); x.fillRect(3, 7, 1, 2); x.fillRect(12, 7, 1, 2);
+      const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter;
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }));
+      s.scale.setScalar(1.1); s.position.set(0.3, 0.55, 0); s.renderOrder = 999; return s;
     },
     safeZone(x, z, r, on) {
       zone.visible = on; if (!on) return;
@@ -392,6 +422,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   }
 
   // ---- hooks into dialogue / npcs ----
+  dialogue.preClick = (x, y) => !!(active && active.def.onPointer?.(active.S, x, y, g));
   dialogue.onClick = (n) => {
     if (n.special === 'giver') { clickGiver(n); return true; }
     return !!(active && active.def.onClick?.(active.S, n, g));

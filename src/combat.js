@@ -105,8 +105,12 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   function control(dt, keyMoving) {
     const npcs = getNPCs(); wire(npcs);
     checkTrip(npcs);
-    if (downT > 0) downT -= dt;
-    if (stun > 0) { stun -= dt; return { lock: true }; }
+    if (downT > 0) downT = Math.max(0, downT - dt);
+    if (stun > 0) {                                   // clamp at exactly 0: callers test `stun` for truthiness
+      stun = Math.max(0, stun - dt);
+      if (stun === 0) { player.vel.set(0, 0, 0); if (!player.airborne) player.antic = -1; }   // got up: clean slate
+      return { lock: true };
+    }
     if (slapping) {
       const n = slapping.npc, ch = charOf();
       slapping.t += dt;

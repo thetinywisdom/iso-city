@@ -132,6 +132,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   }
   window.addEventListener('pointerdown', (e) => {
     if (e.target !== canvas || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (api.preClick?.(e.clientX, e.clientY)) { e.stopImmediatePropagation(); e.preventDefault(); hideAll(); return; }   // e.g. a mission pickup under the cursor beats the NPC behind it
     const npc = pick(e.clientX, e.clientY);
     if (npc) {
       e.stopImmediatePropagation(); e.preventDefault();

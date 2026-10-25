@@ -106,7 +106,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyP') { pixel.setEnabled(!pixel.enabled); showHud(); return; }
   if (e.code === 'KeyB') { pixel.dither = !pixel.dither; showHud(); return; }
   if (e.code === 'KeyO') { pixel.outlines = !pixel.outlines; showHud(); return; }
-  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !extras?.combat.stun) player.jump(); return; }
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !(extras?.combat.stun > 0)) player.jump(); return; }
   const k = KEYMAP[e.code];
   if (k) { keys.add(k); e.preventDefault(); if (k !== 'run') clickTarget = null; }
 });
@@ -116,6 +116,11 @@ window.addEventListener('blur', () => keys.clear());
 let clickTarget = null, stuckTime = 0;
 const raycaster = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+// lets missions redirect a click (e.g. click the cap -> walk under it)
+player.walkTo = (x, z) => {
+  clickTarget = new THREE.Vector3(x, 0, z); stuckTime = 0;
+  marker.position.set(x, city.groundHeight(x, z) + 0.05, z); marker.visible = true;
+};
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
