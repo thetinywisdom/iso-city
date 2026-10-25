@@ -16,6 +16,16 @@ export function loadCustom() {
     return Array.isArray(a) ? a.filter((d) => d && typeof d === 'object') : [];
   } catch { return []; }
 }
+// Which saved character the player plays as (null = the default bald guy).
+export const PLAYER_KEY = 'isoCity.playerChar.v1';
+export function getPlayerChar() {
+  try { const v = JSON.parse(localStorage.getItem(PLAYER_KEY) || 'null'); return v && typeof v.id === 'string' ? v.id : null; } catch { return null; }
+}
+export function setPlayerChar(id) {
+  try { if (id) localStorage.setItem(PLAYER_KEY, JSON.stringify({ id })); else localStorage.removeItem(PLAYER_KEY); } catch {}
+}
+/** The saved design the player is playing as, or null (default guy / deleted design). */
+export function playerCharDef() { const id = getPlayerChar(); return id ? loadCustom().find((d) => d.id === id) || null : null; }
 export function saveCustom(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
 export const newId = () => 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 // Seeded variety pedestrians built from the creator's options (plain, generic lines).

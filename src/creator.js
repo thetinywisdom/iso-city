@@ -1,9 +1,9 @@
 // Character creator page (creator.html). Builds custom characters with the same builder + pixel
 // pipeline as the game and saves them to localStorage; the city tab picks them up live.
 import * as THREE from 'three';
-import { CUSTOM, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025c';
-import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025c';
-import { HOMES, loadCustom, saveCustom, newId } from './customchars.js?v=20261025c';
+import { CUSTOM, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025d';
+import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025d';
+import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025d';
 
 const MAX = 30;
 const $ = (s) => document.querySelector(s);
@@ -206,6 +206,9 @@ function renderList() {
   const list = loadCustom();
   $('#count').textContent = `${list.length}/${MAX}`;
   if (!list.length) ul.append(el('li', { className: 'empty', textContent: 'Nobody yet — make someone and hit SAVE.' }));
+  const pid = getPlayerChar(), you = pid && list.find((d) => d.id === pid);
+  const pd = $('#playDefault');
+  if (pd) { pd.setAttribute('aria-pressed', String(!you)); pd.textContent = you ? 'PLAY AS BALD GUY' : '★ YOU: BALD GUY'; }
   for (const d of list) {
     const li = el('li', { className: d.id === editingId ? 'editing' : '' }); li.dataset.id = d.id;
     const dot = el('span', { className: 'dot' }); dot.style.background = d.topColor || '#F0F2F4';
@@ -223,7 +226,14 @@ function renderList() {
       const L = loadCustom(); if (L.length >= MAX) return status(`Max ${MAX} characters.`, true);
       L.push({ ...d, id: newId(), name: String(d.name).slice(0, 15) + ' 2' }); saveCustom(L); status(`${d.name} duplicated.`); renderList();
     }); dup.dataset.act = 'dup';
-    li.append(dot, el('span', { className: 'nm', textContent: d.name }), edit, dup, del);
+    const me = getPlayerChar() === d.id;
+    const play = btn(me ? '★ YOU' : 'PLAY', () => {
+      if (getPlayerChar() === d.id) { setPlayerChar(null); status('Back to the bald guy.'); }
+      else { setPlayerChar(d.id); status(`You're playing as ${d.name} now.`); }
+      renderList();
+    }, me ? 'yellow' : ''); play.dataset.act = 'play'; play.title = me ? 'Playing as them — click to go back to the bald guy' : 'Play as this character';
+    if (me) li.classList.add('me');
+    li.append(dot, el('span', { className: 'nm', textContent: d.name }), play, edit, dup, del);
     ul.append(li);
   }
 }
@@ -251,8 +261,9 @@ $('#importFile').onchange = async (e) => {
     saveCustom(list); renderList(); status(`Imported ${n} character${n === 1 ? '' : 's'}.`, n === 0);
   } catch (err) { status('That file is not character JSON.', true); }
 };
-addEventListener('storage', (e) => { if (e.key === null || e.key === 'isoCity.customChars.v1') renderList(); });
+addEventListener('storage', (e) => { if (e.key === null || e.key === 'isoCity.customChars.v1' || e.key === PLAYER_KEY) renderList(); });
 
+$('#playDefault').onclick = () => { setPlayerChar(null); status('Back to the bald guy.'); renderList(); };
 // go
 changed(); renderList();
 window.__creator = { get cur() { return cur; }, set cur(v) { cur = v; changed(); }, get ch() { return ch; }, get editingId() { return editingId; }, renderList, save };

@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261025c';
-import { Player, JUMP } from './player.js?v=20261025c';
-import { P } from './palette.js?v=20261025c';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025c';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025c';
-import { initExtras } from './extras.js?v=20261025c';
+import { generateCity } from './city.js?v=20261025d';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261025d';
+import { Player, JUMP } from './player.js?v=20261025d';
+import { P } from './palette.js?v=20261025d';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025d';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025d';
+import { initExtras } from './extras.js?v=20261025d';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -74,9 +75,38 @@ scene.add(player.root);
 // Real characters live in ../characters/characters.js and export
 // createMainCharacter() and createNPC(options). If the file exists we swap the
 // placeholder capsule for the main character; otherwise the capsule stays.
-import('../characters/characters.js?v=20261025c')
+let charMod = null, playingAs = undefined;
+/** Rebuild the player model from the saved choice (isoCity.playerChar.v1); falls back to the default guy. */
+function applyPlayerChar(force = false) {
+  if (!charMod?.createMainCharacter) return;
+  const def = charMod.createCustom ? playerCharDef() : null;
+  const key = def ? def.id + ':' + JSON.stringify(def) : 'default';
+  if (!force && key === playingAs) return;
+  let model = null;
+  if (def) { try { model = charMod.createCustom(def); } catch (e) { console.warn('custom player failed, using default:', e.message); } }
+  if (!model) model = charMod.createMainCharacter();
+  player.setModel(model); pixel.toonify(player.root);
+  playingAs = model.def ? key : 'default';
+  player.heroName = model.def ? String(model.def.name || 'YOU').toUpperCase() : null;
+  updatePlayerBtn();
+}
+const playerBtn = document.getElementById('playerBtn');
+function updatePlayerBtn() {
+  if (!playerBtn) return;
+  playerBtn.textContent = 'YOU: ' + (player.heroName || 'BALD GUY');
+  playerBtn.title = 'Click: cycle who you play as (saved creator characters / default bald guy)';
+}
+playerBtn?.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation(); playerBtn.blur();
+  const ids = [null, ...loadCustom().map((d) => d.id)], cur = playerCharDef()?.id || null;
+  setPlayerChar(ids[(ids.indexOf(cur) + 1) % ids.length]);
+  applyPlayerChar(); npcs?.syncCustom?.();
+});
+addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
+import('../characters/characters.js?v=20261025d')
   .then((mod) => {
-    if (mod?.createMainCharacter) player.setModel(mod.createMainCharacter());
+    charMod = mod;
+    if (mod?.createMainCharacter) applyPlayerChar(true);
     if (mod?.createNPC) { npcs = new NPCs(scene, mod, city); npcs.toonify = (r) => pixel.toonify(r); }
     pixel.toonify(scene);
   })

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Iso City — Character Creator</title>
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="creator.css?v=20261025c" />
+  <link rel="stylesheet" href="creator.css?v=20261025d" />
   <script>
     // Load guard: if the module graph fails (stale cached file, old browser), say so instead of dead buttons.
     (function () { var shown = false; function show(msg) { if (shown || window.__creator) return; shown = true;
@@ -17,7 +17,7 @@
       addEventListener('load', function () { setTimeout(function () { show('script did not load'); }, 6000); }); })();
   </script>
   <script type="importmap">
-    { "imports": { "three": "./vendor/three.module.js?v=20261025c" } }
+    { "imports": { "three": "./vendor/three.module.js?v=20261025d" } }
   </script>
 </head>
 <body>
@@ -42,6 +42,7 @@
       <p id="status" role="status"></p>
       <h2>SAVED <span id="count"></span></h2>
       <ul id="saved"></ul>
+      <div class="row center"><button class="pbtn sm" id="playDefault" type="button">PLAY AS BALD GUY</button></div>
       <div class="row center">
         <button class="pbtn sm" id="btnExport">EXPORT JSON</button>
         <label class="pbtn sm" for="importFile">IMPORT JSON</label>
@@ -51,6 +52,6 @@
     </section>
     <section id="form"></section>
   </main>
-  <script type="module" src="src/creator.js?v=20261025c"></script>
+  <script type="module" src="src/creator.js?v=20261025d"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261025c';
-import { loadCustom, HOMES, VARIETY, STORE_KEY } from './customchars.js?v=20261025c';
+import { addGhosts } from './player.js?v=20261025d';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025d';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -165,7 +165,7 @@ export class NPCs {
     }
     if (charMod.createCustom) {
       this.syncCustom();
-      addEventListener('storage', (e) => { if (e.key === STORE_KEY || e.key === null) this.syncCustom(); });
+      addEventListener('storage', (e) => { if (e.key === STORE_KEY || e.key === PLAYER_KEY || e.key === null) this.syncCustom(); });
     }
     for (const n of this.list) n.root.position.y = city.groundHeight(n.root.position.x, n.root.position.z);
   }
@@ -192,8 +192,9 @@ export class NPCs {
     const C = this.charMod;
     for (const n of this.customs) { n.root.removeFromParent(); const i = this.list.indexOf(n); if (i >= 0) this.list.splice(i, 1); n.removed = true; }
     this.customs = []; this.customGen = (this.customGen || 0) + 1;
-    const defs = loadCustom();
+    const defs = loadCustom(), me = getPlayerChar();
     defs.forEach((raw, i) => {
+      if (me && raw.id === me) return;   // you're playing as them — no NPC twin
       let n;
       try {
         const d = C.normalizeCustom(raw);
