@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { Bucket, mat } from './bucket.js?v=20261025g';
-import { P, SCHEMES, COMIC } from './palette.js?v=20261025g';
-import { makeProps } from './props.js?v=20261025g';
+import { Bucket, mat } from './bucket.js?v=20261025h';
+import { P, SCHEMES, COMIC } from './palette.js?v=20261025h';
+import { makeProps } from './props.js?v=20261025h';
 
 // Small art-direction test scene: a main intersection at (0,0) plus two
 // streets on the near (+x / +z) side, so the block nearest the camera has

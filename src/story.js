@@ -3,7 +3,7 @@
 // oddity hunt ("THAT'S WEIRD!" [Q], 7 of 10 per loop). Free roam is the untouched sandbox.
 // Saves to localStorage isoCity.story.v1. The hidden house + the 7:00 finale come in Phase C.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025g';
+import { COMIC } from './palette.js?v=20261025h';
 
 export const STORY_KEY = 'isoCity.story.v1';
 export const RENT = 77777;
@@ -383,7 +383,8 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
 
   // ================= glitches (day 5 small, day 6 big) =================
   let glitchT = 8, skyT = 0;
-  const SKY0 = scene.background?.clone?.() || null;
+  const BG = scene.background?.isColor ? scene.background : null, SKY0 = BG ? BG.clone() : null;   // recolour in place: pixel.js swaps scene.background mid-frame
+  const FOG = scene.fog?.color || null, FOG0 = FOG ? FOG.clone() : null;
   const SKIES = [K[3], Y[2], B[3], T[3], W[3]].map((c) => new THREE.Color(c));
   function glitch(level) {
     const cv = document.querySelector('#app canvas'); if (!cv) return;
@@ -396,7 +397,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
       ui.tear.innerHTML = '';
       for (let k = 0; k < 4; k++) { const d = document.createElement('div'); d.style.top = Math.round(Math.random() * 90) + '%'; d.style.height = (3 * (2 + Math.floor(Math.random() * 6))) + 'px'; d.style.background = pick([K[1], B[2], Y[1], T[2], N[0]]); d.style.translate = `${(Math.random() < 0.5 ? -1 : 1) * 3 * Math.floor(2 + Math.random() * 8)}px 0`; ui.tear.appendChild(d); }
       ui.tear.className = 'on'; setTimeout(() => (ui.tear.className = ''), 260);
-      if (SKY0) { scene.background = pick(SKIES); if (scene.fog) scene.fog.color = scene.background; skyT = performance.now() + 1600; }
+      if (BG) { const c = pick(SKIES); BG.copy(c); FOG?.copy(c); skyT = performance.now() + 1600; }
     }
   }
   function glitchTick(dt) {
@@ -418,7 +419,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
   scene.onBeforeRender = (...a) => {
     prev.apply(scene, a);
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
-    if (skyT && now >= skyT && SKY0) { skyT = 0; scene.background = SKY0.clone(); if (scene.fog) scene.fog.color = scene.background; }
+    if (skyT && now >= skyT && BG) { skyT = 0; BG.copy(SKY0); if (FOG) FOG.copy(FOG0); }
     if (mode !== 'story') return;
     glitchTick(dt);
     // Z on the spawn point (screen space, art-pixel snapped)
