@@ -1,21 +1,22 @@
 // Story mode, chapter 7: the landlady's hidden house and the 7:00 finale.
 // The house shows up once all 7 oddities are found. Inside: a 7:00 timer, a landlady who is faster than you
-// and dodges, a time machine, a bowl of bananas and (soon enough) Officer Dough.
-// Slap her (F) to stun her, push her (E) into the time machine. GIVE UP any time: ACCEPT FATE.
+// and dodges, a time machine (a black hole floating in the middle of the room), a bowl of bananas and (soon enough) Officer Dough.
+// Slap her (F) to stun her, push her (E) into the black hole. GIVE UP any time: ACCEPT FATE.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025j';
-import { box, sign } from './growth.js?v=20261025j';
+import { COMIC } from './palette.js?v=20261025l';
+import { box, sign } from './growth.js?v=20261025l';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 export const HOUSE = { x0: -28, x1: -21, z0: 8.5, z1: 14, door: { x: -24.5, z: 14.9, r: 1.1 } };
 export const HX = 110, HZ = 0;
 const RW = 9, RD = 7;                                   // room half-size
-export const PAD = { x: HX - 6.5, z: HZ - 4, r: 1.35 };
+export const PAD = { x: HX, z: HZ, r: 1.6 };              // the black hole: shove her under it
+export const BH = { y: 2.7, core: 1.1, pull: 5.5, pullSpeed: 0.5, minD: 1.2 };
 export const ENTRY = { x: HX + 6.5, z: HZ + 5.5 };
 export const BOWL = { x: HX + 3, z: HZ - 6.1, r: 1.7 };
 export const TIME = 420;
 export const TUNE = { llSpeed: 7.8, notice: 3.6, rest: 0.75, tiredRest: 1.7, dizzy: 3.2, copAt: 45, copAtSnitch: 20, copBack: 25, thrownOut: 60, pushR: 2.0, slapR: 1.7 };
-const SPOTS = [[-5, 4.5], [-7, 1], [-3, -4.5], [1, -4.8], [4.5, -2], [7, -4.5], [2.5, 2.5], [-1, 5], [6.5, 1.5], [-4.5, -1.5], [0, 0], [-7.2, -1.8]].map(([x, z]) => ({ x: HX + x, z: HZ + z }));
+const SPOTS = [[-5, 4.5], [-7, 1], [-3, -4.5], [1, -4.8], [4.5, -2], [7, -4.5], [2.5, 2.5], [-1, 5], [6.5, 1.5], [-4.5, -1.5], [-7.2, -1.8]].map(([x, z]) => ({ x: HX + x, z: HZ + z }));
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 
@@ -57,7 +58,7 @@ export function initFinale(ctx) {
   const room = new THREE.Group(); room.name = 'landlady-room'; room.visible = false; scene.add(room);
   const roomCols = [];
   const solid = (x0, x1, z0, z1, top = null) => roomCols.push({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: top ?? undefined, house: 'room' });
-  let ring = null, padGlow = null;
+  let bh = null;
   {
     const y = 0;
     box(room, HX, y - 0.6, HZ, 90, 1, 90, N[0]).receiveShadow = false;                     // the void
@@ -79,18 +80,80 @@ export function initFinale(ctx) {
     for (const [dx, dz] of [[-0.2, 0], [0.12, -0.1], [0.05, 0.14]]) box(room, BOWL.x + dx, 1.1, BOWL.z + dz, 0.34, 0.12, 0.12, Y[1], dx * 3);
     box(room, HX + 7.6, 0.6, HZ - RD + 0.7, 2.0, 1.2, 0.9, N[1]); box(room, HX + 7.6, 1.75, HZ - RD + 0.55, 1.8, 1.1, 0.2, N[0]); box(room, HX + 7.6, 1.75, HZ - RD + 0.67, 1.5, 0.8, 0.04, T[3]); solid(HX + 6.5, HX + 8.7, HZ - RD, HZ - RD + 1.2, 1.2);
     box(room, HX - RW + 0.4, 0.5, HZ + 4.5, 0.8, 1.0, 1.6, Y[2]); solid(HX - RW, HX - RW + 0.8, HZ + 3.7, HZ + 5.3, 1.0);   // side table
-    // the time machine: cabinet in the back-left corner, a glowing pad in front of it
-    box(room, HX - RW + 1.1, 1.6, HZ - RD + 1.1, 1.8, 3.2, 1.8, B[1]); solid(HX - RW, HX - RW + 2.1, HZ - RD, HZ - RD + 2.1);
-    box(room, HX - RW + 1.1, 3.35, HZ - RD + 1.1, 2.0, 0.3, 2.0, N[0]);
-    sign(room, 'TIME', HX - RW + 2.02, 2.4, HZ - RD + 1.1, 1.3, 0.5, Math.PI / 2, N[0], Y[1]);
-    box(room, HX - RW + 2.02, 1.4, HZ - RD + 1.1, 0.04, 0.9, 0.9, T[3]);
-    padGlow = new THREE.Mesh(new THREE.CylinderGeometry(PAD.r, PAD.r, 0.08, 16), new THREE.MeshBasicMaterial({ color: T[2] }));
-    padGlow.position.set(PAD.x, 0.05, PAD.z); room.add(padGlow);
-    ring = new THREE.Mesh(new THREE.TorusGeometry(PAD.r * 0.8, 0.09, 4, 16), new THREE.MeshBasicMaterial({ color: Y[1] }));
-    ring.rotation.x = Math.PI / 2; ring.position.set(PAD.x, 0.6, PAD.z); room.add(ring);
-    box(room, PAD.x, 0.09, PAD.z, 0.7, 0.02, 0.7, T[3]);
   }
   toon(room);
+  // ---------------- the time machine: a black hole in the middle of the room ----------------
+  {
+    const noInk = scene.userData.noInk || (scene.userData.noInk = new Set());
+    const g = new THREE.Group(); g.name = 'black-hole'; g.position.set(PAD.x, BH.y, PAD.z); room.add(g);
+    const col = (c) => new THREE.Color(c);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(BH.core, 28, 18), new THREE.MeshBasicMaterial({ color: N[0] }));
+    core.name = 'bh-core'; g.add(core);
+    // the swirling accretion ring: comic purples -> pinks -> oranges, banded and turning
+    const diskMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      uniforms: { uT: { value: 0 }, uA: { value: col(K[0]) }, uB: { value: col(K[1]) }, uC: { value: col(Y[0]) }, uD: { value: col(Y[2]) }, uR0: { value: BH.core * 1.18 }, uR1: { value: BH.core * 3.0 } },
+      vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: `uniform float uT, uR0, uR1; uniform vec3 uA, uB, uC, uD; varying vec2 vP;
+        void main(){ float r = length(vP), k = clamp((r - uR0) / (uR1 - uR0), 0.0, 1.0), a = atan(vP.y, vP.x);
+          float sw = sin(a * 3.0 + k * 9.0 - uT * 3.2) * 0.5 + 0.5;
+          float band = step(0.5, fract(k * 4.0 + sw * 0.6 - uT * 0.35));
+          vec3 c = k < 0.33 ? mix(uD, uC, k * 3.0) : k < 0.66 ? mix(uC, uB, (k - 0.33) * 3.0) : mix(uB, uA, (k - 0.66) * 3.0);
+          c = mix(c, uA, band * 0.35);
+          float al = (1.0 - smoothstep(0.75, 1.0, k)) * smoothstep(0.0, 0.06, k) * (0.62 + 0.38 * sw);
+          gl_FragColor = vec4(c, al); }` });
+    const disk = new THREE.Mesh(new THREE.RingGeometry(BH.core * 1.18, BH.core * 3.0, 72, 1), diskMat);
+    disk.name = 'bh-disk'; disk.rotation.x = -Math.PI / 2 + 0.42; disk.renderOrder = 2; g.add(disk); noInk.add(disk);
+    // the bright photon ring hugging the core (gets an outline: it is solid)
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(BH.core * 1.06, 0.07, 6, 48), new THREE.MeshBasicMaterial({ color: Y[1] }));
+    halo.rotation.x = -Math.PI / 2 + 0.42; g.add(halo);
+    // lensing shimmer: a fresnel shell that wobbles colour at the rim
+    const lensMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+      uniforms: { uT: { value: 0 }, uA: { value: col(K[2]) }, uB: { value: col(T[2]) }, uC: { value: col(Y[1]) } },
+      vertexShader: 'varying vec3 vN, vV; varying vec3 vW; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vW = position; gl_Position = projectionMatrix * mv; }',
+      fragmentShader: `uniform float uT; uniform vec3 uA, uB, uC; varying vec3 vN, vV, vW;
+        void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 2.2); float w = sin(vW.y * 9.0 + uT * 4.0 + sin(vW.x * 7.0 - uT * 3.0)) * 0.5 + 0.5;
+          vec3 c = mix(mix(uA, uB, w), uC, smoothstep(0.7, 1.0, f));
+          gl_FragColor = vec4(c, f * (0.55 + 0.35 * w)); }` });
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(BH.core * 1.5, 28, 18), lensMat);
+    lens.name = 'bh-lens'; lens.renderOrder = 3; g.add(lens); noInk.add(lens);
+    // particles spiralling in
+    const NP = 140, pos = new Float32Array(NP * 3), colr = new Float32Array(NP * 3), pts = [];
+    const pcs = [K[1], K[2], Y[0], Y[1], Y[2], W[2]].map(col);
+    for (let i = 0; i < NP; i++) { pts.push({ a: Math.random() * 6.283, r: BH.core * (1.2 + Math.random() * 3.2), h: (Math.random() - 0.5) * 0.5, s: 0.5 + Math.random() * 0.9 }); const c = pcs[i % pcs.length]; colr.set([c.r, c.g, c.b], i * 3); }
+    const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); pg.setAttribute('color', new THREE.BufferAttribute(colr, 3));
+    const points = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.13, vertexColors: true, transparent: true, depthWrite: false }));
+    points.name = 'bh-points'; points.rotation.x = 0.42; g.add(points); noInk.add(points);
+    // its shadow on the rug
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(BH.core * 1.3, 28), new THREE.MeshBasicMaterial({ color: K[0], transparent: true, opacity: 0.55, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2; shadow.position.set(PAD.x, 0.035, PAD.z); room.add(shadow); noInk.add(shadow);
+    bh = { g, core, disk, halo, lens, points, pts, diskMat, lensMat, shadow, pulse: 0 };
+  }
+  const flashEl = document.createElement('div'); flashEl.id = 'bh-flash'; document.body.appendChild(flashEl);
+  function flash() { flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on'); }
+  function bhTick(dt, now) {
+    if (!bh || !room.visible) return;
+    const t = now / 1000;
+    bh.diskMat.uniforms.uT.value = t; bh.lensMat.uniforms.uT.value = t;
+    bh.disk.rotation.z -= dt * 1.4; bh.halo.rotation.z += dt * 0.8;
+    bh.pulse = Math.max(0, bh.pulse - dt * 1.5);
+    const sc = 1 + Math.sin(t * 2.2) * 0.04 + bh.pulse * 0.35; bh.g.scale.setScalar(sc);
+    bh.g.position.y = BH.y + Math.sin(t * 1.3) * 0.12;
+    const P = bh.points.geometry.attributes.position;
+    bh.pts.forEach((p, i) => {
+      p.a += dt * p.s * (2.6 / Math.max(0.4, p.r)); p.r -= dt * p.s * 0.55;
+      if (p.r < BH.core * 1.02) { p.r = BH.core * (3.0 + Math.random() * 1.4); p.a = Math.random() * 6.283; }
+      P.setXYZ(i, Math.cos(p.a) * p.r, p.h * (p.r / 3), Math.sin(p.a) * p.r);
+    });
+    P.needsUpdate = true;
+  }
+  // a gentle pull on whoever stands near it (never quite into it)
+  function pullTick(dt) {
+    if (!F.active || ctx.isBusy() || player.vel?.y > 0.5) return;
+    const p = player.position, dx = PAD.x - p.x, dz = PAD.z - p.z, d = Math.hypot(dx, dz);
+    if (d > BH.pull || d < BH.minD) return;
+    const step = Math.min(d - BH.minD, BH.pullSpeed * (1 - d / BH.pull) * 1.6 * dt);
+    p.x += dx / d * step; p.z += dz / d * step;
+  }
   // the city's edge: while you're inside, the bounds grow to reach the room; these keep the city crowd in
   const EDGE = [{ minX: 46, maxX: 47.5, minZ: -32, maxZ: 48 }, { minX: -32, maxX: 48, minZ: 46, maxZ: 47.5 }].map((c) => ({ ...c, house: 'edge' }));
   const B0 = { ...city.bounds };
@@ -116,7 +179,7 @@ export function initFinale(ctx) {
   function spawnLL() {
     const npcs = getNPCs();
     const n = npcs._wrap(npcs.charMod.createCustom({ ...LANDLADY_DEF, id: 'finale-landlady' }), 9002);
-    const x = HX - 2, z = HZ - 0.5;
+    const x = HX - 4, z = HZ + 2;
     Object.assign(n, { tag: 'LANDLADY', important: true, story: 'landlady', finale: true, landlady: true, lines: ['RENT!'], walker: false, idleT: 0, temper: 'timid' });
     n.root.position.set(x, gy(x, z) + 0.02, z);
     n.heading = n.root.rotation.y = Math.atan2(ENTRY.x - x, ENTRY.z - z); n.home = { x, z, heading: n.heading };
@@ -216,7 +279,7 @@ export function initFinale(ctx) {
     const S = ctx.S();
     if (S.phase === 'after') { ctx.toast('CLOSED. FOREVER.'); return; }
     if (ctx.missions.active) { ctx.toast('FINISH THE JOB FIRST'); return; }
-    ctx.card({ head: 'THE LANDLADY\'S HOUSE', lines: ['the door is open a crack. something inside goes tick... tick...', 'once you\'re in: 7:00 on the clock.', 'F: slap her dizzy. E: push her into the time machine.', 'bananas help. she\'s fast. GIVE UP any time.'],
+    ctx.card({ head: 'THE LANDLADY\'S HOUSE', lines: ['the door is open a crack. something inside goes tick... tick...', 'once you\'re in: 7:00 on the clock.', 'F: slap her dizzy. E: push her into the black hole.', 'bananas help. she\'s fast. GIVE UP any time.'],
       buttons: [['GO IN [ENTER]', enter, true], ['NOT YET [ESC]', () => {}]] });
   }
   function enter() {
@@ -257,20 +320,28 @@ export function initFinale(ctx) {
     police.state.mode === 'chase' && police.callOff('...huh?', 3);
     F.suck = { t: 0, n, from: n.root.position.clone() };
     n.drive = () => 0; n.down = null; n.fly = null;
-    combat.burstAt?.(new THREE.Vector3(PAD.x, 1.6, PAD.z), 'ZWOOP!'); combat.shakeIt?.(0.4); combat.audio?.whoosh?.(1);
+    combat.burstAt?.(new THREE.Vector3(PAD.x, BH.y, PAD.z), 'ZWOOP!'); if (bh) bh.pulse = 1; combat.shakeIt?.(0.4); combat.audio?.whoosh?.(1);
     dialogue.shout(n, 'NOOO! MY RENT! MY BEAUTIFUL RENT!', 2000);
     ctx.glitch(2);
   }
   function suckTick(dt) {
     const s = F.suck; if (!s) return;
-    s.t += dt; const k = Math.min(1, s.t / 1.3), n = s.n;
-    n.root.position.set(s.from.x + (PAD.x - s.from.x) * k, gy(PAD.x, PAD.z) + 0.02 + k * 1.5, s.from.z + (PAD.z - s.from.z) * k);
-    n.root.rotation.y += dt * (6 + k * 20); n.root.scale.setScalar(Math.max(0.01, 1 - k));
-    if (s.t > 1.5) { F.suck = null; drop(n); F.ll = null; setTimeout(rentFree, 500); }
+    // spiral in: the orbit shrinks and speeds up, she rises to the core, shrinks and spins, then a flash
+    if (s.a0 === undefined) { s.a0 = Math.atan2(s.from.z - PAD.z, s.from.x - PAD.x); s.r0 = Math.max(1.2, Math.hypot(s.from.x - PAD.x, s.from.z - PAD.z)); s.y0 = s.from.y; }
+    s.t += dt; const k = Math.min(1, s.t / 1.4), n = s.n;
+    const r = s.r0 * Math.pow(1 - k, 1.4), a = s.a0 + k * k * 11 + k * 3, y = s.y0 + (BH.y - 0.4 - s.y0) * Math.min(1, k * 1.4);
+    n.root.position.set(PAD.x + Math.cos(a) * r, y, PAD.z + Math.sin(a) * r);
+    n.root.rotation.y += dt * (6 + k * 26); n.root.rotation.z = Math.sin(k * 9) * 0.6 * k;
+    n.root.scale.setScalar(Math.max(0.01, 1 - Math.pow(k, 1.6)));
+    if (s.t > 1.5) {
+      F.suck = null; n.root.rotation.z = 0; drop(n); F.ll = null; flash(); if (bh) bh.pulse = 1.4;
+      combat.burstAt?.(new THREE.Vector3(PAD.x, BH.y, PAD.z), 'POP!'); combat.shakeIt?.(0.5); combat.audio?.thud?.();
+      setTimeout(rentFree, 700);
+    }
   }
   function rentFree() {
     const S = ctx.S(); if (!S.endings.includes('free')) S.endings.push('free'); ctx.persist();
-    ctx.card({ head: 'RENT FREE', cls: 'ending', lines: ['ENDING 3 of 3', 'the landlady gets sucked into her own time machine.', 'the clock stops. the loop breaks.', 'tomorrow is... day 8?'],
+    ctx.card({ head: 'RENT FREE', cls: 'ending', lines: ['ENDING 3 of 3', 'the landlady gets sucked into her own black hole.', 'the clock stops. the loop breaks.', 'tomorrow is... day 8?'],
       buttons: [['DAY 8 [ENTER]', () => ctx.fadeTo('DAY 8', () => { leave(); ctx.afterLoop(); }, 1800), true]] });
   }
   // ---------------- the baby landlady: she will never stop ----------------
@@ -314,8 +385,7 @@ export function initFinale(ctx) {
   // ---------------- per frame (called by story.js) ----------------
   function tick(dt, now) {
     const S = ctx.S();
-    if (ring) { ring.rotation.z += dt * 2; ring.position.y = 0.6 + Math.sin(now / 300) * 0.15; }
-    suckTick(dt); babyTick(dt);
+    bhTick(dt, now); suckTick(dt); babyTick(dt);
     // the door
     if (outside.visible && !F.active && !ctx.isBusy()) {
       const d = Math.hypot(player.position.x - HOUSE.door.x, player.position.z - HOUSE.door.z);
@@ -335,6 +405,7 @@ export function initFinale(ctx) {
     F.bowlT -= dt;
     if (F.bowlT <= 0 && Math.hypot(player.position.x - BOWL.x, player.position.z - BOWL.z) < BOWL.r && bananas.state.supply < 3) { bananas.setSupply(3); F.bowlT = 6; ctx.toast('BANANAS x3! [B] DROP ONE IN HER WAY'); }
     if (ctx.isBusy() || police.state.mode === 'over') return;
+    pullTick(dt);
     F.t -= dt; hud();
     if (F.t <= 0) { acceptFate('time'); return; }
     // the cop
@@ -344,6 +415,6 @@ export function initFinale(ctx) {
   }
   // story.js: a fresh day 0 / new story: no house, no room, no baby
   function resetAll() { if (F.active || room.visible) leave(); dropBaby(); }
-  return { F, get active() { return F.active; }, HOUSE, PAD, ENTRY, TUNE, SPOTS, showHouse, enter, leave, tick, thrownOut, acceptFate, askGiveUp, win, spawnBaby, dropBaby, resetAll, callCop, room, outside, el: hudEl, stars,
+  return { F, get active() { return F.active; }, HOUSE, PAD, BH, get bh() { return bh; }, ENTRY, TUNE, SPOTS, showHouse, enter, leave, tick, thrownOut, acceptFate, askGiveUp, win, spawnBaby, dropBaby, resetAll, callCop, room, outside, el: hudEl, stars,
     get inside() { return room.visible; } };
 }

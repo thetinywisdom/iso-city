@@ -1,16 +1,17 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261025j';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261025j';
-import { Player, JUMP } from './player.js?v=20261025j';
-import { P } from './palette.js?v=20261025j';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025j';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025j';
-import { initExtras } from './extras.js?v=20261025j';
+import { generateCity } from './city.js?v=20261025l';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261025l';
+import { Player, JUMP } from './player.js?v=20261025l';
+import { P } from './palette.js?v=20261025l';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025l';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025l';
+import { initExtras } from './extras.js?v=20261025l';
+import { initGameMenu } from './gamemenu.js?v=20261025l';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
 const renderer = new THREE.WebGLRenderer({ antialias: false });
-renderer.setPixelRatio(1); // pixel art: one canvas pixel per CSS pixel, chunky pixels come from the low-res target
+renderer.setPixelRatio(new URLSearchParams(location.search).get('pr') ? +new URLSearchParams(location.search).get('pr') : navigator.webdriver ? 0.34 : Math.min(window.devicePixelRatio || 1, 2)); // full resolution, crisp (automated runs: third-res, software GL is slow)
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.BasicShadowMap; // hard, crisp shadow edges;
@@ -28,14 +29,9 @@ const camOffset = new THREE.Vector3(
   Math.cos(PITCH) * Math.sin(YAW), Math.sin(PITCH), Math.cos(PITCH) * Math.cos(YAW)).multiplyScalar(DIST);
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 600);
 let zoom = 1.6;
-// ---- Pixel-art pipeline --------------------------------------------------------
+// ---- Cartoon pipeline: toon ramps + black ink outlines, full resolution -----------
 const params = new URLSearchParams(location.search);
-const pixel = new PixelPipeline(renderer, {
-  scale: parseInt(params.get('px') || '3', 10),
-  enabled: params.get('pixel') !== '0',
-});
-pixel.dither = params.get('dither') === '1';
-pixel.outlines = params.get('outlines') === '1'; // default: no outlines
+const pixel = new PixelPipeline(renderer, { outlines: params.get('outlines') !== '0' });
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   pixel.setSize(window.innerWidth, window.innerHeight);
@@ -53,7 +49,7 @@ const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(
 scene.add(new THREE.HemisphereLight('#ffffff', '#dfe4e8', 2.2));
 const sun = new THREE.DirectionalLight('#ffffff', 1.4);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024); // low-res shadow map reads as chunky pixel shadows
+sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 220 });
 sun.shadow.bias = -0.0012;
 sun.shadow.normalBias = 0.06;
@@ -90,20 +86,9 @@ function applyPlayerChar(force = false) {
   player.heroName = model.def ? String(model.def.name || 'YOU').toUpperCase() : null;
   updatePlayerBtn();
 }
-const playerBtn = document.getElementById('playerBtn');
-function updatePlayerBtn() {
-  if (!playerBtn) return;
-  playerBtn.textContent = 'YOU: ' + (player.heroName || 'BALD GUY');
-  playerBtn.title = 'Click: cycle who you play as (saved creator characters / default bald guy)';
-}
-playerBtn?.addEventListener('click', (e) => {
-  e.preventDefault(); e.stopPropagation(); playerBtn.blur();
-  const ids = [null, ...loadCustom().map((d) => d.id)], cur = playerCharDef()?.id || null;
-  setPlayerChar(ids[(ids.indexOf(cur) + 1) % ids.length]);
-  applyPlayerChar(); npcs?.syncCustom?.();
-});
+function updatePlayerBtn() {}
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261025j')
+import('../characters/characters.js?v=20261025l')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
@@ -123,22 +108,10 @@ scene.add(marker);
 const keys = new Set();
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left',
   KeyD: 'right', ArrowRight: 'right', ShiftLeft: 'run', ShiftRight: 'run' };
-const hud = document.getElementById('pixelHud');
-let hudTimer = 0;
-function showHud() {
-  if (!hud) return;
-  hud.textContent = pixel.enabled ? `Pixel ×${pixel.scale}${pixel.dither ? ' · dither' : ''}${pixel.outlines ? '' : ' · no outlines'}` : 'Pixel off';
-  hud.style.opacity = 1; clearTimeout(hudTimer); hudTimer = setTimeout(() => (hud.style.opacity = 0), 1400);
-}
 // Character creator: opens in a new tab; saved characters spawn here live (storage event in npcs.js)
-function openCreator() { window.open('creator.html', 'isoCityCreator'); }
-document.getElementById('creatorBtn')?.addEventListener('click', (e) => { e.preventDefault(); openCreator(); });
+function openCreator() { gameMenu.open('creator'); }
+const gameMenu = initGameMenu({ onPick: () => { applyPlayerChar(); npcs?.syncCustom?.(); }, getStory: () => extras?.story, onOpen: () => { keys.clear(); clickTarget = null; } });
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'BracketLeft') { pixel.setScale(pixel.scale - 1); showHud(); return; }
-  if (e.code === 'BracketRight') { pixel.setScale(pixel.scale + 1); showHud(); return; }
-  if (e.code === 'KeyP') { pixel.setEnabled(!pixel.enabled); showHud(); return; }
-  if (e.code === 'KeyI') { pixel.dither = !pixel.dither; showHud(); return; }
-  if (e.code === 'KeyO') { pixel.outlines = !pixel.outlines; showHud(); return; }
   if (e.code === 'KeyC' && !e.repeat && !e.metaKey && !e.ctrlKey) { openCreator(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (e.repeat) return; if (extras?.hiding?.hidden) { if (!extras.hiding.state.doomed) extras.hiding.popOut(); return; } if (!(extras?.combat.stun > 0)) player.jump(); return; }
   const k = KEYMAP[e.code];
@@ -229,11 +202,13 @@ function tryMove(dx, dz) {
 
 // ---- Loop ------------------------------------------------------------------------
 const camTarget = player.position.clone();
+let camFocus = null, zoomNow = zoom;
 const clock = new THREE.Clock();
 const move = new THREE.Vector3();
 
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
+  if (gameMenu.isOpen) { pixel.render(scene, camera); requestAnimationFrame(tick); return; }   // paused
   let running = keys.has('run');
   let speed = (running ? 7 : 3.2) * (extras?.story?.speedMul || 1); // walk/run speeds matched to the character's natural stride
 
@@ -289,9 +264,12 @@ function tick() {
   }
 
   // Camera follow (smooth)
-  camTarget.lerp(player.position, 1 - Math.exp(-dt * 6));
+  // story scenes can frame someone else (camFocus: { pos: Vector3, zoom })
+  const fc = camFocus;
+  camTarget.lerp(fc ? fc.pos : player.position, 1 - Math.exp(-dt * (fc ? 3 : 6)));
+  zoomNow += ((fc?.zoom ?? zoom) - zoomNow) * (1 - Math.exp(-dt * 3));
   if (npcs) npcs.update(dt, player.position, RADIUS);
-  pixel.placeCamera(camera, camTarget, camOffset, VIEW / zoom); // snaps to the low-res pixel grid
+  pixel.placeCamera(camera, camTarget, camOffset, VIEW / zoomNow); 
 
   // Sun + shadow frustum follow the player (snapped to shadow texels: no crawling)
   placeSnappedSun(sun, camTarget, SUN_OFFSET);
@@ -302,6 +280,6 @@ function tick() {
 requestAnimationFrame(tick);
 
 // Expose a little debug handle (used by the headless smoke test).
-window.__game = { player, standHeight, city, camera, renderer, keys, pixel, get npcs() { return npcs; }, setZoom: (z) => (zoom = z) };
+window.__game = { menu: gameMenu, player, standHeight, city, camera, renderer, scene, keys, pixel, get npcs() { return npcs; }, setZoom: (z) => (zoom = zoomNow = z), focus: (f) => { camFocus = f || null; }, get camFocus() { return camFocus; } };
 const extras = window.__game.extras = initExtras({ scene, camera, renderer, pixel, city, player, keys, getNPCs: () => npcs });
 window.__game.missions = extras.missions;

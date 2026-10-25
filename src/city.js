@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { Bucket, mat } from './bucket.js?v=20261025j';
-import { P, SCHEMES, COMIC } from './palette.js?v=20261025j';
-import { makeProps } from './props.js?v=20261025j';
+import { Bucket, mat } from './bucket.js?v=20261025l';
+import { P, SCHEMES, COMIC } from './palette.js?v=20261025l';
+import { makeProps } from './props.js?v=20261025l';
+import { resolveFace, faceFrame } from './facing.js?v=20261025l';
+import { addFill } from './fill.js?v=20261025l';
 
 // Small art-direction test scene: a main intersection at (0,0) plus two
 // streets on the near (+x / +z) side, so the block nearest the camera has
@@ -57,7 +59,8 @@ export function generateCity(scene) {
   }
 
   // ---- props ----
-  const props = makeProps(solid, addCollider, CURB);
+  const treeSolid = new Bucket();
+  const props = makeProps(solid, addCollider, CURB, treeSolid);
   const tree = props.roundTree;
   function lamp(x, z) {
     const y = CURB;
@@ -69,39 +72,41 @@ export function generateCity(scene) {
   }
   const bench = props.slatBench;
 
-  // Building: light wall, roof cap, windows on the camera-facing faces (+x, +z),
-  // door + shop window + optional awning/blade sign on the `door` face.
-  function building({ x0, z0, x1, z1, floors, scheme, door = 'x', awning = true, sign = false }) {
+  // Building: light wall, roof cap, windows on the camera-facing faces (+x, +z) and on the front;
+  // door + shop window + optional awning/blade sign on the FRONT, which faces the nearest road (facing.js).
+  const buildings = [];
+  function building({ x0, z0, x1, z1, floors, scheme, door, awning = true, sign = false, name = scheme, kind = 'base' }) {
     const C = SCHEMES[scheme];
+    const L = { x0, x1, z0, z1 };
+    const face = resolveFace(L, door);
     const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const h = floors * 3, base = CURB;
     solid.add(G.box, mat(cx, base + h / 2, cz, w, h, d), C.body);
     solid.add(G.box, mat(cx, base + h + 0.18, cz, w + 0.3, 0.36, d + 0.3), P.roof);
+    const faces = new Set(['+x', '+z', face]);
     for (let f = 1; f < floors; f++) {
       const wy = base + f * 3 + 1.7;
-      for (let u = x0 + 1.5; u <= x1 - 1.2; u += 2.2)
-        solid.add(G.box, mat(u + 0.35, wy, z1 + 0.02, 1.1, 1.4, 0.06), C.win);
-      for (let u = z0 + 1.5; u <= z1 - 1.2; u += 2.2)
-        solid.add(G.box, mat(x1 + 0.02, wy, u + 0.35, 0.06, 1.4, 1.1), C.win);
+      for (const fc of faces) {
+        const F = faceFrame(L, fc);
+        for (let u = F.lo + 1.5; u <= F.lo + F.len - 1.2; u += 2.2) {
+          const [px, pz] = F.pos(u + 0.35 - F.mid, 0.02), [sx, sz] = F.size(1.1, 0.06);
+          solid.add(G.box, mat(px, wy, pz, sx, 1.4, sz), C.win);
+        }
+      }
     }
-    if (door === 'x') {
-      solid.add(G.box, mat(x1 + 0.03, base + 1.15, cz - d * 0.25, 0.06, 2.3, 1.3), C.door);
-      solid.add(G.box, mat(x1 + 0.03, base + 1.4, cz + d * 0.15, 0.06, 1.5, d * 0.4), C.win);
-      if (awning) solid.add(G.box, mat(x1 + 0.7, base + 2.75, cz, 1.4, 0.14, d * 0.8, 0, 0, -0.22), C.accent);
-      if (sign) {
-        solid.add(G.box, mat(x1 + 0.6, base + 4.6, z0 + 0.8, 1.1, 1.4, 0.14), C.accent);
-        solid.add(G.box, mat(x1 + 0.1, base + 4.6, z0 + 0.8, 0.2, 0.2, 0.2), P.black);
-      }
-    } else {
-      solid.add(G.box, mat(cx - w * 0.25, base + 1.15, z1 + 0.03, 1.3, 2.3, 0.06), C.door);
-      solid.add(G.box, mat(cx + w * 0.15, base + 1.4, z1 + 0.03, w * 0.4, 1.5, 0.06), C.win);
-      if (awning) solid.add(G.box, mat(cx, base + 2.75, z1 + 0.7, w * 0.8, 0.14, 1.4, 0, 0.22, 0), C.accent);
-      if (sign) {
-        solid.add(G.box, mat(x0 + 0.8, base + 4.6, z1 + 0.6, 0.14, 1.4, 1.1), C.accent);
-        solid.add(G.box, mat(x0 + 0.8, base + 4.6, z1 + 0.1, 0.2, 0.2, 0.2), P.black);
-      }
+    const F = faceFrame(L, face), put = (u, y, out, along, hh, thick, color, rx = 0, rz = 0) => {
+      const [px, pz] = F.pos(u, out), [sx, sz] = F.size(along, thick); solid.add(G.box, mat(px, y, pz, sx, hh, sz, 0, rx, rz), color);
+    };
+    put(-F.len * 0.25, base + 1.15, 0.03, 1.3, 2.3, 0.06, C.door);
+    put(F.len * 0.15, base + 1.4, 0.03, F.len * 0.4, 1.5, 0.06, C.win);
+    if (awning) { const [rx, rz] = F.tilt(0.22); put(0, base + 2.75, 0.7, F.len * 0.8, 0.14, 1.4, C.accent, rx, rz); }
+    if (sign) {
+      put(-F.len / 2 + 0.8, base + 4.6, 0.6, 0.14, 1.4, 1.1, C.accent);
+      put(-F.len / 2 + 0.8, base + 4.6, 0.1, 0.2, 0.2, 0.2, P.black);
     }
     addCollider(cx, cz, w / 2, d / 2);
+    buildings.push({ x0, x1, z0, z1, face, name, kind, base, h });
+    return { face, h };
   }
 
   const S = SIDEWALK, a = R + S, b = 33 - R - S; // inner lot range of the near block: [7.5, 25.5]
@@ -118,8 +123,8 @@ export function generateCity(scene) {
   building({ x0: a, z0: -a - 10, x1: a + 10, z1: -a, floors: 4, scheme: 'peach', door: 'z' });
   building({ x0: -a - 10, z0: a, x1: -a, z1: a + 9, floors: 3, scheme: 'white', door: 'x' });
   // Beyond the near streets — low buildings for context
-  building({ x0: 33 + a, z0: a + 2, x1: 33 + a + 8, z1: a + 12, floors: 2, scheme: 'pink', door: 'z', awning: false });
-  building({ x0: a + 2, z0: 33 + a, x1: a + 11, z1: 33 + a + 7, floors: 2, scheme: 'teal', door: 'x', awning: false });
+  building({ x0: 33 + a, z0: a + 2, x1: 33 + a + 8, z1: a + 12, floors: 2, scheme: 'pink', awning: false, name: 'pink (east)' });
+  building({ x0: a + 2, z0: 33 + a, x1: a + 11, z1: 33 + a + 7, floors: 2, scheme: 'teal', awning: false, name: 'teal (south)' });
 
   // Trees / lamps / benches on sidewalks
   tree(a + 3, R + 1.2); props.autumnTree(a + 13, R + 1.2, 1.05); props.blossomTree(R + 1.2, a + 13);
@@ -152,11 +157,15 @@ export function generateCity(scene) {
   props.blockBench(a + 6.5, 33 - R - 0.9, Math.PI); props.bin(a + 9.6, 33 - R - 0.8, 0);
   props.railing(b - 2.2, b + 0.45, 3.6, 0);
 
-  scene.add(solid.build(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+  addFill({ solid, addCollider, props, building, lamp, CURB, scene });
+
+  const cityMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  scene.add(solid.build(cityMat));
+  const treeMesh = treeSolid.build(cityMat); treeMesh.name = 'city-trees'; scene.add(treeMesh);
 
   function groundHeight(x, z) {
     for (const k of blocks) if (x > k.x0 && x < k.x1 && z > k.z0 && z < k.z1) return CURB;
     return 0;
   }
-  return { colliders, groundHeight, bounds: { min: -30, max: 46 }, spawn: new THREE.Vector3(0, 0, 0) };
+  return { colliders, buildings, groundHeight, bounds: { min: -30, max: 46 }, spawn: new THREE.Vector3(0, 0, 0), trees: { mesh: treeMesh, log: props.treeLog, draw: props.treeDraw } };
 }

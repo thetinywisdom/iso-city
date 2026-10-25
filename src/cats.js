@@ -64,6 +64,7 @@ function buildCat(coat, seed) {
 }
 
 export function initCats({ scene, city, player, getNPCs, dialogue, combat, actions, police, pixel }) {
+  const hooks = {};   // story.js can override a cat's voice (day 5: they bark)
   const state = { pets: 0, scatters: 0, trouble: 0, lastTrouble: null };
   const cats = [];
   const tmp = new THREE.Vector3();
@@ -308,7 +309,7 @@ export function initCats({ scene, city, player, getNPCs, dialogue, combat, actio
       if (c.mode === 'follow' && pose === 'walk' && c.speed < 0.1) pose = 'sit';
       // meow now and then (when on screen-ish)
       c.meowT -= dt;
-      if (c.meowT <= 0) { c.meowT = 18 + Math.random() * 30; if (dp < 16 && c.mode !== 'flee' && c.mode !== 'poof') dialogue.show(c, pick(MEOWS), 1400); }
+      if (c.meowT <= 0) { c.meowT = 18 + Math.random() * 30; if (dp < 16 && c.mode !== 'flee' && c.mode !== 'poof') dialogue.show(c, hooks.voice?.(c) || pick(MEOWS), 1400); }
       if (Math.random() < dt * 0.4) c.flick = 1;
       animate(c, pose, dt);
     }
@@ -412,5 +413,5 @@ export function initCats({ scene, city, player, getNPCs, dialogue, combat, actio
     update(dt);
     prev.apply(scene, a);
   };
-  return { cats, state, followers, pet, petRequest, trouble, scatter, pickCat, COATS };
+  return { cats, state, followers, pet, petRequest, trouble, scatter, pickCat, COATS, hooks };
 }

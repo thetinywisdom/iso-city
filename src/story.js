@@ -3,9 +3,11 @@
 // oddity hunt ("THAT'S WEIRD!" [Q], 7 of 10 per loop). Free roam is the untouched sandbox.
 // Saves to localStorage isoCity.story.v1. The hidden house + the 7:00 finale come in Phase C.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025j';
-import { initGrowth } from './growth.js?v=20261025j';
-import { initFinale } from './finale.js?v=20261025j';
+import { COMIC } from './palette.js?v=20261025l';
+import { initGrowth } from './growth.js?v=20261025l';
+import { initFinale } from './finale.js?v=20261025l';
+import { APARTMENT } from './fill.js?v=20261025l';
+import { initGlitch } from './glitch.js?v=20261025l';
 
 export const STORY_KEY = 'isoCity.story.v1';
 export const RENT = 77777;
@@ -13,7 +15,12 @@ export const JOBS_PER_DAY = 2;
 export const PAY = { 'slap-tour': 8800, rejected: 7700, bully: 12100, ball: 11000, cap: 9900 };
 const MODE_KEY = 'isoCity.mode';          // sessionStorage: same-tab reloads skip the title
 const NEW_KEY = 'isoCity.storyNew';      // sessionStorage: NEW STORY picked in free roam (survives the reload)
-const SLEEP = { x: 0, z: 0, r: 1.1 };     // the Z sits on the spawn point
+const SLEEP = { x: APARTMENT.door.x, z: APARTMENT.door.z, r: 1.1 };   // HOME: the run-down apartment's front door
+const WAKE = { x: APARTMENT.door.x + 1.3, z: APARTMENT.door.z + 1.3 };   // a step out the door (outside the sleep ring)
+// the landlady's beat: up and down the sidewalk in front of the apartment
+const LL_PATH = [[-26.6, -5.25], [-8.6, -5.25], [-8.6, -4.95], [-26.6, -4.95]];
+const LL_RUDE = ['late again and you\'re out on your a**.', 'i can smell your bank balance from here.', 'your apartment? MY apartment.', 'that shirt is a lease violation.',
+  'rent\'s not gonna pay itself, sweetie.', 'don\'t lean on the walls. they\'re load-bearing. barely.', 'move. you\'re blocking the view of my property.', 'the heating works on tuesdays. sometimes.'];
 const yen = (v) => '¥' + Math.round(v).toLocaleString('en-US');
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
@@ -38,7 +45,7 @@ const MB_LINES = {
   noBall: [['Mon ballon? Bof. Qui a besoin d\'un ballon?', 'my ball? meh. who needs a ball?']],
 };
 
-export function initStory({ scene, camera, city, player, getNPCs, dialogue, combat, missions, police, pixel, actions, bananas }) {
+export function initStory({ scene, camera, city, player, getNPCs, dialogue, combat, missions, police, pixel, actions, bananas, cats }) {
   const params = new URLSearchParams(location.search);
   let S = load();
   let mode = null;            // 'story' | 'free' | null (title up)
@@ -63,9 +70,10 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
       <div id="story-hud"><div class="sh-day"></div><div class="sh-money"></div><div class="sh-jobs"></div></div>
       <button id="story-weird" class="mo-btn mo-yes">THAT'S WEIRD! [Q]</button>
       <div id="story-card"></div>
-      <div id="story-fade"><div></div></div>
+      <div id="story-fade"><div></div><p></p></div>
       <div id="story-tear"></div>
-      <div id="story-z"></div>
+      <div id="story-z"><div class="hm"><b>HOME</b><i>SLEEP HERE</i><s></s></div></div>
+      <div class="ll-icon" id="ll-icon">LANDLADY</div>
       <button id="story-menu">MENU</button>`;
     document.body.appendChild(root);
     const $ = (s) => root.querySelector(s);
@@ -76,12 +84,9 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     $('#story-weird').addEventListener('click', (e) => { e.stopPropagation(); weird(); });
     $('#story-menu').addEventListener('click', (e) => { e.stopPropagation(); showTitle(); });
     $('#story-z').addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'story' && !busy) sleepPrompt(); });
-    // pixel "Zz" sprite (comic palette, per-pixel)
-    const zc = document.createElement('canvas'), rows = ['XXXXX.....', '...X......', '..X..XXX..', '.X.....X..', 'XXXXX.X...', '.....XXX..'];
-    zc.width = rows[0].length; zc.height = rows.length; const zx = zc.getContext('2d');
-    rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch === 'X') { zx.fillStyle = j < 5 && i < 5 ? B[2] : B[1]; zx.fillRect(i, j, 1, 1); } }));
-    zc.style.width = zc.width * 6 + 'px'; zc.style.height = zc.height * 6 + 'px'; $('#story-z').appendChild(zc);
-    return { root, $, title: $('#story-title'), hud: $('#story-hud'), weird: $('#story-weird'), card: $('#story-card'), fade: $('#story-fade'), tear: $('#story-tear'), z: $('#story-z'), menu: $('#story-menu') };
+    // a talk card advances on a click anywhere on it
+    $('#story-card').addEventListener('click', () => { if ($('#story-card').classList.contains('talk')) $('#story-card .mo-yes')?.click(); });
+    return { root, $, llIcon: $('#ll-icon'), title: $('#story-title'), hud: $('#story-hud'), weird: $('#story-weird'), card: $('#story-card'), fade: $('#story-fade'), tear: $('#story-tear'), z: $('#story-z'), menu: $('#story-menu') };
   }
   function confirmNew() { return true; }   // a new story simply overwrites the save (the title shows CONTINUE first)
   function showTitle() {
@@ -97,7 +102,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     document.body.classList.toggle('story-on', on); document.body.classList.toggle('story-hunt', on && S.phase === 'hunt');
     if (!on) return;
     const after = S.phase === 'after';
-    ui.$('.sh-day').textContent = after ? `DAY ${S.day}  RENT FREE` : `DAY ${S.day}` + (S.loop > 1 ? `  LOOP ${S.loop}` : '');
+    ui.$('.sh-day').textContent = after ? `DAY ${S.day}  RENT FREE` : `DAY ${S.day}/7` + (S.loop > 1 ? `  LOOP ${S.loop}` : '');
     ui.$('.sh-money').textContent = after ? `${yen(S.money)}  RENT: ${yen(0)}` : `${yen(S.money)} / ${yen(RENT)}`;
     const j = ui.$('.sh-jobs');
     if (finale?.active) { j.textContent = 'THE LANDLADY\'S HOUSE'; j.className = 'sh-jobs odd'; }
@@ -106,10 +111,11 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     else { j.textContent = `JOBS ${S.jobs}/${JOBS_PER_DAY}`; j.className = 'sh-jobs' + (S.jobs >= JOBS_PER_DAY ? ' done' : ''); }
   }
   // generic card: { head, lines[], buttons: [[label, fn, yes?]], cls }
-  function card({ head, lines = [], buttons = [], cls = '' }) {
+  function card({ head, lines = [], buttons = [], cls = '', step = '', caption = '' }) {
     busy = true; ui.card.className = 'on ' + cls; ui.card.innerHTML = '';
-    const h = document.createElement('div'); h.className = 'sc-head'; h.textContent = head; ui.card.appendChild(h);
+    const h = document.createElement('div'); h.className = 'sc-head'; h.textContent = head; if (step) h.dataset.step = step; ui.card.appendChild(h);
     for (const l of lines) { const d = document.createElement('div'); d.className = 'sc-line'; d.textContent = l; ui.card.appendChild(d); }
+    if (caption) { const d = document.createElement('div'); d.className = 'sc-line cap'; d.textContent = caption; ui.card.appendChild(d); }
     const row = document.createElement('div'); row.className = 'sc-row';
     buttons.forEach(([label, fn, yes], i) => {
       const b = document.createElement('button'); b.className = 'mo-btn' + (yes ? ' mo-yes' : ''); b.textContent = label; b.dataset.i = i;
@@ -121,11 +127,11 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     setTimeout(() => row.querySelector('.mo-yes, .mo-btn')?.focus(), 30);
   }
   function closeCard() { if (!ui.card.classList.contains('on')) return; ui.card.className = ''; ui.card.innerHTML = ''; busy = false; combat.hold(0); hud(); }
-  function fadeTo(text, mid, ms = 1400) {
+  function fadeTo(text, mid, ms = 1400, sub = '') {
     busy = true; hud(); combat.hold(1e6);
-    ui.fade.firstChild.textContent = text; ui.fade.className = 'on';
+    ui.fade.firstChild.textContent = text; ui.fade.lastChild.textContent = sub; ui.fade.className = 'on' + (/^DAY \d/.test(text) ? ' day' : '');
     setTimeout(() => { mid?.(); }, ms * 0.5);
-    setTimeout(() => { ui.fade.className = 'on out'; }, ms);
+    setTimeout(() => { ui.fade.className = ui.fade.className.replace(' out', '') + ' out'; }, ms);
     setTimeout(() => { ui.fade.className = ''; if (!ui.card.classList.contains('on')) { busy = false; combat.hold(0); } hud(); }, ms + 360);
   }
   function toast(t) { missions.toast(t); }
@@ -178,7 +184,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     dialogue.shout(b, pick(['OOOH! TELLING THE LANDLADY!', 'WRITING THAT DOWN!', 'LANDLADY\'S GONNA HEAR ABOUT THIS!']), 2200);
     toast(`BRENDA SNITCHED: -${yen(1111)} (LATE FEE)`);
   }
-  function spawnLandlady(x = 2.4, z = 2.4) {
+  function spawnLandlady(x = LL_PATH[0][0], z = LL_PATH[0][1]) {
     const npcs = getNPCs(); if (!npcs) return null;
     if (story.landlady) return story.landlady;
     const n = npcs._wrap(npcs.charMod.createCustom({ ...LANDLADY_DEF, id: 'story-landlady' }), 9001);
@@ -187,7 +193,16 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     n.heading = n.root.rotation.y = Math.atan2(player.position.x - x, player.position.z - z);
     n.home = { x, z, heading: n.heading };
     npcs.list.push(n); npcs.toonify?.(n.root); story.landlady = n;
+    patrol(n);
     return n;
+  }
+  /** she is always around in story mode: walking her beat in front of the apartment */
+  function patrol(n = story?.landlady) {
+    if (!n || n.removed) return;
+    // head for the beat point farthest from you, so she never walks into you and stalls (walkers yield to the player)
+    let bi = 0, bd = -1; const pp = player.position;
+    LL_PATH.forEach((w, i) => { const d = Math.hypot(w[0] - pp.x, w[1] - pp.z); if (d > bd) { bd = d; bi = i; } });
+    Object.assign(n, { path: LL_PATH, idx: bi, dir: 1, speed: 1.05, walker: true, talkT: 0, wait: 0 });
   }
   function removeLandlady() {
     const n = story?.landlady; if (!n) return;
@@ -195,37 +210,83 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     const i = npcs.list.indexOf(n); if (i >= 0) npcs.list.splice(i, 1);
     story.landlady = null;
   }
-  function toSpawn() { player.position.set(city.spawn.x + 1.2, city.groundHeight(city.spawn.x + 1.2, city.spawn.z + 1.2) + 0.02, city.spawn.z + 1.2); player.vel?.set(0, 0, 0); zInside = true; }
+  function toSpawn() { player.position.set(WAKE.x, city.groundHeight(WAKE.x, WAKE.z) + 0.02, WAKE.z); player.vel?.set(0, 0, 0); zInside = true; }
+
+  /** A slow, readable scene: she walks up, the camera frames her, one line per card, click / ENTER to go on. */
+  function talkScene(head, steps, done, lastBtn = 'OK... [ENTER]') {
+    const ll = spawnLandlady(); if (!ll) { done?.(); return; }
+    busy = true;
+    const pp = player.position, a = Math.atan2(WAKE.z - SLEEP.z, WAKE.x - SLEEP.x) + 0.9;
+    let x = pp.x + Math.cos(a) * 1.5, z = pp.z + Math.sin(a) * 1.5;
+    if (!getNPCs()._free(x, z, 0.3)) { x = pp.x + 1.4; z = pp.z + 0.3; }
+    ll.walker = false; ll.talkT = 0; ll.root.position.set(x, city.groundHeight(x, z) + 0.02, z);
+    ll.heading = ll.root.rotation.y = Math.atan2(pp.x - x, pp.z - z);
+    ll.home = { x, z, heading: ll.heading };
+    player.rotation && (player.rotation.y = Math.atan2(x - pp.x, z - pp.z));
+    const focusPos = new THREE.Vector3((x + pp.x) / 2, pp.y + 0.6, (z + pp.z) / 2);
+    window.__game?.focus?.({ pos: focusPos, zoom: 2.7 });
+    const N = steps.length;
+    const show = (i) => {
+      const [line, cap] = Array.isArray(steps[i]) ? steps[i] : [steps[i], ''];
+      dialogue.show(ll, line.length > 46 ? line.slice(0, 44) + '...' : line, 60000);
+      getNPCs()?.talk(ll, 60, player.position);
+      card({ head, cls: 'talk', step: `${i + 1}/${N}`, lines: [`"${line}"`], caption: cap,
+        buttons: [[i < N - 1 ? 'NEXT ▶ [ENTER]' : lastBtn, () => {
+          if (i < N - 1) { setTimeout(() => show(i + 1), 0); return; }
+          dialogue.clear?.(ll); getNPCs()?.endTalk(ll); window.__game?.focus?.(null);
+          patrol(ll); done?.();
+        }, true]] });
+    };
+    show(0);
+  }
 
   // ================= the day loop =================
   function dayZero() {
     S.day = 0; S.jobs = 0; persist(); hud(); toSpawn(); growDay();
-    const ll = spawnLandlady();
-    dialogue.shout(ll, 'RENT!', 2600);
     const again = S.loop > 1;
-    setTimeout(() => card({ head: again ? 'RENT\'S DUE. AGAIN?' : 'RENT\'S DUE', cls: 'notice',
-      lines: again ? [`"${yen(RENT)}. 7 days. same as always, dear."`, 'wait. didn\'t she say that already?']
-        : [`"${yen(RENT)}. You have 7 days."`, '"pay up, or ELSE."', 'the shady guy has odd jobs. 2 a day. sleep at the Z.'],
-      buttons: [[again ? 'UGH. [ENTER]' : 'OK... [ENTER]', () => { removeLandlady(); S.phase = S.phase === 'intro' ? 'grind' : S.phase; nextDay(); }, true]] }), 700);
+    setTimeout(() => talkScene(again ? 'RENT\'S DUE. AGAIN?' : 'THE LANDLADY: RENT\'S DUE', again ? [
+      ['knock knock, dear. RENT.', 'your landlady. again. wait... didn\'t she say that already?'],
+      [`${yen(RENT)}. 7 days. same as always.`, 'same words. same smile. same morning.'],
+      ['now get out of my hallway, you smelly little loop.', 'jobs from the shady guy: 2 a day. sleep at HOME.'],
+    ] : [
+      ['knock knock. RENT.', 'your landlady. she owns this run-down dump. and, honestly, you.'],
+      [`${yen(RENT)}. you have 7 days.`, 'rent is due on DAY 7.'],
+      ['pay up, or you\'re out on your a**.', ''],
+      ['the shady guy has odd jobs. now get out of my hallway.', 'do 2 jobs a day for the shady guy, then sleep at HOME (your apartment door).'],
+    ], () => { S.phase = S.phase === 'intro' ? 'grind' : S.phase; nextDay(); }, again ? 'UGH. [ENTER]' : 'OK... [ENTER]'), 500);
   }
   function nextDay(text) {
-    fadeTo(text || `DAY ${S.day + 1}`, () => {
+    const n = S.day + 1, left = 7 - n;
+    const sub = S.phase === 'after' ? 'RENT FREE' : n >= 7 ? 'RENT DAY' : `RENT DUE IN ${left} DAY${left === 1 ? '' : 'S'}`;
+    fadeTo(text || `DAY ${n}`, () => {
       S.day++; S.jobs = 0; toSpawn(); persist(); hud(); applyOddities(); growDay(true);
-      if (S.day >= 7 && S.phase !== 'after') setTimeout(rentDay, 1300);
-    });
+      if (S.day >= 7 && S.phase !== 'after') setTimeout(rentMorning, 1300);
+    }, text ? 1400 : 2000, text ? '' : sub);
+  }
+  function rentMorning() {
+    if (S.day < 7 || S.phase === 'after') return;
+    const enough = S.money >= RENT;
+    talkScene('DAY 7: RENT DAY', [
+      ['it\'s RENT DAY, sweetie.', `you have ${yen(S.money)}. rent is ${yen(RENT)}.`],
+      [enough ? 'oh? you might actually have it. how boring.' : `${yen(RENT - S.money)} short. i\'m counting, dear.`, ''],
+      ['tonight. i\'ll be waiting at your door.', 'last day: sleep at HOME tonight to pay the rent.'],
+    ], () => toast('RENT IS DUE TONIGHT: SLEEP AT HOME'), 'FINE. [ENTER]');
   }
   let zInside = true;
   function sleepPrompt() {
     if (busy || mode !== 'story' || missions.active || finale?.active) { if (missions.active) toast('FINISH THE JOB FIRST'); return; }
+    if (S.day >= 7 && S.phase !== 'after') { card({ head: 'SLEEP? RENT TIME.', lines: ['she\'s waiting at your door.', `you have ${yen(S.money)}.`],
+      buttons: [['OPEN THE DOOR [ENTER]', rentDay, true], ['NOT YET [ESC]', () => {}]] }); return; }
     card({ head: 'SLEEP?', lines: [S.jobs < JOBS_PER_DAY && S.phase !== 'hunt' && S.phase !== 'house' ? `only ${S.jobs}/${JOBS_PER_DAY} jobs done today.` : 'good work today. probably.', `ends day ${S.day}.`],
-      buttons: [['SLEEP [ENTER]', () => nextDay('Z Z Z'), true], ['NOT YET [ESC]', () => {}]] });
+      buttons: [['SLEEP [ENTER]', () => nextDay(), true], ['NOT YET [ESC]', () => {}]] });
   }
   function rentDay() {
-    const ll = spawnLandlady();
-    dialogue.shout(ll, 'RENT! ' + yen(RENT) + '. NOW.', 3000);
     const enough = S.money >= RENT;
-    card({ head: 'DAY 7: RENT DAY', cls: 'notice', lines: enough ? [`you've got ${yen(S.money)}. you can pay!`] : [`you've got ${yen(S.money)}. that's... not ${yen(RENT)}.`],
-      buttons: [[enough ? `PAY ${yen(RENT)}` : `PAY ${yen(S.money)}`, reset, true]] });
+    talkScene('THE LANDLADY', [[`well? ${yen(RENT)}. NOW.`, `you have ${yen(S.money)}.`]], () => {
+      dialogue.shout(story.landlady, 'RENT! ' + yen(RENT) + '. NOW.', 2600);
+      card({ head: 'DAY 7: RENT DAY', cls: 'notice', lines: enough ? [`you've got ${yen(S.money)}. you can pay!`] : [`you've got ${yen(S.money)}. that's... not ${yen(RENT)}.`],
+        buttons: [[enough ? `PAY ${yen(RENT)}` : `PAY ${yen(S.money)}`, reset, true]] });
+    }, 'UH... [ENTER]');
   }
   function reset() {
     glitch(2); const lost = S.money;
@@ -237,7 +298,6 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     }, 900);
   }
   function afterReset() {
-    removeLandlady();
     if (S.phase === 'grind') { S.phase = 'choice'; persist(); choiceCard(); return; }
     S.loop++;                                 // hunting (or past it): a new loop, a fresh set of oddities
     if (S.phase === 'hunt') { S.found = []; S.set = rollSet(); }
@@ -272,7 +332,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     const pay = PAY[def.id] || 8000;
     S.money += pay; S.jobs++; persist(); hud();
     const sub = banner?.querySelector('.mb-sub');
-    if (sub) sub.textContent = `+${yen(pay)}` + (S.jobs >= JOBS_PER_DAY ? '  DONE FOR TODAY. SLEEP AT THE Z' : '  ONE MORE JOB TODAY');
+    if (sub) sub.textContent = `+${yen(pay)}` + (S.jobs >= JOBS_PER_DAY ? '  DONE FOR TODAY. SLEEP AT HOME' : '  ONE MORE JOB TODAY');
   };
   // ---- busted: a night in the cell, then the next morning ----
   police.hooks.onOver = (over) => {
@@ -302,7 +362,13 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
         return true;
       }
     }
-    if (mode === 'story' && n.story === 'landlady') { dialogue.shout(n, 'RENT!', 1600); return true; }
+    if (mode === 'story' && n.story === 'landlady') {
+      if (n.finale) { dialogue.shout(n, 'RENT!', 1600); return true; }
+      const d = S.day, short = Math.max(0, RENT - S.money);
+      const pool = LL_RUDE.concat(S.phase === 'after' ? ['rent free?! who signed THAT?', 'enjoy it while it lasts, freeloader.']
+        : [d >= 7 ? 'TONIGHT. at your door. with my money.' : d === 6 ? 'tomorrow, sweetie. TOMORROW.' : `${7 - d} days, dear. tick tock.`, short ? `${yen(short)} short. i'm counting.` : 'oh, you have it? we\'ll see.']);
+      dialogue.show(n, pick(pool), 3400); getNPCs()?.talk(n, 3, player.position); return true;
+    }
     if (mode === 'story' && n.cityKey === 'big-deb' && !n.mode && !n.down) {
       if ((S.phase === 'house' || S.phase === 'finale') && S.house) {
         if (!S.shake) { S.shake = true; persist(); toast('PROTEIN SHAKE! +12% SPEED IN THE FINALE'); }
@@ -322,6 +388,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
       if (n.special === 'bully' && on('bully')) return pick(['please may i slap you? thank you.', 'pardon me. thank you kindly.', 'please. and thank you.']);
       if (on('rude') && n.temper === 'aggressive' && !n.special && !n.important) return 'hi.';
       if (n.story === 'brick' && on('brick')) return pick(['where did it all go...', 'i skipped ONE leg day.', 'my gains... gone.']);
+      if (S.phase !== 'after') { const gl = glitchFx.pickLine(n); if (gl) return gl; }
       if (S.day === 5 && Math.random() < 0.25 && n.lastLine) return n.lastLine;   // déjà vu: the same line again
     }
     return prevPick?.(n) || null;
@@ -450,16 +517,18 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     }
   }
   function glitchTick(dt) {
-    if (mode !== 'story' || busy || (S.day !== 5 && S.day !== 6)) return;
+    if (mode !== 'story' || busy || S.day < 5 || S.day > 7 || S.phase === 'after') return;
     glitchT -= dt;
     if (glitchT > 0) return;
-    glitchT = S.day === 5 ? 14 + Math.random() * 8 : 8 + Math.random() * 5;
-    glitch(S.day === 6 ? 2 : 1);
+    glitchT = S.day === 5 ? 14 + Math.random() * 8 : S.day === 6 ? 8 + Math.random() * 5 : 6 + Math.random() * 4;
+    glitch(S.day >= 6 ? 2 : 1);
     if (S.day === 5) {   // someone near you says the same thing three times
       const n = (getNPCs()?.list || []).filter((o) => !o.mode && !o.special && o.root.position.distanceTo(player.position) < 14)[0];
       if (n) { const l = n.lastLine || 'nice weather.'; dialogue.show(n, `${l} ${l} ${l}`, 2600); }
     }
   }
+
+  const glitchFx = initGlitch({ scene, city, player, getNPCs, dialogue, combat, cats, pixel });
 
   // ================= per frame =================
   const tmp = new THREE.Vector3();
@@ -469,13 +538,37 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     prev.apply(scene, a);
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (skyT && now >= skyT && BG) { skyT = 0; BG.copy(SKY0); if (FOG) FOG.copy(FOG0); }
+    glitchFx.tick(dt, now, mode === 'story' && S && S.phase !== 'after' && !finale?.active ? S.day : 0);
     if (mode !== 'story') return;
     finale.tick(dt, now);
     glitchTick(dt);
-    // Z on the spawn point (screen space, art-pixel snapped)
-    const g = pixel && pixel.enabled ? pixel.scale : 1, cv = document.querySelector('#app canvas');
-    tmp.set(SLEEP.x, city.groundHeight(SLEEP.x, SLEEP.z) + 1.6 + Math.round(Math.sin(now / 400)) * 0.12, SLEEP.z).project(camera);
-    if (cv) { const x = Math.round(((tmp.x + 1) / 2 * cv.clientWidth) / g) * g, y = Math.round(((1 - tmp.y) / 2 * cv.clientHeight) / g) * g; ui.z.style.transform = `translate(${x - 30}px, ${y - 18}px)`; }
+    // the landlady is always about (until she's gone for good / while the finale has its own)
+    if (story && !busy) {
+      const want = S.phase !== 'after' && !finale?.active;
+      if (want && !story.landlady) spawnLandlady();
+      else if (!want && story.landlady) removeLandlady();
+    }
+    // HOME marker over the apartment door (screen space, clamped to the screen edge when off-screen)
+    const cv = document.querySelector('#app canvas');
+    tmp.set(SLEEP.x, city.groundHeight(SLEEP.x, SLEEP.z) + 2.2, SLEEP.z).project(camera);
+    if (cv) {
+      const W = cv.clientWidth, H = cv.clientHeight, M = 34;
+      let x = (tmp.x + 1) / 2 * W, y = (1 - tmp.y) / 2 * H;
+      if (tmp.z > 1) { x = W - x; y = H - M; }
+      const edge = x < M || x > W - M || y < M + 30 || y > H - M;
+      x = Math.max(M, Math.min(W - M, x)); y = Math.max(M + 30, Math.min(H - M, y));
+      ui.z.classList.toggle('edge', edge);
+      ui.z.style.transform = `translate(${Math.round(x - ui.z.offsetWidth / 2)}px, ${Math.round(y - ui.z.offsetHeight)}px)`;
+    }
+    // a name tag over the landlady's head (the finale's one too)
+    const ll = finale?.active ? finale.F?.ll : story?.landlady;
+    if (ll && !ll.removed && ll.root.visible !== false && cv) {
+      tmp.copy(ll.root.position); tmp.y += 2.35; tmp.project(camera);
+      ui.llIcon.textContent = finale?.active ? '¥ RENT ¥' : 'LANDLADY';
+      const on = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
+      ui.llIcon.classList.toggle('on', on);
+      if (on) ui.llIcon.style.transform = `translate(${Math.round((tmp.x + 1) / 2 * cv.clientWidth - ui.llIcon.offsetWidth / 2)}px, ${Math.round((1 - tmp.y) / 2 * cv.clientHeight - ui.llIcon.offsetHeight)}px)`;
+    } else ui.llIcon.classList.remove('on');
     const d = Math.hypot(player.position.x - SLEEP.x, player.position.z - SLEEP.z);
     if (d < SLEEP.r && !zInside && !busy && !missions.active) { zInside = true; sleepPrompt(); }
     else if (d > SLEEP.r + 0.6) zInside = false;
@@ -485,13 +578,14 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
       const gv = sp('giver'); if (gv && on('shady')) gv.c.root.rotation.y = Math.PI;
       const k = sp('syoya'); if (k && on('kimata') && !k.c.dancing && !k.mode && !busy) story.npcs.dance?.(k, player.position);
       if (story.odd.fountain) for (const o of story.odd.fountain.children) { const u = o.userData, t = (now / 1400 + u.ph) % 1; o.position.set(Math.cos(u.a + t) * u.r * (1 - t), t * 7, Math.sin(u.a + t) * u.r * (1 - t)); o.visible = t < 0.96; }
-      if (story.landlady && !story.landlady.mode) story.landlady.targetHeading = Math.atan2(player.position.x - story.landlady.root.position.x, player.position.z - story.landlady.root.position.z);
+      if (story.landlady && !story.landlady.mode && !story.landlady.walker && !(story.landlady.talkT > 0)) story.landlady.targetHeading = Math.atan2(player.position.x - story.landlady.root.position.x, player.position.z - story.landlady.root.position.z);
     }
   };
   window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyQ' && !e.repeat && mode === 'story') { weird(); return; }
     if (!ui.card.classList.contains('on')) return;
     const bs = [...ui.card.querySelectorAll('button')];
+    if (e.code === 'Space' && ui.card.classList.contains('talk')) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) bs[0]?.click(); return; }
     if (e.code === 'Enter') { e.preventDefault(); e.stopPropagation(); (bs.find((b) => b.classList.contains('mo-yes')) || bs[0])?.click(); }
     else if (e.code === 'Escape' && bs.length > 1) { e.preventDefault(); e.stopPropagation(); bs[bs.length - 1].click(); }
   }, true);
@@ -529,8 +623,8 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
   return {
     get mode() { return mode; }, get state() { return S; }, get busy() { return busy; }, ODD, PAY, RENT, growth, growDay, snitch,
     get speedMul() { return mode === 'story' && S && S.shake && finale?.active ? 1.12 : 1; },
-    begin, showTitle, weird, nextDay, sleepPrompt, glitch, applyOddities, closeCard, rentDay,
-    get story() { return story; }, el: ui,
+    begin, showTitle, weird, nextDay, sleepPrompt, glitch, applyOddities, closeCard, rentDay, rentMorning, talkScene, SLEEP, WAKE, LL_PATH,
+    get story() { return story; }, el: ui, glitchFx,
     get finale() { return finale; }, credits,
     debug: { set(patch) { Object.assign(S, patch); persist(); applyOddities(); growDay(); finale.showHouse(!!S.house); hud(); } },
   };

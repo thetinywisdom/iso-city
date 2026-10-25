@@ -1,17 +1,17 @@
 // Gameplay extras hooked from main.js with one line: contact shadows that show
 // through roofs (task 4), click-to-talk NPC chat bubbles (task 7), and long-press SLAP (combat.js).
-import { ContactShadows } from './shadows.js?v=20261025j';
-import { initDialogue } from './dialogue.js?v=20261025j';
-import { initCombat } from './combat.js?v=20261025j';
-import { initMissions } from './missions.js?v=20261025j';
-import { initActions } from './actions.js?v=20261025j';
-import { initChatter } from './chatter.js?v=20261025j';
-import { initPolice } from './police.js?v=20261025j';
-import { initBananas } from './bananas.js?v=20261025j';
-import { initCats } from './cats.js?v=20261025j';
-import { initHiding } from './hiding.js?v=20261025j';
-import { initGrandma } from './grandma.js?v=20261025j';
-import { initStory } from './story.js?v=20261025j';
+import { ContactShadows } from './shadows.js?v=20261025l';
+import { initDialogue } from './dialogue.js?v=20261025l';
+import { initCombat } from './combat.js?v=20261025l';
+import { initMissions } from './missions.js?v=20261025l';
+import { initActions } from './actions.js?v=20261025l';
+import { initChatter } from './chatter.js?v=20261025l';
+import { initPolice } from './police.js?v=20261025l';
+import { initBananas } from './bananas.js?v=20261025l';
+import { initCats } from './cats.js?v=20261025l';
+import { initHiding } from './hiding.js?v=20261025l';
+import { initGrandma } from './grandma.js?v=20261025l';
+import { initStory } from './story.js?v=20261025l';
 
 export function initExtras({ scene, camera, renderer, pixel, city, player, getNPCs, keys }) {
   const shadows = new ContactShadows(scene, city);
@@ -33,6 +33,6 @@ export function initExtras({ scene, camera, renderer, pixel, city, player, getNP
   const cats = initCats({ scene, city, player, getNPCs, dialogue, combat, actions, police, pixel });
   const hiding = initHiding({ scene, camera, city, player, keys, getNPCs, dialogue, combat, police, missions, shadows, pixel });
   const grandma = initGrandma({ scene, player, getNPCs, dialogue, combat, police });
-  const story = initStory({ scene, camera, city, player, getNPCs, dialogue, combat, missions, police, pixel, actions, bananas });   // last: wraps dialogue hooks
+  const story = initStory({ scene, camera, city, player, getNPCs, dialogue, combat, missions, police, pixel, actions, bananas, cats });   // last: wraps dialogue hooks
   return { shadows, dialogue, combat, missions, actions, chatter, police, bananas, cats, hiding, grandma, story };
 }

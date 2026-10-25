@@ -1,11 +1,11 @@
 // Character creator page (creator.html). Builds custom characters with the same builder + pixel
 // pipeline as the game and saves them to localStorage; the city tab picks them up live.
 import * as THREE from 'three';
-import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025j';
-import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025j';
-import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025j';
-import * as CH from '../characters/characters.js?v=20261025j';
-import { CITY_ROSTER, OVERRIDE_KEY, cityBaseDef, loadOverrides, saveOverride, clearOverride } from './citychars.js?v=20261025j';
+import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025l';
+import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025l';
+import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025l';
+import * as CH from '../characters/characters.js?v=20261025l';
+import { CITY_ROSTER, OVERRIDE_KEY, cityBaseDef, loadOverrides, saveOverride, clearOverride } from './citychars.js?v=20261025l';
 
 const MAX = 30;
 const $ = (s) => document.querySelector(s);
@@ -20,7 +20,9 @@ const label = (v) => LABELS[v] || pretty(v);
 rampUniforms.uSunI.value = 1.1;
 const host = $('#preview');
 const renderer = new THREE.WebGLRenderer({ antialias: false });
-renderer.setPixelRatio(1);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const EMBED = new URLSearchParams(location.search).has('embed');
+if (EMBED) { document.documentElement.classList.add('embed'); addEventListener('keydown', (e) => { if (e.code === 'Escape') window.parent?.__gameMenu?.close?.(); }); }
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.BasicShadowMap;
 host.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
@@ -34,8 +36,7 @@ const ground = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.12, 24), 
 ground.position.y = -0.06; ground.receiveShadow = true; scene.add(ground);
 const stage = new THREE.Group(); scene.add(stage);
 const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-const pixel = new PixelPipeline(renderer, { scale: 3 });
-pixel.outlines = false; pixel.dither = false;
+const pixel = new PixelPipeline(renderer, {});
 pixel.toonify(scene);
 const CAM_OFFSET = new THREE.Vector3(10, 10, 10), target = new THREE.Vector3(0, 1.15, 0), VIEW = 1.45;
 function resize() {

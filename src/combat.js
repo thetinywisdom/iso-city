@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TUNE, NPC_RADIUS } from './npcs.js?v=20261025j';
+import { TUNE, NPC_RADIUS } from './npcs.js?v=20261025l';
 
 // SLAP: long-press an NPC (dialogue.js fires onLongPress) -> the player walks into
 // reach, winds up and slaps. Impact = pixel "SLAP!" burst, screen shake, a synthesized
@@ -325,6 +325,18 @@ class SlapAudio {
     for (const x of [o, wob, flut]) { x.start(t); x.stop(t + dur + 0.05); }
     this._noise(t, dur * 0.8, 'lowpass', 700, 150, 0.22, 1.5);
     return dur;
+  }
+  bark(vol = 1) {   // a cartoon "WOOF": two quick square-wave yaps with a noisy edge (from a cat. on day 5.)
+    if (this.muted || !this.ctx) return;
+    const c = this.ctx, t0 = c.currentTime;
+    for (const [dt, f0] of [[0, 420 + Math.random() * 80], [0.2, 380 + Math.random() * 60]]) {
+      const t = t0 + dt, o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
+      o.type = 'square'; o.frequency.setValueAtTime(f0 * 0.7, t); o.frequency.exponentialRampToValueAtTime(f0, t + 0.03); o.frequency.exponentialRampToValueAtTime(f0 * 0.45, t + 0.14);
+      lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 3;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.32 * vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      o.connect(lp).connect(g).connect(c.destination); o.start(t); o.stop(t + 0.17);
+      this._noise(t, 0.08, 'bandpass', 900, 500, 0.18 * vol, 1.2);
+    }
   }
   smack() {
     if (this.muted || !this.ctx) return;

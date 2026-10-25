@@ -55,3 +55,6 @@ textarea { resize: vertical; min-height: 86px; }
 
 #city li.edited .nm { color: #A92D59; }
 #city .pbtn:disabled { opacity: .35; cursor: default; }
+
+/* embedded in the game menu */
+html.embed header { display: none; }

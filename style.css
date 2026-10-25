@@ -2,17 +2,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #EFFAFA;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 #app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 #app canvas { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-#controls { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); pointer-events: none;
-  background: #292C2E; color: #F0F2F4; padding: 8px 18px; border-radius: 999px; font-size: 13px;
-  white-space: nowrap; letter-spacing: .01em; }
-#controls b { color: #FFCC3F; font-weight: 600; }
 
-#pixelHud {
-  position: fixed; top: 14px; right: 14px; padding: 6px 10px; border-radius: 4px;
-  background: #292C2E; color: #FFCC3F; font: 600 13px/1 ui-monospace, monospace;
-  opacity: 0; transition: opacity .3s; pointer-events: none;
-}
 canvas { image-rendering: pixelated; }
+#app canvas { image-rendering: auto; }
 
 /* ---- NPC chat bubbles (pixel-art) ---------------------------------------- */
 @font-face { font-family: 'PressStart2P'; src: url('fonts/PressStart2P-Regular.ttf') format('truetype'); font-display: block; }
@@ -233,7 +225,7 @@ canvas { image-rendering: pixelated; }
 #story-menu { position: fixed; bottom: 128px; right: 18px; display: none; pointer-events: auto; cursor: pointer; border: 0;
   font: 10px/10px 'PressStart2P', ui-monospace, monospace; -webkit-font-smoothing: none; color: #F0F2F4; background: #5B6A7B; padding: 8px 10px;
   box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E, 0 6px 0 0 #292C2E; }
-#story-menu.on { display: block; }
+#story-menu.on { display: none; }   /* folded into the game menu (TITLE SCREEN) */
 #story-menu:hover { background: #292C2E; color: #FFCC3F; }
 #story-z { position: absolute; left: 0; top: 0; display: none; pointer-events: auto; cursor: pointer; will-change: transform; }
 #story-z.on { display: block; }
@@ -251,6 +243,9 @@ canvas { image-rendering: pixelated; }
 #story-fade { position: fixed; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center; background: #292C2E; }
 #story-fade.on { display: flex; animation: story-fade-in .36s steps(4, end) backwards; }
 #story-fade.out { animation: story-fade-out .36s steps(4, end) forwards; }
+#story-fade { flex-direction: column; gap: 28px; }
+#story-fade.day > div { font-size: 112px; line-height: 112px; text-shadow: 10px 10px 0 #A92D59; }
+#story-fade > p { margin: 0; font-size: 20px; color: #B0E9FF; }
 #story-fade > div { font-size: 48px; line-height: 48px; color: #FFCC3F; text-shadow: 6px 6px 0 #A92D59; }
 @keyframes story-fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
 @keyframes story-fade-out { 0% { opacity: 1; } 100% { opacity: 0; } }
@@ -259,8 +254,7 @@ canvas { image-rendering: pixelated; }
 #story-tear > div { position: absolute; left: 0; right: 0; }
 body.story-on #wanted { top: 120px; }
 body.story-hunt #wanted { top: 168px; }
-body.story-on #pixelHud { top: 120px; }
-/* story finale: the 7:00 clock in the landlady's house */
+body.story-on /* story finale: the 7:00 clock in the landlady's house */
 #finale-hud { position: fixed; left: 15px; top: 15px; display: none; font-family: 'PressStart2P', ui-monospace, monospace; text-align: left; color: #F0F2F4; background: #292C2E;
   padding: 9px 12px 9px; box-shadow: 0 6px 0 0 #FF5491; white-space: nowrap; pointer-events: auto; z-index: 9; }
 #finale-hud.on { display: block; }
@@ -268,3 +262,53 @@ body.story-on #pixelHud { top: 120px; }
 #finale-hud .fh-t.low { color: #FF5491; }
 #finale-hud .fh-k { font-size: 16px; line-height: 16px; color: #B0E9FF; margin-bottom: 9px; }
 #finale-hud .fh-give { font-size: 16px; }
+
+/* ---- one in-game menu: CONTROLS · CHARACTERS · CREATOR (gamemenu.js) ---- */
+#menuBtn { position: fixed; bottom: 18px; right: 18px; z-index: 8; cursor: pointer; border: 0;
+  font: 12px/12px 'PressStart2P', ui-monospace, monospace; -webkit-font-smoothing: none; color: #292C2E; background: #FFCC3F; padding: 10px 12px;
+  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E, 0 6px 0 0 #5B6A7B; }
+#menuBtn:hover { background: #F0F2F4; }
+#game-menu { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; background: rgba(41,44,46,.72); }
+#game-menu.on { display: flex; }
+#game-menu .gm-box { width: min(1100px, 94vw); height: min(760px, 90vh); display: flex; flex-direction: column; background: #F0F2F4; color: #292C2E;
+  font: 12px/16px 'PressStart2P', ui-monospace, monospace; -webkit-font-smoothing: none;
+  box-shadow: 0 -4px 0 0 #292C2E, 0 4px 0 0 #292C2E, -4px 0 0 0 #292C2E, 4px 0 0 0 #292C2E, 0 10px 0 0 #A92D59; }
+#game-menu .gm-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #292C2E; color: #FFCC3F; font-size: 16px; }
+#game-menu .gm-x { cursor: pointer; border: 0; background: #FF5491; color: #F0F2F4; font: inherit; padding: 6px 10px; }
+#game-menu .gm-tabs { display: flex; gap: 8px; padding: 12px 16px 0; flex-wrap: wrap; }
+#game-menu .gm-tabs button { cursor: pointer; border: 0; font: inherit; padding: 10px 12px; background: #B0E9FF; color: #292C2E; }
+#game-menu .gm-tabs button.on { background: #292C2E; color: #FFCC3F; }
+#game-menu .gm-tabs .gm-title { margin-left: auto; background: #5B6A7B; color: #F0F2F4; }
+#game-menu .gm-pane { display: none; flex: 1; min-height: 0; overflow: auto; padding: 16px; border-top: 4px solid #292C2E; margin-top: -4px; }
+#game-menu .gm-pane.on { display: flex; flex-direction: column; }
+#game-menu .gm-keys { border-collapse: collapse; }
+#game-menu .gm-keys td { padding: 8px 14px 8px 0; }
+#game-menu .gm-keys b { color: #A92D59; }
+#game-menu .gm-note { margin: 0 0 12px; font-size: 10px; color: #5B6A7B; }
+#game-menu .gm-note a { color: #A92D59; }
+#game-menu .gm-chars { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+#game-menu .gm-char { cursor: pointer; border: 0; font: inherit; text-align: left; padding: 14px; background: #B0E9FF; color: #292C2E; box-shadow: 0 4px 0 0 #292C2E; }
+#game-menu .gm-char.on { background: #FFCC3F; }
+#game-menu .gm-frame { flex: 1; min-height: 0; }
+#game-menu .gm-frame iframe { width: 100%; height: 100%; border: 0; background: #EFFAFA; }
+/* HOME marker over the run-down apartment door (story mode): where you wake up and sleep */
+#story-z .hm { display: flex; flex-direction: column; align-items: center; animation: mark-bob .8s steps(2, end) infinite; }
+#story-z .hm b { font: 12px/12px 'PressStart2P', ui-monospace, monospace; color: #292C2E; background: #FFCC3F; padding: 7px 9px 5px; font-weight: normal;
+  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E; white-space: nowrap; }
+#story-z .hm i { font: 8px/8px 'PressStart2P', ui-monospace, monospace; font-style: normal; color: #F0F2F4; background: #292C2E; padding: 4px 6px 3px; margin-top: 3px; white-space: nowrap; }
+#story-z .hm s { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 12px solid #292C2E; margin-top: 2px; }
+#story-z.edge .hm i, #story-z.edge .hm s { display: none; }
+/* talk scenes: a caption box at the bottom so the framed scene stays visible; advance on click / ENTER */
+#story-card.talk { top: auto; bottom: 34px; text-align: left; width: min(640px, 92vw); cursor: pointer; }
+#story-card.talk .sc-head { color: #FF7DAF; font-size: 18px; line-height: 22px; }
+#story-card.talk .sc-head::after { content: attr(data-step); float: right; color: #A7BFA4; font-size: 12px; }
+#story-card.talk .sc-line { font-size: 18px; line-height: 28px; }
+#story-card.talk .sc-line.cap { font-size: 11px; line-height: 16px; color: #B0E9FF; margin-top: 10px; }
+#story-card.talk .sc-row { justify-content: flex-end; margin-top: 12px; }
+/* rent-day / finale: an icon over the landlady's head */
+.ll-icon { position: absolute; left: 0; top: 0; pointer-events: none; display: none; font: 14px/14px 'PressStart2P', ui-monospace, monospace; color: #292C2E; background: #FF7DAF; padding: 6px 7px 4px;
+  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E; animation: mark-bob .6s steps(2, end) infinite; white-space: nowrap; }
+.ll-icon.on { display: block; }
+#bh-flash { position: fixed; inset: 0; z-index: 24; pointer-events: none; background: #F0F2F4; opacity: 0; }
+#bh-flash.on { animation: bh-flash .7s steps(6, end) forwards; }
+@keyframes bh-flash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }

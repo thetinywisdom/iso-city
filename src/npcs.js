@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261025j';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025j';
-import { registerPools } from './french.js?v=20261025j';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261025j';
+import { addGhosts } from './player.js?v=20261025l';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025l';
+import { registerPools } from './french.js?v=20261025l';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261025l';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -26,6 +26,9 @@ const IDLERS = [
   { seed: 909, pos: [-6.4, -14.0], face: [-8, -14.0] },  // window-shopping at the teal tower
   { seed: 1010, pos: [-24.4, 22.7], face: [-21.5, 21.5] }, // watching the fountain (west side of the plaza)
   { seed: 1111, pos: [13.4, -6.1], face: [16, -6.1] },     // waiting at the bus stop
+  { seed: 1212, pos: [11.4, -22.4], face: [12.5, -23.2] }, // pocket park, by the bench
+  { seed: 1313, pos: [-23.6, -24.0], face: [-22.3, -26.0] }, // parking lot, admiring a car
+  { seed: 1414, pos: [39.6, -27.3], face: [40.6, -27.3] },  // outside the laundromat
 ];
 // The cop walks a big beat around four blocks (outer sidewalk lane).
 const COP_BEAT = { path: [[-7.15, -7.15], [10.4, -7.15], [10.9, -5.0], [17.0, -5.0], [17.3, -7.15], [40.15, -7.15], [40.15, 40.15], [-7.15, 40.15], [-7.15, 17.2], [-4.6, 16.7], [-4.6, 12.6], [-7.15, 12.1]], start: 0, dir: 1, speed: 1.2, along: 0.15 };   // detours round the bus shelter and the bench

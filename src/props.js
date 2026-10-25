@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { mat } from './bucket.js?v=20261025j';
-import { COMIC } from './palette.js?v=20261025j';
+import { mat } from './bucket.js?v=20261025l';
+import { COMIC } from './palette.js?v=20261025l';
 
 // Street-furniture & vegetation library. Everything is baked into the city's
 // shared vertex-colour Bucket (one draw call) and uses Comic palette colours
@@ -14,7 +14,7 @@ const G = {
   ico: new THREE.IcosahedronGeometry(1, 0),
 };
 
-export function makeProps(solid, addCollider, CURB) {
+export function makeProps(solid, addCollider, CURB, treesBucket = null) {
   // place a part at local (lx, ly, lz) of an object at (x, z) rotated by ry
   const part = (geo, x, z, ry, lx, ly, lz, sx, sy, sz, color, rx = 0, rz = 0) => {
     const c = Math.cos(ry), s = Math.sin(ry);
@@ -25,28 +25,27 @@ export function makeProps(solid, addCollider, CURB) {
   const y0 = CURB;
 
   // ---------------- trees ----------------
-  function crownTree(x, z, s, trunk, c1, c2) {
-    solid.add(G.cyl8, mat(x, y0 + 0.8 * s, z, 0.3 * s, 1.6 * s, 0.3 * s), trunk);
-    solid.add(G.ico, mat(x, y0 + 2.5 * s, z, 1.3 * s, 1.15 * s, 1.3 * s, 0.4), c1);
-    solid.add(G.ico, mat(x + 0.55 * s, y0 + 3.15 * s, z - 0.35 * s, 0.75 * s, 0.7 * s, 0.75 * s, 1.1), c2);
-    addCollider(x, z, 0.3, 0.3);
+  // Trees bake into their own bucket (city-trees) and are logged, so story mode can swap them for spinning
+  // instanced copies (the day 5+ glitch). draw*(bk, x, z, s, yb) work in world space or local space (x=z=0, yb=0).
+  const treeBucket = treesBucket || solid, treeLog = [];
+  function crownTree(bk, x, z, s, trunk, c1, c2, yb = y0) {
+    bk.add(G.cyl8, mat(x, yb + 0.8 * s, z, 0.3 * s, 1.6 * s, 0.3 * s), trunk);
+    bk.add(G.ico, mat(x, yb + 2.5 * s, z, 1.3 * s, 1.15 * s, 1.3 * s, 0.4), c1);
+    bk.add(G.ico, mat(x + 0.55 * s, yb + 3.15 * s, z - 0.35 * s, 0.75 * s, 0.7 * s, 0.75 * s, 1.1), c2);
   }
-  const roundTree = (x, z, s = 1) => crownTree(x, z, s, T[0], N[3], N[3]);
-  const blossomTree = (x, z, s = 1) => {
-    crownTree(x, z, s, W[0], K[3], K[2]);
-    solid.add(G.ico, mat(x - 0.6 * s, y0 + 2.2 * s, z + 0.5 * s, 0.6 * s, 0.55 * s, 0.6 * s, 0.7), K[2]);
+  const DRAW = {
+    round: (bk, x, z, s, yb) => crownTree(bk, x, z, s, T[0], N[3], N[3], yb),
+    blossom: (bk, x, z, s, yb = y0) => { crownTree(bk, x, z, s, W[0], K[3], K[2], yb); bk.add(G.ico, mat(x - 0.6 * s, yb + 2.2 * s, z + 0.5 * s, 0.6 * s, 0.55 * s, 0.6 * s, 0.7), K[2]); },
+    autumn: (bk, x, z, s, yb = y0) => { crownTree(bk, x, z, s, W[0], Y[1], Y[0], yb); bk.add(G.ico, mat(x - 0.5 * s, yb + 2.0 * s, z + 0.55 * s, 0.6 * s, 0.55 * s, 0.6 * s, 0.2), Y[2]); },
+    conifer: (bk, x, z, s, yb = y0) => {
+      bk.add(G.cyl8, mat(x, yb + 0.4 * s, z, 0.3 * s, 0.8 * s, 0.3 * s), T[0]);
+      bk.add(G.cone, mat(x, yb + 1.6 * s, z, 2.0 * s, 1.8 * s, 2.0 * s, 0.2), T[1]);
+      bk.add(G.cone, mat(x, yb + 2.6 * s, z, 1.55 * s, 1.6 * s, 1.55 * s, 0.6), T[1]);
+      bk.add(G.cone, mat(x, yb + 3.5 * s, z, 1.05 * s, 1.4 * s, 1.05 * s, 0.1), T[1]);
+    },
   };
-  const autumnTree = (x, z, s = 1) => {
-    crownTree(x, z, s, W[0], Y[1], Y[0]);
-    solid.add(G.ico, mat(x - 0.5 * s, y0 + 2.0 * s, z + 0.55 * s, 0.6 * s, 0.55 * s, 0.6 * s, 0.2), Y[2]);
-  };
-  function conifer(x, z, s = 1) {
-    solid.add(G.cyl8, mat(x, y0 + 0.4 * s, z, 0.3 * s, 0.8 * s, 0.3 * s), T[0]);
-    solid.add(G.cone, mat(x, y0 + 1.6 * s, z, 2.0 * s, 1.8 * s, 2.0 * s, 0.2), T[1]);
-    solid.add(G.cone, mat(x, y0 + 2.6 * s, z, 1.55 * s, 1.6 * s, 1.55 * s, 0.6), T[1]);
-    solid.add(G.cone, mat(x, y0 + 3.5 * s, z, 1.05 * s, 1.4 * s, 1.05 * s, 0.1), T[1]);
-    addCollider(x, z, 0.35, 0.35);
-  }
+  const plant = (kind, r) => (x, z, s = 1) => { DRAW[kind](treeBucket, x, z, s); treeLog.push({ kind, x, z, s, y: y0 }); addCollider(x, z, r, r); };
+  const roundTree = plant('round', 0.3), blossomTree = plant('blossom', 0.3), autumnTree = plant('autumn', 0.3), conifer = plant('conifer', 0.35);
   function sapling(x, z, s = 1) {
     solid.add(G.cyl8, mat(x, y0 + 0.65 * s, z, 0.12, 1.3 * s, 0.12), W[1]);
     solid.add(G.box, mat(x + 0.18, y0 + 0.5, z, 0.06, 1.0, 0.06), W[2]); // stake
@@ -221,6 +220,6 @@ export function makeProps(solid, addCollider, CURB) {
     planter(x1 - 0.75, cz - 3.1, K[1]); planter(x1 - 0.75, cz + 3.1, Y[1]);
   }
 
-  return { roundTree, blossomTree, autumnTree, conifer, sapling, bush, hedge, planter,
+  return { treeLog, treeDraw: DRAW, roundTree, blossomTree, autumnTree, conifer, sapling, bush, hedge, planter,
     slatBench, blockBench, parkBench, bin, bollard, picketFence, railing, busStop, vending, bikeRack, fountain, park };
 }
