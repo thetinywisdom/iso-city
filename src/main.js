@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js';
-import { Player, JUMP } from './player.js';
-import { P } from './palette.js';
-import { PixelPipeline, placeSnappedSun } from './pixel.js';
-import { NPCs, NPC_RADIUS } from './npcs.js';
-import { initExtras } from './extras.js';
+import { generateCity } from './city.js?v=20261025c';
+import { Player, JUMP } from './player.js?v=20261025c';
+import { P } from './palette.js?v=20261025c';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025c';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025c';
+import { initExtras } from './extras.js?v=20261025c';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -74,7 +74,7 @@ scene.add(player.root);
 // Real characters live in ../characters/characters.js and export
 // createMainCharacter() and createNPC(options). If the file exists we swap the
 // placeholder capsule for the main character; otherwise the capsule stays.
-import('../characters/characters.js')
+import('../characters/characters.js?v=20261025c')
   .then((mod) => {
     if (mod?.createMainCharacter) player.setModel(mod.createMainCharacter());
     if (mod?.createNPC) { npcs = new NPCs(scene, mod, city); npcs.toonify = (r) => pixel.toonify(r); }

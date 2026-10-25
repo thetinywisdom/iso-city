@@ -5,9 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Iso City — Character Creator</title>
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="creator.css" />
+  <link rel="stylesheet" href="creator.css?v=20261025c" />
+  <script>
+    // Load guard: if the module graph fails (stale cached file, old browser), say so instead of dead buttons.
+    (function () { var shown = false; function show(msg) { if (shown || window.__creator) return; shown = true;
+      var d = document.createElement('div'); d.id = 'loadErr';
+      d.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:9999;background:#E2412F;color:#fff;font:14px/1.4 monospace;padding:12px 14px;border:3px solid #232A33';
+      d.textContent = 'Could not start (' + msg + '). Hard-reload the page: Cmd+Shift+R (Safari: Option+Cmd+E then reload).';
+      (document.body || document.documentElement).appendChild(d); }
+      addEventListener('error', function (e) { if (e.message) setTimeout(function () { show(e.message); }, 1500); }, true);
+      addEventListener('load', function () { setTimeout(function () { show('script did not load'); }, 6000); }); })();
+  </script>
   <script type="importmap">
-    { "imports": { "three": "./vendor/three.module.js" } }
+    { "imports": { "three": "./vendor/three.module.js?v=20261025c" } }
   </script>
 </head>
 <body>
@@ -41,6 +51,6 @@
     </section>
     <section id="form"></section>
   </main>
-  <script type="module" src="src/creator.js"></script>
+  <script type="module" src="src/creator.js?v=20261025c"></script>
 </body>
 </html>

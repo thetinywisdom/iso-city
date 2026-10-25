@@ -1,14 +1,14 @@
 // Gameplay extras hooked from main.js with one line: contact shadows that show
 // through roofs (task 4), click-to-talk NPC chat bubbles (task 7), and long-press SLAP (combat.js).
-import { ContactShadows } from './shadows.js';
-import { initDialogue } from './dialogue.js';
-import { initCombat } from './combat.js';
-import { initMissions } from './missions.js';
-import { initActions } from './actions.js';
-import { initChatter } from './chatter.js';
-import { initPolice } from './police.js';
-import { initBananas } from './bananas.js';
-import { initCats } from './cats.js';
+import { ContactShadows } from './shadows.js?v=20261025c';
+import { initDialogue } from './dialogue.js?v=20261025c';
+import { initCombat } from './combat.js?v=20261025c';
+import { initMissions } from './missions.js?v=20261025c';
+import { initActions } from './actions.js?v=20261025c';
+import { initChatter } from './chatter.js?v=20261025c';
+import { initPolice } from './police.js?v=20261025c';
+import { initBananas } from './bananas.js?v=20261025c';
+import { initCats } from './cats.js?v=20261025c';
 
 export function initExtras({ scene, camera, renderer, pixel, city, player, getNPCs, keys }) {
   const shadows = new ContactShadows(scene, city);

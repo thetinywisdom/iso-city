@@ -1,9 +1,9 @@
 // Character creator page (creator.html). Builds custom characters with the same builder + pixel
 // pipeline as the game and saves them to localStorage; the city tab picks them up live.
 import * as THREE from 'three';
-import { CUSTOM, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js';
-import { PixelPipeline, rampUniforms } from './pixel.js';
-import { HOMES, loadCustom, saveCustom, newId } from './customchars.js';
+import { CUSTOM, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025c';
+import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025c';
+import { HOMES, loadCustom, saveCustom, newId } from './customchars.js?v=20261025c';
 
 const MAX = 30;
 const $ = (s) => document.querySelector(s);
@@ -44,9 +44,12 @@ addEventListener('resize', resize); resize();
 
 let ch = null, spin = true, walk = false, yaw = Math.PI / 4;
 function rebuild() {
-  if (ch) ch.root.removeFromParent();
-  ch = createCustom(cur);
-  stage.add(ch.root); pixel.toonify(ch.root);
+  // never let a preview failure kill the form: log it and keep the old model
+  try {
+    const next = createCustom(cur);
+    if (ch) ch.root.removeFromParent();
+    ch = next; stage.add(ch.root); pixel.toonify(ch.root);
+  } catch (e) { console.error('[creator] preview rebuild failed', e); }
 }
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {

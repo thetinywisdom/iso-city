@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js';
-import { loadCustom, HOMES, VARIETY, STORE_KEY } from './customchars.js';
+import { addGhosts } from './player.js?v=20261025c';
+import { loadCustom, HOMES, VARIETY, STORE_KEY } from './customchars.js?v=20261025c';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
