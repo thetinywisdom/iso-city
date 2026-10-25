@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261025n';
+import { P } from './palette.js?v=20261025o';
 
 // Silhouette shown only where the player is hidden behind buildings.
 const ghostMat = new THREE.MeshBasicMaterial({ color: P.ghost, depthWrite: false });
@@ -54,6 +54,7 @@ export class Player {
     let obj = null, update = null;
     if (model && model.isObject3D) { obj = model; update = model.userData?.character?.update ? model.userData.character : null; }
     else if (model) { obj = model.root || model.object3d || model.mesh || model.group; update = model; }
+    this.char = model && !model.isObject3D ? model : model?.userData?.character || null;   // for the head anchor (bubbles)
     this.isPlaceholder = !obj;
     this.model = obj || createPlaceholder();
     // characters.js API: character.update(dt, { speed, grounded, vy, crouch, turn })

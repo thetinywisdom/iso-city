@@ -9,23 +9,41 @@ canvas { image-rendering: pixelated; }
 /* ---- NPC chat bubbles (pixel-art) ---------------------------------------- */
 @font-face { font-family: 'PressStart2P'; src: url('fonts/PressStart2P-Regular.ttf') format('truetype'); font-display: block; }
 #bubbles { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
-.bubble { position: absolute; left: 0; top: 0; will-change: transform; }
-.bubble > span {
-  position: absolute; left: 0; bottom: 18px; display: block; white-space: nowrap;
-  transform-origin: 50% 100%;
-  font: 16px/16px 'PressStart2P', ui-monospace, monospace; color: #292C2E;
-  background: #F0F2F4; padding: 6px 9px 6px 9px;
+/* ONE comic bubble for every line (talk, shouts, chatter, cats, story, name tags):
+   rounded white body + dark outline, SVG tail laid out per frame by dialogue.js so its tip sits on the head */
+.bubble { position: absolute; left: 0; top: 0; will-change: transform; z-index: 2; }
+.bubble .bb {
+  position: relative; z-index: 1; display: block; width: max-content; max-width: 420px; box-sizing: border-box;
+  font: 16px/20px 'PressStart2P', ui-monospace, monospace; color: #292C2E; text-align: center; white-space: normal;
+  background: #F0F2F4; border: 3px solid #292C2E; border-radius: 12px; padding: 7px 10px 6px;
+  box-shadow: 0 3px 0 0 #5B6A7B;
   -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
-  /* 3px pixel border with notched (pixel-rounded) corners */
-  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E,
-              0 6px 0 0 #5B6A7B; /* hard drop "shadow" row in palette slate */
-  animation: bubble-pop .22s steps(4, end) backwards;
+  transform-origin: 50% 100%; animation: bubble-pop .22s steps(4, end) backwards;
 }
-/* stepped pixel tail (3px art pixels; covers the border under it and steps down to a point) */
-.bubble > span::after {
-  content: ''; position: absolute; left: calc(50% - 6px); top: 100%; width: 15px; height: 18px;
-  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='5' height='6' shape-rendering='crispEdges'><rect x='1' y='0' width='1' height='1' fill='%23F0F2F4'/><rect x='2' y='0' width='1' height='1' fill='%23F0F2F4'/><rect x='3' y='0' width='1' height='1' fill='%23F0F2F4'/><rect x='0' y='1' width='1' height='1' fill='%23292C2E'/><rect x='1' y='1' width='1' height='1' fill='%23F0F2F4'/><rect x='2' y='1' width='1' height='1' fill='%23F0F2F4'/><rect x='3' y='1' width='1' height='1' fill='%23F0F2F4'/><rect x='4' y='1' width='1' height='1' fill='%23292C2E'/><rect x='1' y='2' width='1' height='1' fill='%23292C2E'/><rect x='2' y='2' width='1' height='1' fill='%23F0F2F4'/><rect x='3' y='2' width='1' height='1' fill='%23F0F2F4'/><rect x='4' y='2' width='1' height='1' fill='%23292C2E'/><rect x='2' y='3' width='1' height='1' fill='%23292C2E'/><rect x='3' y='3' width='1' height='1' fill='%23F0F2F4'/><rect x='4' y='3' width='1' height='1' fill='%23292C2E'/><rect x='3' y='4' width='1' height='1' fill='%23292C2E'/><rect x='4' y='4' width='1' height='1' fill='%23292C2E'/><rect x='4' y='5' width='1' height='1' fill='%23292C2E'/></svg>") 0 0 / 15px 18px no-repeat; image-rendering: pixelated;
-}
+.bubble svg.tail { position: absolute; left: 0; top: 0; overflow: visible; z-index: 2; pointer-events: none; animation: tail-in .22s steps(1, end) backwards; }
+.bubble .tf { fill: #F0F2F4; }
+.bubble .tl { fill: none; stroke: #292C2E; stroke-width: 3; stroke-linejoin: miter; }
+@keyframes tail-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+.bubble .who { font-size: 8px; line-height: 8px; color: #A92D59; text-align: left; margin: -1px 0 5px; white-space: nowrap; }
+.bubble .who .step { font-style: normal; color: #5B6A7B; float: right; margin-left: 12px; }
+.bubble .en { display: block; font-size: 8px; line-height: 10px; color: #5B6A7B; margin-top: 4px; }
+.bubble .cap { font-size: 8px; line-height: 11px; color: #5B6A7B; margin-top: 6px; }
+.bubble .hint { font-size: 8px; line-height: 8px; color: #FF5491; text-align: right; margin-top: 6px; white-space: nowrap; animation: mark-bob .8s steps(2, end) infinite; }
+/* shouts: the same bubble, red bold text + a shake */
+.bubble.shout { z-index: 3; animation: shout-shake .3s steps(2, end) .22s 6; }
+.bubble.shout .txt { color: #A92D59; text-shadow: 1px 0 0 #A92D59; }
+/* idle chatter: the same bubble, just smaller and under the real ones */
+.bubble.chat { z-index: 1; }
+.bubble.chat .bb { font-size: 8px; line-height: 10px; padding: 4px 7px 3px; border-radius: 9px; max-width: 200px; }
+/* icons (♪ / ♥) */
+.bubble.icon .bb { padding: 5px 8px; line-height: 0; animation: bubble-pop .22s steps(4, end) backwards, icon-bob 1s steps(2, end) .22s infinite; }
+.bubble.icon canvas { display: block; image-rendering: pixelated; }
+/* story lines: same bubble, a little roomier */
+.bubble.story { z-index: 4; }
+.bubble.story .bb { max-width: min(480px, 86vw); text-align: left; padding: 8px 11px 7px; }
+/* name tags (hover / LANDLADY mark): a tiny version of the same bubble */
+.bubble.tag .bb { font-size: 8px; line-height: 8px; color: #A92D59; padding: 4px 6px 3px; border-radius: 8px; white-space: nowrap; }
+.bubble.mark .bb { animation: bubble-pop .22s steps(4, end) backwards; }
 @keyframes bubble-pop {
   0% { transform: scale(.2); }
   70% { transform: scale(1.12); }
@@ -33,21 +51,6 @@ canvas { image-rendering: pixelated; }
 }
 
 /* ---- SHOUT bubbles (angry / scared NPCs) ---------------------------------- */
-.bubble.shout { z-index: 2; }
-.bubble.fr > span { text-align: center; }
-.bubble > span > .en { display: block; font: 8px/8px 'PressStart2P', ui-monospace, monospace; color: #5B6A7B; margin-top: 5px; }
-.bubble.shout > span > .en { color: #A92D59; text-shadow: none; }
-.bubble.shout > span {
-  font-size: 16px; line-height: 16px; color: #A92D59; background: #F9F0F1; padding: 9px 12px;
-  /* faux-bold: glyph repeated 1-2px to the right */
-  text-shadow: 1px 0 0 #A92D59, 2px 0 0 #A92D59;
-  box-shadow: 0 -3px 0 0 #A92D59, 0 3px 0 0 #A92D59, -3px 0 0 0 #A92D59, 3px 0 0 0 #A92D59,
-              0 -6px 0 0 #292C2E, 0 6px 0 0 #292C2E, -6px 0 0 0 #292C2E, 6px 0 0 0 #292C2E,
-              0 9px 0 0 #5B6A7B;
-  bottom: 24px;
-  animation: bubble-pop .22s steps(4, end) backwards, shout-shake .3s steps(2, end) .22s 6;
-}
-.bubble.shout > span::after { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='5' height='6' shape-rendering='crispEdges'><path d='M1 0h3v1h-3z M1 1h3v1h-3z M2 2h2v1h-2z M3 3h1v1h-1z' fill='%23F9F0F1'/><path d='M0 1h1v1h-1z M4 1h1v1h-1z M1 2h1v1h-1z M4 2h1v1h-1z M2 3h1v1h-1z M4 3h1v1h-1z M3 4h2v1h-2z M4 5h1v1h-1z' fill='%23A92D59'/></svg>"); top: calc(100% + 3px); }
 @keyframes shout-shake {
   0% { translate: -3px 0; } 50% { translate: 3px -3px; } 100% { translate: 0 0; }
 }
@@ -71,16 +74,8 @@ canvas { image-rendering: pixelated; }
 #hud-mute { position: fixed; right: 12px; bottom: 12px; font: 8px/8px 'PressStart2P', monospace; color: #F0F2F4; background: #292C2E; padding: 6px; z-index: 6; pointer-events: none; display: none; }
 
 /* ---- special NPCs: floating pixel icon bubble + hover name tag ---------------- */
-.bubble.icon > span { padding: 6px 9px; line-height: 0; animation: bubble-pop .22s steps(4, end) backwards, icon-bob 1s steps(2, end) .22s infinite; }
-.bubble.icon canvas { display: block; image-rendering: pixelated; }
 @keyframes icon-bob { 0% { translate: 0 0; } 50% { translate: 0 -3px; } }
-.nametag {
-  position: absolute; left: 0; top: 0; display: none; white-space: nowrap; will-change: transform;
-  font: 16px/16px 'PressStart2P', ui-monospace, monospace; color: #F0F2F4; background: #292C2E; padding: 6px 6px 6px 9px;
-  margin-top: -33px; /* sits above the anchor point (just over the head) */
-  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
-  box-shadow: 0 3px 0 0 #5B6A7B;
-}
+
 
 /* ---- missions: HUD, banner, offer panel, giver marker, off-screen arrow ---------- */
 #missions { position: fixed; inset: 0; pointer-events: none; z-index: 7; font-family: 'PressStart2P', ui-monospace, monospace;
@@ -147,11 +142,7 @@ canvas { image-rendering: pixelated; }
 #npc-menu .nm-item[data-act="mission"]:hover { color: #FF5491; }
 
 /* ---- idle small-talk bubbles (chatter.js): smaller, cool tint, sit under real bubbles ---- */
-.bubble { z-index: 1; }
-.bubble.chat { z-index: 0; }
-.bubble.chat > span { font-size: 8px; line-height: 8px; padding: 6px 6px 3px; background: #DBF5FE; color: #363E47;
-  box-shadow: 0 -3px 0 0 #5B6A7B, 0 3px 0 0 #5B6A7B, -3px 0 0 0 #5B6A7B, 3px 0 0 0 #5B6A7B, 0 6px 0 0 #A7BFA4; bottom: 12px; }
-.bubble.chat > span::after { left: calc(50% - 6px); width: 12px; height: 15px; background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='5' shape-rendering='crispEdges'><rect x='1' y='0' width='1' height='1' fill='%23DBF5FE'/><rect x='2' y='0' width='1' height='1' fill='%23DBF5FE'/><rect x='0' y='1' width='1' height='1' fill='%235B6A7B'/><rect x='1' y='1' width='1' height='1' fill='%23DBF5FE'/><rect x='2' y='1' width='1' height='1' fill='%23DBF5FE'/><rect x='3' y='1' width='1' height='1' fill='%235B6A7B'/><rect x='1' y='2' width='1' height='1' fill='%235B6A7B'/><rect x='2' y='2' width='1' height='1' fill='%23DBF5FE'/><rect x='3' y='2' width='1' height='1' fill='%235B6A7B'/><rect x='2' y='3' width='1' height='1' fill='%235B6A7B'/><rect x='3' y='3' width='1' height='1' fill='%235B6A7B'/><rect x='3' y='4' width='1' height='1' fill='%235B6A7B'/></svg>") 0 0 / 12px 15px no-repeat; }
+
 
 /* ---- police: WANTED badge + GAME OVER (police.js) ---- */
 #wanted { position: fixed; right: 15px; top: 15px; z-index: 8; display: none; pointer-events: none;
@@ -299,16 +290,9 @@ body.story-on /* story finale: the 7:00 clock in the landlady's house */
 #story-z .hm s { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 12px solid #292C2E; margin-top: 2px; }
 #story-z.edge .hm i, #story-z.edge .hm s { display: none; }
 /* talk scenes: a caption box at the bottom so the framed scene stays visible; advance on click / ENTER */
-#story-card.talk { top: auto; bottom: 34px; text-align: left; width: min(640px, 92vw); cursor: pointer; }
-#story-card.talk .sc-head { color: #FF7DAF; font-size: 18px; line-height: 22px; }
-#story-card.talk .sc-head::after { content: attr(data-step); float: right; color: #A7BFA4; font-size: 12px; }
-#story-card.talk .sc-line { font-size: 18px; line-height: 28px; }
-#story-card.talk .sc-line.cap { font-size: 11px; line-height: 16px; color: #B0E9FF; margin-top: 10px; }
-#story-card.talk .sc-row { justify-content: flex-end; margin-top: 12px; }
+#story-card.talk, #story-card.talk.on { display: none; }   /* talk lines show in the speaker's bubble now */
 /* rent-day / finale: an icon over the landlady's head */
-.ll-icon { position: absolute; left: 0; top: 0; pointer-events: none; display: none; font: 14px/14px 'PressStart2P', ui-monospace, monospace; color: #292C2E; background: #FF7DAF; padding: 6px 7px 4px;
-  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E; animation: mark-bob .6s steps(2, end) infinite; white-space: nowrap; }
-.ll-icon.on { display: block; }
+.ll-icon, .ll-icon.on { display: none; }   /* replaced by a small tag bubble (dialogue.setMark) */
 #bh-flash { position: fixed; inset: 0; z-index: 24; pointer-events: none; background: #F0F2F4; opacity: 0; }
 #bh-flash.on { animation: bh-flash .7s steps(6, end) forwards; }
 @keyframes bh-flash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }

@@ -3,11 +3,11 @@
 // oddity hunt ("THAT'S WEIRD!" [Q], 7 of 10 per loop). Free roam is the untouched sandbox.
 // Saves to localStorage isoCity.story.v1. The hidden house + the 7:00 finale come in Phase C.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025n';
-import { initGrowth } from './growth.js?v=20261025n';
-import { initFinale } from './finale.js?v=20261025n';
-import { APARTMENT } from './fill.js?v=20261025n';
-import { initGlitch } from './glitch.js?v=20261025n';
+import { COMIC } from './palette.js?v=20261025o';
+import { initGrowth } from './growth.js?v=20261025o';
+import { initFinale } from './finale.js?v=20261025o';
+import { APARTMENT } from './fill.js?v=20261025o';
+import { initGlitch } from './glitch.js?v=20261025o';
 
 export const STORY_KEY = 'isoCity.story.v1';
 export const RENT = 77777;
@@ -86,6 +86,8 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     $('#story-z').addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'story' && !busy) sleepPrompt(); });
     // a talk card advances on a click anywhere on it
     $('#story-card').addEventListener('click', () => { if ($('#story-card').classList.contains('talk')) $('#story-card .mo-yes')?.click(); });
+    // talk scenes: a click anywhere on the game advances the line (the card itself is hidden)
+    dialogue.modal = () => { const c = $('#story-card'); if (!c.classList.contains('on') || !c.classList.contains('talk')) return false; $('#story-card .mo-yes')?.click(); return true; };
     return { root, $, llIcon: $('#ll-icon'), title: $('#story-title'), hud: $('#story-hud'), weird: $('#story-weird'), card: $('#story-card'), fade: $('#story-fade'), tear: $('#story-tear'), z: $('#story-z'), menu: $('#story-menu') };
   }
   function confirmNew() { return true; }   // a new story simply overwrites the save (the title shows CONTINUE first)
@@ -228,7 +230,8 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     const N = steps.length;
     const show = (i) => {
       const [line, cap] = Array.isArray(steps[i]) ? steps[i] : [steps[i], ''];
-      dialogue.show(ll, line.length > 46 ? line.slice(0, 44) + '...' : line, 60000);
+      // the line lives in her own comic bubble (the card below is hidden: it only carries the buttons / keys)
+      dialogue.story(ll, line, { tag: i === 0 ? head : 'LANDLADY', step: N > 1 ? `${i + 1}/${N}` : '', cap, hint: (i < N - 1 ? '' : lastBtn.replace(/\s*\[ENTER\]/, '') + '  ') + 'click / ENTER ▶' });
       getNPCs()?.talk(ll, 60, player.position);
       card({ head, cls: 'talk', step: `${i + 1}/${N}`, lines: [`"${line}"`], caption: cap,
         buttons: [[i < N - 1 ? 'NEXT ▶ [ENTER]' : lastBtn, () => {
@@ -561,14 +564,14 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
       ui.z.style.transform = `translate(${Math.round(x - ui.z.offsetWidth / 2)}px, ${Math.round(y - ui.z.offsetHeight)}px)`;
     }
     // a name tag over the landlady's head (the finale's one too)
+    // (drawn by dialogue as a tiny tag bubble on her head; #ll-icon keeps the state for tests / tools)
     const ll = finale?.active ? finale.F?.ll : story?.landlady;
     if (ll && !ll.removed && ll.root.visible !== false && cv) {
-      tmp.copy(ll.root.position); tmp.y += 2.35; tmp.project(camera);
-      ui.llIcon.textContent = finale?.active ? '¥ RENT ¥' : 'LANDLADY';
-      const on = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
-      ui.llIcon.classList.toggle('on', on);
-      if (on) ui.llIcon.style.transform = `translate(${Math.round((tmp.x + 1) / 2 * cv.clientWidth - ui.llIcon.offsetWidth / 2)}px, ${Math.round((1 - tmp.y) / 2 * cv.clientHeight - ui.llIcon.offsetHeight)}px)`;
-    } else ui.llIcon.classList.remove('on');
+      const txt = finale?.active ? '¥ RENT ¥' : 'LANDLADY';
+      ui.llIcon.textContent = txt; dialogue.setMark?.(ll, txt);
+      const a = dialogue.anchor?.(ll);
+      ui.llIcon.classList.toggle('on', !!a && a.vis && a.x > -20 && a.x < cv.clientWidth + 20 && a.y > -20 && a.y < cv.clientHeight + 20);
+    } else { ui.llIcon.classList.remove('on'); dialogue.setMark?.(null); }
     const d = Math.hypot(player.position.x - SLEEP.x, player.position.z - SLEEP.z);
     if (d < SLEEP.r && !zInside && !busy && !missions.active) { zInside = true; sleepPrompt(); }
     else if (d > SLEEP.r + 0.6) zInside = false;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { isFrench, frLine } from './french.js?v=20261025n';
+import { isFrench, frLine } from './french.js?v=20261025o';
 
 // Click an NPC -> pixel-art chat bubble with a random line above their head.
 // The listener runs in the capture phase on window, so a click that hits an NPC
@@ -51,23 +51,39 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   }
   // Shout: bigger, red-bordered, shaking bubble. Does not stop the NPC.
   function shout(npc, text, ms = 1900) { show(npc, text, ms, true); place(); }
-  function show(npc, line, ms, isShout) {
+  // Every bubble is the same comic bubble: a rounded body (.bb) + an SVG tail whose tip sits on the
+  // speaker's head. place() lays them all out each frame (clamped to the screen, stacked so they don't overlap).
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  function makeBubble(cls) {
+    const el = document.createElement('div'); el.className = 'bubble' + (cls ? ' ' + cls : '');
+    const bb = document.createElement('div'); bb.className = 'bb'; el.appendChild(bb);
+    const svg = document.createElementNS(SVGNS, 'svg'); svg.setAttribute('class', 'tail'); svg.setAttribute('width', '1'); svg.setAttribute('height', '1');
+    const fill = document.createElementNS(SVGNS, 'polygon'); fill.setAttribute('class', 'tf');
+    const line = document.createElementNS(SVGNS, 'polyline'); line.setAttribute('class', 'tl');
+    svg.append(fill, line); el.appendChild(svg);
+    layer.appendChild(el);
+    return { el, bb, fill, line };
+  }
+  function whoLine(npc, text) { const w = document.createElement('div'); w.className = 'who'; w.textContent = text; return w; }
+  function show(npc, line, ms, isShout, opt = {}) {
     let b = bubbles.get(npc);
     if (b) b.el.remove();
-    const el = document.createElement('div');
-    el.className = isShout ? 'bubble shout' : 'bubble';
-    const span = document.createElement('span');
-    if (isFrench(npc)) {   // Mbappé: french line + a small english translation underneath
+    const B = makeBubble(isShout ? 'shout' : '');
+    const tag = opt.tag !== undefined ? opt.tag : (!opt.chat && npc.tag ? npc.tag : '');
+    if (tag || opt.step) { const w = whoLine(npc, tag || ''); if (opt.step) { const s = document.createElement('i'); s.className = 'step'; s.textContent = opt.step; w.appendChild(s); } B.bb.appendChild(w); }
+    const span = document.createElement('span'); span.className = 'txt';
+    if (isFrench(npc) && !opt.story) {   // Mbappé: french line + a small english translation underneath
       const [fr, en] = Array.isArray(line) ? line : frLine(line);
       span.append(fr); const sub = document.createElement('small'); sub.className = 'en'; sub.textContent = '(' + en + ')'; span.append(sub);
-      el.classList.add('fr');
+      B.el.classList.add('fr');
     } else span.textContent = line;
-    el.appendChild(span);
-    layer.appendChild(el);
-    // centre on whole pixels (a -50% transform would land text on half pixels and blur it)
-    span.style.left = -Math.round(span.offsetWidth / 2 / 3) * 3 + 'px';
-    b = { el, until: performance.now() + ms, shout: isShout };
+    B.bb.appendChild(span);
+    if (opt.cap) { const c = document.createElement('div'); c.className = 'cap'; c.textContent = opt.cap; B.bb.appendChild(c); }
+    if (opt.hint) { const h = document.createElement('div'); h.className = 'hint'; h.textContent = opt.hint; B.bb.appendChild(h); }
+    if (opt.story) B.el.classList.add('story');
+    b = { ...B, until: performance.now() + ms, shout: isShout, story: !!opt.story, prio: opt.story ? 4 : isShout ? 3 : 2 };
     bubbles.set(npc, b);
+    return b;
   }
   // floating pixel icon bubble (♪ / ♥), drawn per-pixel on a tiny canvas
   const ICONS = {
@@ -84,15 +100,12 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   }
   function showIcon(npc, kind, ms) {
     let b = bubbles.get(npc); if (b) b.el.remove();
-    const el = document.createElement('div'); el.className = 'bubble icon';
-    const span = document.createElement('span'); span.appendChild(iconCanvas(kind)); el.appendChild(span);
-    layer.appendChild(el);
-    span.style.left = -Math.round(span.offsetWidth / 2 / 3) * 3 + 'px';
-    b = { el, until: performance.now() + ms, shout: false, icon: true };
+    const B = makeBubble('icon'); B.bb.appendChild(iconCanvas(kind));
+    b = { ...B, until: performance.now() + ms, shout: false, icon: true, prio: 1 };
     bubbles.set(npc, b);
   }
   function hideAll() {   // closes chat bubbles; shouts keep going
-    for (const [n, b] of bubbles) { if (b.shout || b.icon) continue; b.el.remove(); if (!n.cat) getNPCs()?.endTalk(n); bubbles.delete(n); }
+    for (const [n, b] of bubbles) { if (b.shout || b.icon || b.story) continue; b.el.remove(); if (!n.cat) getNPCs()?.endTalk(n); bubbles.delete(n); }
   }
 
   // Short click/tap on an NPC = talk. Hold >= LONG_PRESS_MS = slap (api.onLongPress).
@@ -143,6 +156,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   }
   window.addEventListener('pointerdown', (e) => {
     if (e.target !== canvas || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (api.modal?.(e)) { e.stopImmediatePropagation(); e.preventDefault(); return; }   // a story line on screen: a click just advances it
     if (api.preClick?.(e.clientX, e.clientY)) { e.stopImmediatePropagation(); e.preventDefault(); hideAll(); return; }   // e.g. a mission pickup under the cursor beats the NPC behind it
     const npc = pick(e.clientX, e.clientY);
     if (npc) {
@@ -167,35 +181,102 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
       const n = pick(lastMove.clientX, lastMove.clientY);
       canvas.style.cursor = n ? 'pointer' : '';
       hoverNPC = n && n.tag ? n : null;
-      tagEl.textContent = hoverNPC ? hoverNPC.tag : '';
-      tagEl.style.display = hoverNPC ? 'block' : 'none';
-      if (hoverNPC) tagEl.style.marginLeft = -Math.round(tagEl.offsetWidth / 2 / 3) * 3 + 'px';
+      setTag(hoverNPC);
     });
   });
-  canvas.addEventListener('pointerleave', () => { hoverNPC = null; tagEl.style.display = 'none'; });
-  // hover name tag for named NPCs (pixel font, follows them under the bubble line)
+  canvas.addEventListener('pointerleave', () => { hoverNPC = null; setTag(null); });
+  // hover name tag for named NPCs + a story "mark" (LANDLADY / ¥ RENT ¥): the same comic bubble, small
   let hoverNPC = null;
-  const tagEl = document.createElement('div'); tagEl.className = 'nametag'; layer.appendChild(tagEl);
+  const tagB = makeBubble('tag'); tagB.el.style.display = 'none';
+  const markB = makeBubble('tag mark'); markB.el.style.display = 'none';
+  let markNPC = null;
+  function setTag(n) { hoverNPC = n && n.tag ? n : null; tagB.bb.textContent = hoverNPC ? hoverNPC.tag : ''; }
+  function setMark(n, text) {
+    markNPC = n || null;
+    if (markNPC && markB.bb.textContent !== text) markB.bb.textContent = text;
+  }
 
-  // Follow the NPC's head in screen space; snapped to the art-pixel grid.
+  // ---- head anchor: the top of the speaker's actual head (hair / hat included), not a fixed height ----
+  const MARGIN = 0.1, TAIL = 14, EDGE = 6;
+  const hw = new THREE.Vector3(), box = new THREE.Box3(), tb = new THREE.Box3();
+  function headNode(n) {
+    const h = n.c?.parts?.headCenter || n.char?.parts?.headCenter || n.parts?.headCenter;
+    if (h) return h;
+    return n.head?.isObject3D ? n.head : null;
+  }
+  function headTop(n, hn, now) {   // world-units from the head node up to the top of what's visible on it
+    const c = n._headTop;
+    if (c && c.node === hn && now - c.t < 500) return c.v;
+    box.makeEmpty();
+    hn.traverseVisible((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      tb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); box.union(tb);
+    });
+    hn.getWorldPosition(hw);
+    const v = box.isEmpty() ? 0.25 : Math.max(0.05, Math.min(1.2, box.max.y - hw.y));
+    n._headTop = { node: hn, t: now, v };
+    return v;
+  }
+  /** Screen point (CSS px) just above the speaker's head. */
+  function anchor(n, now = performance.now()) {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const hn = headNode(n);
+    if (hn) { hn.getWorldPosition(head); head.y += headTop(n, hn, now) + MARGIN; }
+    else { n.root.getWorldPosition(head); head.y += n.bubbleY ?? 2.35; }
+    head.project(camera);
+    return { x: (head.x + 1) / 2 * w, y: (1 - head.y) / 2 * h, vis: head.z < 1 && n.root?.visible !== false && !n.removed };
+  }
+
+  // Lay out every bubble: centred over the head, tail tip on the head, clamped to the screen, no overlaps.
   function place() {
     const now = performance.now();
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    const g = pixel && pixel.enabled ? pixel.scale : 1;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const items = [];
     for (const [npc, b] of bubbles) {
       if (now > b.until) { b.el.remove(); bubbles.delete(npc); continue; }
-      npc.root.getWorldPosition(head); head.y += npc.bubbleY ?? 2.35;
-      head.project(camera);
-      const x = Math.round(((head.x + 1) / 2 * w) / g) * g;
-      const y = Math.round(((1 - head.y) / 2 * h) / g) * g;
-      b.el.style.transform = `translate(${x}px, ${y}px)`;
-      b.el.style.visibility = head.z < 1 ? 'visible' : 'hidden';
+      items.push({ npc, b, prio: b.prio ?? 2 });
     }
-    tagEl.style.visibility = hoverNPC && bubbles.has(hoverNPC) ? 'hidden' : 'visible';   // the bubble takes the spot
-    if (hoverNPC) {
-      hoverNPC.root.getWorldPosition(head); head.y += 2.1; head.project(camera);
-      const x = Math.round(((head.x + 1) / 2 * w) / g) * g, y = Math.round(((1 - head.y) / 2 * h) / g) * g;
-      tagEl.style.transform = `translate(${x}px, ${y}px)`;
+    const tagOn = hoverNPC && !bubbles.has(hoverNPC) && hoverNPC !== markNPC;
+    tagB.el.style.display = tagOn ? '' : 'none';
+    if (tagOn) items.push({ npc: hoverNPC, b: tagB, prio: 0 });
+    const markOn = markNPC && !bubbles.has(markNPC);
+    markB.el.style.display = markOn ? '' : 'none';
+    if (markOn) items.push({ npc: markNPC, b: markB, prio: 0.5 });
+    // read pass (no writes in between, so layout is measured once)
+    for (const it of items) { it.a = anchor(it.npc, now); it.w = it.b.bb.offsetWidth; it.h = it.b.bb.offsetHeight; }
+    items.sort((p, q) => q.prio - p.prio || q.a.y - p.a.y);
+    const placed = [];
+    for (const it of items) {
+      const { a, w, h } = it;
+      if (!a.vis) { it.b.el.style.visibility = 'hidden'; it.b.tip = null; continue; }
+      let x = Math.round(a.x - w / 2), y = Math.round(a.y - TAIL - h);
+      const clampX = () => { x = Math.max(EDGE, Math.min(W - EDGE - w, x)); };
+      const clampY = () => { y = Math.max(EDGE, Math.min(H - EDGE - h, y)); };
+      clampX(); clampY();
+      let moved = false;
+      for (let k = 0; k < 8; k++) {
+        const o = placed.find((r) => x < r.x + r.w + 3 && x + w + 3 > r.x && y < r.y + r.h + 3 && y + h + 3 > r.y);
+        if (!o) break;
+        moved = true;
+        const up = o.y - h - 4;
+        if (up >= EDGE) y = up;
+        else { x = a.x < o.x + o.w / 2 ? o.x - w - 4 : o.x + o.w + 4; clampX(); }
+      }
+      placed.push({ x, y, w, h });
+      const el = it.b.el;
+      el.style.visibility = 'visible';
+      el.style.zIndex = moved ? '1' : ''; // stacked bubbles sit behind, so their tails tuck under the nearer bubble
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      // tail: base on the body's bottom edge (as close under the head as the body allows), tip on the head
+      const tx = Math.round(Math.max(EDGE, Math.min(W - EDGE, a.x))) - x, ty = Math.round(Math.max(EDGE, Math.min(H - EDGE, a.y))) - y;
+      const bx = Math.max(12, Math.min(w - 12, tx)), by = h - 3, half = it.prio < 1 ? 5 : 8;
+      const on = ty > by + 4;
+      it.b.fill.setAttribute('points', on ? `${bx - half},${by} ${tx},${ty} ${bx + half},${by}` : '');
+      it.b.line.setAttribute('points', on ? `${bx - half},${by + 1} ${tx},${ty} ${bx + half},${by + 1}` : '');
+      it.b.tip = on ? { x: x + tx, y: y + ty } : null;
+      it.b.box = { x, y, w, h };
+      it.b.anchor = { x: a.x, y: a.y };
     }
   }
   const prev = scene.onBeforeRender;
@@ -205,10 +286,10 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   function chat(npc, line, ms) {
     const b = bubbles.get(npc);
     if (b && !b.chat) return false;
-    show(npc, line, ms, false);
-    const nb = bubbles.get(npc); nb.chat = true; nb.el.classList.add('chat');
+    show(npc, line, ms, false, { chat: true });
+    const nb = bubbles.get(npc); nb.chat = true; nb.prio = 0.8; nb.el.classList.add('chat'); nb.bb.querySelector('.who')?.remove();
     place(); return true;
   }
-  const api = { say, chat, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n) { hoverNPC = n; tagEl.textContent = n ? n.tag : ''; tagEl.style.display = n ? 'block' : 'none'; if (n) tagEl.style.marginLeft = -Math.round(tagEl.offsetWidth / 2 / 3) * 3 + 'px'; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false) => { show(n, t, ms, sh); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
+  const api = { say, chat, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n) { setTag(n); }, setMark, anchor, headNode, place, modal: null, story: (n, line, opt = {}) => { const b = show(n, line, 1e9, false, { ...opt, story: true }); place(); return b; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false, opt) => { show(n, t, ms, sh, opt); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
   return api;
 }
