@@ -581,6 +581,8 @@ export function strideLength(speed, run = 0, mul = 1) {
 const SLAP_HIT = 0.31, SLAP_DUR = 0.62, HIT_DUR = 0.7;   // slap timings (s)
 export { SLAP_HIT };
 const _m = new THREE.Matrix4(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+const _kq = new THREE.Quaternion(), _kx = new THREE.Vector3(1, 0, 0);
+const KD_FALL = 0.36, KD_UP = 0.55;   // knockdown: tumble / get-up durations (s)
 const _A = new THREE.Vector3(), _B = new THREE.Vector3(), _C = new THREE.Vector3(), _D = new THREE.Vector3(), _E = new THREE.Vector3(),
   _F = new THREE.Vector3(), _G = new THREE.Vector3(), _Hv = new THREE.Vector3(), _M2 = new THREE.Matrix4();
 
@@ -625,6 +627,37 @@ class Character {
   get slapping() { return this._slapT !== undefined && this._slapT < SLAP_DUR; }
   /** Got slapped: head snaps to `side` (+1 = to its left, -1 = to its right), body recoils. */
   hit(side = 1) { this._hitT = 0; this._hitSide = side; }
+  /** Tripped: ragdoll-ish tumble (dir +1 = face-down forward, -1 = onto the back), lie for `lie` s, then get up.
+   *  Pivots the whole body about the feet. Returns the total duration in s. */
+  knockdown(dir = 1, lie = 1.5, roll = 0) {
+    if (this._dance) this.stopDance(0.08);
+    this._kd = { t: 0, dir, lie, roll: roll || (Math.random() < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.2) };
+    return KD_FALL + lie + KD_UP;
+  }
+  get down() { return !!this._kd; }
+  _kdStep(D) {
+    const k = this._kd, P = this.parts, H = this.h;
+    const t = (k.t += D), T1 = KD_FALL, T2 = KD_FALL + k.lie, T3 = T2 + KD_UP;
+    if (t >= T3) { this._kd = null; return; }
+    let a, flail;
+    if (t < T1) { const u = t / T1; a = u * u * 1.04; flail = u; }                                  // gravity tumble
+    else if (t < T2) { const u = t - T1; a = 1 + 0.07 * Math.exp(-u * 7) * Math.sin(u * 26 + 1.6) - 0.04; flail = Math.max(0.35, 1 - u * 3); }  // thud bounce, lie
+    else { const u = (t - T2) / KD_UP; a = 1 - u * u * (3 - 2 * u); flail = 0.35 * (1 - u); }       // push up
+    const ang = a * (Math.PI / 2 - 0.08) * k.dir;
+    _kq.setFromAxisAngle(_kx, ang);
+    P.body.position.applyQuaternion(_kq); P.body.quaternion.premultiply(_kq);
+    _kq.setFromAxisAngle(_v.set(0, 0, 1), k.roll * a); P.body.position.applyQuaternion(_kq); P.body.quaternion.premultiply(_kq);
+    P.body.position.y += 0.15 * H * Math.min(1, Math.abs(a));
+    // limbs: arms fling out on the fall, splay while lying, push the ground getting up; head lolls
+    for (const [side, sx] of [['L', 1], ['R', -1]]) {
+      const arm = P['arm' + side];
+      arm.rotation.z += sx * 1.25 * flail;
+      arm.rotation.x += (t < T2 ? -1.1 * flail * k.dir : 0.9 * flail);
+      P['elbow' + side].rotation.x -= 0.5 * flail;
+      P['leg' + side].rotation.x += -0.25 * flail * (sx > 0 ? 1 : 0.3);
+    }
+    P.head.rotation.x += 0.35 * k.dir * Math.min(1, Math.abs(a)); P.head.rotation.z += k.roll * a * 0.8;
+  }
 
   // additive action layer, applied after the locomotion pose
   _actions(D) {
@@ -667,6 +700,7 @@ class Character {
       }
       if (t >= HIT_DUR) P.head.rotation.z = 0;
     }
+    if (this._kd) this._kdStep(D);
   }
 
   /**

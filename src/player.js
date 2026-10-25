@@ -31,8 +31,8 @@ function createPlaceholder() {
   return g;
 }
 
-// Jump tuning: ~1.1 units high, short anticipation crouch, no double jump.
-export const JUMP = { height: 1.1, gravity: 34, anticipation: 0.08, airControl: 2.5 };
+// Jump tuning: ~1.3 units high (clears fences / bushes / benches), short anticipation crouch, no double jump.
+export const JUMP = { height: 1.3, gravity: 36, anticipation: 0.08, airControl: 2.5 };
 
 // Wraps whatever character model is used. Character modules are expected to
 // return either a THREE.Object3D or { object3d|mesh|root, update(dt, state) }.
@@ -89,6 +89,8 @@ export class Player {
       p.y += this.vy * dt;
       if (p.y <= groundY && this.vy <= 0) { p.y = groundY; this.vy = 0; this.grounded = true; }
       else if (p.y < groundY) p.y = groundY;          // rising past a raised sidewalk edge
+    } else if (p.y - groundY > 0.3) {
+      this.grounded = false; this.vy = 0;             // walked off a bench / fountain rim: fall
     } else {
       p.y += (groundY - p.y) * Math.min(1, dt * 20);  // existing step-height smoothing
     }

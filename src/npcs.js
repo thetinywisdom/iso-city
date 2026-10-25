@@ -18,16 +18,16 @@ const WALKERS = [
   { seed: 222, path: loop(0, 33, 7.15), start: 1, dir: -1, speed: 1.45, along: 0.6 },
 ];
 const IDLERS = [
-  { seed: 707, pos: [-6.5, 22.0], face: [-5.8, 23.1] },   // chatting pair on the sunny sidewalk past the white building
-  { seed: 808, pos: [-5.8, 23.1], face: [-6.5, 22.0] },
+  { seed: 707, pos: [-19.6, 26.9], face: [-18.8, 26.4] },   // chatting pair on the sidewalk in front of the park
+  { seed: 808, pos: [-18.8, 26.4], face: [-19.6, 26.9] },
   { seed: 909, pos: [-6.4, -14.0], face: [-8, -14.0] },  // window-shopping at the teal tower
-  { seed: 1010, pos: [-14.4, 21.5], face: [-12.5, 21.5] }, // watching the fountain in the park (west path; front path left clear for SYOYA)
+  { seed: 1010, pos: [-24.4, 22.7], face: [-21.5, 21.5] }, // watching the fountain (west side of the plaza)
   { seed: 1111, pos: [13.4, -6.1], face: [16, -6.1] },     // waiting at the bus stop
 ];
 // Named easter-egg NPCs (characters.js SPECIALS): stand idle, dance when clicked, always timid.
 const SPECIAL_SPOTS = [
   { key: 'mbappe', pos: [-8.5, 2.2], face: [-5.5, 5.0], ball: [0.14, 0.42] },    // quiet west arm of the spawn crossing: clear sightline, kit reads on dark asphalt
-  { key: 'syoya', pos: [-14.3, 23.5], face: [-11.3, 26.3] },                       // park lawn left of the front path, out of the blossom tree's shade
+  { key: 'syoya', pos: [-15.5, 23.0], face: [-12.5, 26.0] },                       // park lawn east of the fountain plaza, open on all sides
   { key: 'giver', pos: [5.6, -9.7], face: [2.0, -6.0] },                            // mission giver: lurking by the peach building
   { key: 'bully', pos: [-5.5, -9.8], face: [-2.0, -6.0] },                          // the bully: west sidewalk, in plain view of spawn
 ];
@@ -45,6 +45,7 @@ export const TUNE = {
   fleeSpeed: 5.6, fleeTime: [4, 6], fleeDist: 10,
   staggerDist: 0.7, staggerTime: 0.28,
 };
+export const TRIP_LINES = ['ow!!', 'watch it!', 'what the h*ll', 'my back...'];
 export const SHOUTS = { chase: 'you motherf**ker!', giveUp: 'yeah run away p**sy!', help: 'help!' };
 const hash01 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const forced = new URLSearchParams(location.search).get('temper');   // ?temper=aggressive|timid
@@ -117,7 +118,7 @@ export class NPCs {
   }
   /** Start a special NPC's dance (faces the player, stands still). Returns the duration in s, 0 if busy. */
   dance(n, playerPos) {
-    if (!n.special || n.mode || n.stagger || n.c.dancing) return 0;
+    if (!n.special || n.mode || n.stagger || n.down || n.c.dancing) return 0;
     n.talkT = 0; n.danceTo = playerPos;
     return n.c.dance(n.danceName);
   }
@@ -161,6 +162,26 @@ export class NPCs {
       this._shout(n, 'help');
     }
     this.emit('slap', n);
+  }
+
+  /** Jumped into by the player: falls onto their back (facing the jumper), lies, gets up, complains.
+   *  Chasers resume the chase; aggressive ones start one (like a slap). Returns the down time in s. */
+  knockdown(n, from) {
+    if (n.down || !n.c.knockdown) return 0;
+    const p = n.root.position;
+    n.root.rotation.y = n.targetHeading = Math.atan2(from.x - p.x, from.z - p.z);
+    const lie = 1.2 + Math.random() * 0.6;
+    const t = n.c.knockdown(-1, lie);              // also cancels a dance cleanly
+    n.down = { t, wasChasing: n.mode === 'chase' || n.mode === 'react', cfg: n.chaseCfg };
+    n.talkT = 0; n.stagger = null; n.pendingHit = -1; n.chaseV = 0; n.curSpeed = 0;
+    this.emit('trip', n);
+    return t;
+  }
+  _getUp(n) {
+    const d = n.down; n.down = null;
+    this.onShout?.(n, TRIP_LINES[Math.floor(Math.random() * TRIP_LINES.length)]);
+    if (d.wasChasing && n.chaseCfg === d.cfg && n.mode) { n.mode = 'react'; n.modeT = 0.25; n.chaseT = n.chaseT || 0; n.shoutT = 1.2; }
+    else if (n.temper === 'aggressive' && !n.mode) { n.mode = 'react'; n.modeT = 0.6; n.chaseT = 0; n.shoutT = 1.2; }
   }
 
   // ---- collision for NPCs that leave their lane (reuses the city colliders) ----
@@ -300,6 +321,14 @@ export class NPCs {
     for (const n of this.list) {
       const p = n.root.position;
       let speed = 0;
+      if (n.down) {                            // knocked over: lie still, then get up
+        n.down.t -= dt; n.talkT = 0; n.curSpeed = 0;
+        if (n.down.t <= 0) this._getUp(n);
+        const gy = this.city.groundHeight(p.x, p.z);
+        p.y += (gy + 0.02 - p.y) * Math.min(1, dt * 15);
+        n.c.update(dt, 0);
+        continue;
+      }
       if (n.mode || n.stagger) {
         n.talkT = 0;
         speed = this._combat(n, dt, playerPos, playerR);

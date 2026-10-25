@@ -134,8 +134,13 @@ renderer.domElement.addEventListener('wheel', (e) => {
 
 // ---- Collision -----------------------------------------------------------------
 const RADIUS = 0.42;
+// Low props (collider.top set: fences, bushes, benches, bins, fountain rim...) only block while the
+// feet are below their top: a jump carries you over them. CLEAR = leg-tuck forgiveness.
+const CLEAR = 0.12;
+const lowClear = (c) => c.top !== undefined && player.position.y >= c.top - CLEAR;
 function blocked(x, z) {
   for (const c of city.colliders) {
+    if (lowClear(c)) continue;
     const nx = Math.max(c.minX, Math.min(x, c.maxX));
     const nz = Math.max(c.minZ, Math.min(z, c.maxZ));
     const dx = x - nx, dz = z - nz;
@@ -149,6 +154,30 @@ function blocked(x, z) {
     }
   }
   return false;
+}
+// standable low props (benches, bins, planters, bushes, fountain rim): land on top when the feet come down onto them
+function standHeight(x, z) {
+  let h = -Infinity;
+  for (const c of city.colliders) {
+    if (!c.stand || player.position.y < c.top - 0.15) continue;
+    if (x > c.minX - 0.12 && x < c.maxX + 0.12 && z > c.minZ - 0.12 && z < c.maxZ + 0.12) h = Math.max(h, c.top);
+  }
+  return h;
+}
+// came down overlapping a low prop without standing on it (fence, bollard, edge of a bench): slide off it
+function depenetrate() {
+  const p = player.position;
+  for (const c of city.colliders) {
+    if (c.top === undefined || lowClear(c)) continue;
+    const nx = Math.max(c.minX, Math.min(p.x, c.maxX)), nz = Math.max(c.minZ, Math.min(p.z, c.maxZ));
+    let dx = p.x - nx, dz = p.z - nz; const d = Math.hypot(dx, dz);
+    if (d >= RADIUS) continue;
+    if (d > 1e-4) { p.x = nx + dx / d * (RADIUS + 0.01); p.z = nz + dz / d * (RADIUS + 0.01); continue; }
+    // centre inside the box: out through the nearest side
+    const opts = [[c.minX - RADIUS - 0.01 - p.x, 0], [c.maxX + RADIUS + 0.01 - p.x, 0], [0, c.minZ - RADIUS - 0.01 - p.z], [0, c.maxZ + RADIUS + 0.01 - p.z]];
+    opts.sort((u, v) => Math.hypot(...u) - Math.hypot(...v));
+    p.x += opts[0][0]; p.z += opts[0][1];
+  }
 }
 function tryMove(dx, dz) {
   const p = player.position;
@@ -197,17 +226,18 @@ function tick() {
     const before = player.position.clone();
     tryMove(vel.x * dt, vel.z * dt);
     actualSpeed = dt > 0 ? before.distanceTo(player.position) / dt : 0;
-    if (actualSpeed < vel.length() * 0.5) vel.multiplyScalar(0.5); // bumped into something
+    if (actualSpeed < vel.length() * 0.5 && !player.airborne) vel.multiplyScalar(0.5); // bumped into something (keep momentum mid-jump)
   }
   if (moving) {
-    if (clickTarget) {
+    if (clickTarget && !player.airborne) {
       const progressed = actualSpeed * dt;
       stuckTime = progressed < speed * dt * 0.2 ? stuckTime + dt : 0;
       if (stuckTime > 0.35) clickTarget = null; // walked into a wall
     }
   }
-  const gy = city.groundHeight(player.position.x, player.position.z);
-  player.stepVertical(dt, gy + 0.02); // gravity + jump; step-height smoothing on the ground
+  const gy = Math.max(city.groundHeight(player.position.x, player.position.z) + 0.02, standHeight(player.position.x, player.position.z));
+  player.stepVertical(dt, gy); // gravity + jump; step-height smoothing on the ground
+  depenetrate();
   player.animate(dt, actualSpeed > 0.2, running, targetHeading, actualSpeed);
 
   if (marker.visible) {
@@ -229,6 +259,6 @@ function tick() {
 requestAnimationFrame(tick);
 
 // Expose a little debug handle (used by the headless smoke test).
-window.__game = { player, city, camera, renderer, keys, pixel, get npcs() { return npcs; }, setZoom: (z) => (zoom = z) };
+window.__game = { player, standHeight, city, camera, renderer, keys, pixel, get npcs() { return npcs; }, setZoom: (z) => (zoom = z) };
 const extras = window.__game.extras = initExtras({ scene, camera, renderer, pixel, city, player, keys, getNPCs: () => npcs });
 window.__game.missions = extras.missions;

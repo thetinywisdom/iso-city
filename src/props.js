@@ -20,8 +20,8 @@ export function makeProps(solid, addCollider, CURB) {
     const c = Math.cos(ry), s = Math.sin(ry);
     solid.add(geo, mat(x + lx * c + lz * s, ly, z - lx * s + lz * c, sx, sy, sz, ry, rx, rz), color);
   };
-  const col = (x, z, hx, hz, ry = 0) =>
-    (Math.abs(Math.sin(ry)) > 0.7 ? addCollider(x, z, hz, hx) : addCollider(x, z, hx, hz));
+  const col = (x, z, hx, hz, ry = 0, top) =>
+    (Math.abs(Math.sin(ry)) > 0.7 ? addCollider(x, z, hz, hx, top) : addCollider(x, z, hx, hz, top));
   const y0 = CURB;
 
   // ---------------- trees ----------------
@@ -59,12 +59,12 @@ export function makeProps(solid, addCollider, CURB) {
   function bush(x, z, s = 1, color = T[1]) {
     solid.add(G.ico, mat(x, y0 + 0.4 * s, z, 0.6 * s, 0.5 * s, 0.6 * s, 0.3), color);
     solid.add(G.ico, mat(x + 0.4 * s, y0 + 0.3 * s, z + 0.25 * s, 0.4 * s, 0.35 * s, 0.4 * s, 1.0), color);
-    addCollider(x, z, 0.55 * s, 0.55 * s);
+    addCollider(x, z, 0.55 * s, 0.55 * s, y0 + 0.85 * s);
   }
   function hedge(x, z, len = 2, ry = 0) {
     part(G.box, x, z, ry, 0, y0 + 0.4, 0, len, 0.8, 0.6, T[1]);
     for (let u = -len / 2 + 0.4; u < len / 2; u += 0.8) part(G.ico, x, z, ry, u, y0 + 0.82, 0, 0.42, 0.22, 0.34, T[1]);
-    col(x, z, len / 2, 0.3, ry);
+    col(x, z, len / 2, 0.3, ry, y0 + 0.95);
   }
   function planter(x, z, flower = K[1]) {
     solid.add(G.box, mat(x, y0 + 0.25, z, 0.9, 0.5, 0.9), W[2]);
@@ -72,7 +72,7 @@ export function makeProps(solid, addCollider, CURB) {
     solid.add(G.ico, mat(x, y0 + 0.7, z, 0.42, 0.3, 0.42, 0.5), T[1]);
     for (const [dx, dz] of [[0.2, 0.15], [-0.18, 0.22], [0.05, -0.22], [-0.2, -0.1]])
       solid.add(G.box, mat(x + dx, y0 + 0.95, z + dz, 0.14, 0.14, 0.14), flower);
-    addCollider(x, z, 0.5, 0.5);
+    addCollider(x, z, 0.5, 0.5, y0 + 0.95);
   }
 
   // ---------------- benches (sitter faces local +z, backrest at local -z) ----------------
@@ -83,12 +83,12 @@ export function makeProps(solid, addCollider, CURB) {
     }
     for (const lz of [-0.12, 0.05, 0.22]) part(G.box, x, z, ry, 0, y0 + 0.46, lz, 1.8, 0.06, 0.14, W[1]);
     for (const ly of [0.68, 0.86]) part(G.box, x, z, ry, 0, y0 + ly, -0.24, 1.8, 0.12, 0.05, W[1]);
-    col(x, z, 0.95, 0.4, ry);
+    col(x, z, 0.95, 0.4, ry, y0 + 0.92);
   }
   function blockBench(x, z, ry = 0, len = 1.6) {
     for (const lx of [-len / 2 + 0.25, len / 2 - 0.25]) part(G.box, x, z, ry, lx, y0 + 0.2, 0, 0.3, 0.4, 0.5, N[2]);
     part(G.box, x, z, ry, 0, y0 + 0.45, 0, len, 0.12, 0.6, W[3]);
-    col(x, z, len / 2, 0.3, ry);
+    col(x, z, len / 2, 0.3, ry, y0 + 0.51);
   }
   function parkBench(x, z, ry = 0) {
     for (const lx of [-0.8, 0.8]) {
@@ -98,7 +98,7 @@ export function makeProps(solid, addCollider, CURB) {
     }
     for (const lz of [-0.12, 0.04, 0.2]) part(G.box, x, z, ry, 0, y0 + 0.45, lz, 1.6, 0.06, 0.13, T[1]);
     for (const ly of [0.72, 0.9]) part(G.box, x, z, ry, 0, y0 + ly, -0.27, 1.6, 0.12, 0.05, T[1]);
-    col(x, z, 0.9, 0.38, ry);
+    col(x, z, 0.9, 0.38, ry, y0 + 0.96);
   }
 
   // ---------------- small street furniture ----------------
@@ -112,12 +112,12 @@ export function makeProps(solid, addCollider, CURB) {
       solid.add(G.box, mat(x, y0 + 0.75, z, 0.5, 0.6, 0.5), Y[1]);
       solid.add(G.box, mat(x, y0 + 1.07, z, 0.56, 0.06, 0.56), N[0]);
     }
-    addCollider(x, z, 0.32, 0.32);
+    addCollider(x, z, 0.32, 0.32, y0 + (kind === 0 ? 0.87 : 1.1));
   }
   function bollard(x, z) {
     solid.add(G.cyl8, mat(x, y0 + 0.4, z, 0.24, 0.8, 0.24), N[0]);
     solid.add(G.cyl8, mat(x, y0 + 0.62, z, 0.26, 0.1, 0.26), Y[1]);
-    addCollider(x, z, 0.15, 0.15);
+    addCollider(x, z, 0.15, 0.15, y0 + 0.67);
   }
   // fences: centred at (x, z), running along local x for `len`
   function picketFence(x, z, len, ry = 0) {
@@ -126,14 +126,14 @@ export function makeProps(solid, addCollider, CURB) {
       part(G.box, x, z, ry, u, y0 + 0.42, 0.04, 0.1, 0.84, 0.04, N[4]);
       part(G.box, x, z, ry, u, y0 + 0.86, 0.04, 0.07, 0.07, 0.04, N[4], 0, Math.PI / 4);
     }
-    col(x, z, len / 2, 0.08, ry);
+    col(x, z, len / 2, 0.08, ry, y0 + 0.9);
   }
   function railing(x, z, len, ry = 0) {
     part(G.box, x, z, ry, 0, y0 + 0.95, 0, len, 0.07, 0.07, N[0]);
     part(G.box, x, z, ry, 0, y0 + 0.2, 0, len, 0.05, 0.05, N[1]);
     for (let u = -len / 2; u <= len / 2 + 0.01; u += len / Math.max(1, Math.round(len / 0.25)))
       part(G.box, x, z, ry, u, y0 + 0.5, 0, 0.04, 0.95, 0.04, Math.abs(u) > len / 2 - 0.05 ? N[0] : N[1]);
-    col(x, z, len / 2, 0.08, ry);
+    col(x, z, len / 2, 0.08, ry, y0 + 0.99);
   }
   // bus shelter, open toward local +z
   function busStop(x, z, ry = 0) {
@@ -172,7 +172,7 @@ export function makeProps(solid, addCollider, CURB) {
     part(G.box, x, z, ry, 0.3, y0 + 0.7, 0.2, 0.05, 0.06, 0.6, B[2]);
     part(G.box, x, z, ry, 0.3, y0 + 0.82, 0.0, 0.1, 0.05, 0.25, N[0]);           // saddle
     part(G.box, x, z, ry, 0.3, y0 + 0.9, 0.72, 0.5, 0.05, 0.05, N[0]);           // handlebar
-    { const c = Math.cos(ry), s = Math.sin(ry); col(x + 0.2 * s, z + 0.2 * c, 0.9, 0.5, ry); }
+    { const c = Math.cos(ry), s = Math.sin(ry); col(x + 0.2 * s, z + 0.2 * c, 0.9, 0.5, ry, y0 + 0.95); }
   }
   function fountain(x, z) {
     solid.add(G.cyl12, mat(x, y0 + 0.25, z, 2.8, 0.5, 2.8), N[4]);
@@ -182,37 +182,43 @@ export function makeProps(solid, addCollider, CURB) {
     solid.add(G.cyl12, mat(x, y0 + 1.35, z, 1.0, 0.04, 1.0), B[3]);
     solid.add(G.cyl8, mat(x, y0 + 1.6, z, 0.16, 0.5, 0.16), B[3]);
     solid.add(G.ico, mat(x, y0 + 1.9, z, 0.18, 0.14, 0.18), B[4]);
-    addCollider(x, z, 1.35, 1.35);
+    addCollider(x, z, 1.35, 1.35, y0 + 0.5);     // low rim: hop onto it / over the edge
+    addCollider(x, z, 0.6, 0.6, y0 + 1.45);      // centre column + bowl
   }
 
-  // ---------------- small park ----------------
+  // ---------------- park (20 x 8: open east lawn + fountain plaza in the west half) ----------------
   function park(x0, z0, x1, z1) {
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0, PW = 1.6;
-    solid.add(G.box, mat(cx, y0 + 0.03, cz, w - 0.2, 0.06, d - 0.2), N[3]);           // lawn
-    solid.add(G.box, mat(cx, y0 + 0.065, cz, w - 0.2, 0.02, PW), W[3]);               // paths
-    solid.add(G.box, mat(cx, y0 + 0.065, cz, PW, 0.02, d - 0.2), W[3]);
-    fountain(cx, cz);
-    // fences: picket on the camera-facing sides (+x, +z), railing on the back sides; gaps for paths
-    const segs = (a0, a1, mid) => [[a0 + 0.15, mid - PW / 2], [mid + PW / 2, a1 - 0.15]];
-    for (const [a, b2] of segs(x0, x1, cx)) {
-      picketFence((a + b2) / 2, z1 - 0.12, b2 - a, 0);
-      railing((a + b2) / 2, z0 + 0.12, b2 - a, 0);
-    }
-    for (const [a, b2] of segs(z0, z1, cz)) {
-      picketFence(x1 - 0.12, (a + b2) / 2, b2 - a, Math.PI / 2);
-      railing(x0 + 0.12, (a + b2) / 2, b2 - a, Math.PI / 2);
-    }
-    // benches facing the paths / fountain
-    parkBench(cx - 2.9, cz + 1.45, Math.PI);
-    parkBench(cx + 2.9, cz - 1.45, 0);
-    parkBench(cx - 1.45, cz - 2.4, Math.PI / 2);
-    // tree variety in the corners
+    const cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0, PW = 1.8;
+    const fx = x0 + 6;                                                                   // fountain plaza
+    solid.add(G.box, mat((x0 + x1) / 2, y0 + 0.03, cz, w - 0.2, 0.06, d - 0.2), N[3]);  // lawn
+    solid.add(G.box, mat((x0 + x1) / 2, y0 + 0.065, cz, w - 0.2, 0.02, PW), W[3]);      // main east-west path
+    solid.add(G.box, mat(fx, y0 + 0.065, cz, PW, 0.02, d - 0.2), W[3]);                 // north-south path
+    solid.add(G.box, mat(fx, y0 + 0.068, cz, 4.8, 0.02, 4.8), W[3]);                    // plaza
+    solid.add(G.box, mat(x1 - 1.5, y0 + 0.068, cz, 2.8, 0.02, 5.0), W[3]);              // east gate apron
+    solid.add(G.box, mat(x1 - 5.5, y0 + 0.066, z1 - 1.5, 3.2, 0.02, 2.8), W[3]);        // front gate apron
+    fountain(fx, cz);
+    // fences with wide gaps: picket on the camera-facing sides (+x, +z), railing on the back sides
+    const segs = (a0, a1, gaps) => {
+      const out = []; let s0 = a0 + 0.15;
+      for (const [g0, g1] of gaps) { out.push([s0, g0]); s0 = g1; }
+      out.push([s0, a1 - 0.15]); return out.filter(([p, q]) => q - p > 0.3);
+    };
+    for (const [p, q] of segs(x0, x1, [[fx - PW / 2, fx + PW / 2], [x1 - 7.1, x1 - 3.9]])) picketFence((p + q) / 2, z1 - 0.12, q - p, 0);
+    for (const [p, q] of segs(x0, x1, [[fx - PW / 2, fx + PW / 2], [x1 - 6.2, x1 - 3.8]])) railing((p + q) / 2, z0 + 0.12, q - p, 0);
+    for (const [p, q] of segs(z0, z1, [[cz - 2.5, cz + 2.5]])) picketFence(x1 - 0.12, (p + q) / 2, q - p, Math.PI / 2);
+    for (const [p, q] of segs(z0, z1, [[cz - PW / 2, cz + PW / 2]])) railing(x0 + 0.12, (p + q) / 2, q - p, Math.PI / 2);
+    // benches round the fountain (off the paths) + one on the open lawn
+    parkBench(fx - 2.7, cz + 2.9, Math.PI);
+    parkBench(fx + 2.7, cz - 2.9, 0);
+    // trees at the edges, the middle stays open
     roundTree(x0 + 1.6, z0 + 1.6, 0.95);
     conifer(x0 + 1.5, z1 - 1.5, 0.9);
-    blossomTree(x1 - 1.7, z1 - 1.6, 0.9);
-    autumnTree(x1 - 1.7, z0 + 1.6, 0.85);
-    bush(cx + 1.5, z1 - 0.8, 0.8); bush(cx - 2.2, z1 - 0.75, 0.8);
-    planter(x1 - 0.75, cz + 1.4, K[1]); planter(x1 - 0.75, cz - 1.4, Y[1]);
+    autumnTree(x1 - 12, z1 - 1.3, 0.85);
+    roundTree(x1 - 9, z0 + 1.3, 0.85);
+    blossomTree(x1 - 1.6, z1 - 1.4, 0.9);
+    autumnTree(x1 - 1.6, z0 + 1.4, 0.8);
+    bush(x0 + 3, z1 - 0.8, 0.8); bush(x1 - 9.5, z1 - 0.8, 0.8); bush(x1 - 8, z0 + 0.75, 0.8);
+    planter(x1 - 0.75, cz - 3.1, K[1]); planter(x1 - 0.75, cz + 3.1, Y[1]);
   }
 
   return { roundTree, blossomTree, autumnTree, conifer, sapling, bush, hedge, planter,

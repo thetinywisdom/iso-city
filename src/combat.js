@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TUNE } from './npcs.js';
+import { TUNE, NPC_RADIUS } from './npcs.js';
 
 // SLAP: long-press an NPC (dialogue.js fires onLongPress) -> the player walks into
 // reach, winds up and slaps. Impact = pixel "SLAP!" burst, screen shake, a synthesized
@@ -7,6 +7,7 @@ import { TUNE } from './npcs.js';
 // timid runs away). NPC slaps on the player go through the same impact code.
 const APPROACH_SPEED = 4.6, APPROACH_TIMEOUT = 4;
 const PLAYER_STUN = 0.32, KNOCKBACK = 8;
+const TRIP_DIST = 0.42 + NPC_RADIUS + 0.12;   // airborne player touching an NPC -> both fall
 
 export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, dialogue, keys }) {
   const canvas = renderer.domElement;
@@ -57,15 +58,54 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz) || 1;
     impact(n.root, player.root);
     charOf()?.hit(-1);
-    stun = PLAYER_STUN; slapping = null; target = null;
+    stun = Math.max(stun, PLAYER_STUN); slapping = null; target = null;
     player.vel.set(dx / d * KNOCKBACK, 0, dz / d * KNOCKBACK);
     player.heading = Math.atan2(-dx, -dz);       // knocked while facing the slapper
+  }
+
+  // ---- trip: jumping into / onto someone knocks you both over ----
+  let downT = 0;
+  function dustAt(pos) {
+    const el = document.createElement('div'); el.className = 'impact dust';
+    const inner = document.createElement('div'); inner.appendChild(dustCanvas()); el.appendChild(inner); layer.appendChild(el);
+    bursts.push({ el, pos: pos.clone(), until: performance.now() + 600 });
+    placeBursts();
+  }
+  function trip(n) {
+    const npcs = getNPCs();
+    const tn = npcs.knockdown(n, player.position);
+    if (!tn) return;
+    const p = player.position, q = n.root.position;
+    const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz) || 1;
+    player.heading = Math.atan2(dx, dz);              // face-plant toward them
+    player.vel.set(dx / d * 1.2, 0, dz / d * 1.2);
+    const lie = 1.2 + Math.random() * 0.5;
+    const tp = charOf()?.knockdown(1, lie) ?? lie + 0.9;
+    stun = downT = tp; slapping = null; target = null;
+    dialogue.clear?.(n);
+    setTimeout(() => {                                 // both hit the ground
+      audio.thud(); shake = 0.16;
+      tmp.copy(p).lerp(q, 0.5); tmp.y = q.y + 0.25; dustAt(tmp);
+    }, 300);
+    npcs.emit('playerTrip', n);
+  }
+  function checkTrip(npcs) {
+    if (!npcs || !player.airborne || stun > 0) return;
+    const p = player.position;
+    for (const n of npcs.list) {
+      if (n.down) continue;
+      const q = n.root.position;
+      if (p.y - q.y > 1.75) continue;                  // sailed clean over their head (not with this jump)
+      if ((p.x - q.x) ** 2 + (p.z - q.z) ** 2 < TRIP_DIST * TRIP_DIST) { trip(n); return; }
+    }
   }
 
   // ---- per frame: called by main.js before the player moves ----
   // returns { lock } to freeze input, or { dir, speed } to auto-walk, or null
   function control(dt, keyMoving) {
     const npcs = getNPCs(); wire(npcs);
+    checkTrip(npcs);
+    if (downT > 0) downT -= dt;
     if (stun > 0) { stun -= dt; return { lock: true }; }
     if (slapping) {
       const n = slapping.npc, ch = charOf();
@@ -134,7 +174,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
 
   return {
     control, audio,
-    get target() { return target; }, get slapping() { return slapping; }, get stun() { return stun; },
+    get target() { return target; }, get slapping() { return slapping; }, get stun() { return stun; }, get down() { return downT > 0; }, trip,
     slap: (npc) => dialogue.onLongPress(npc),      // debug / tests
   };
 }
@@ -169,6 +209,25 @@ function starCanvas() {
   return c;
 }
 
+// 24x14 art-pixel dust puff (three grey blobs), cached
+let DUST = null;
+function dustCanvas() {
+  const c = document.createElement('canvas'); c.width = 24; c.height = 14;
+  if (!DUST) {
+    DUST = new ImageData(24, 14);
+    const blobs = [[6, 9, 4.6], [12, 6.5, 5.6], [18, 9, 4.6]];
+    const inside = (x, y, k = 1) => blobs.some(([bx, by, r]) => Math.hypot(x + 0.5 - bx, (y + 0.5 - by) * 1.15) <= r * k);
+    for (let y = 0; y < 14; y++) for (let x = 0; x < 24; x++) {
+      if (!inside(x, y)) continue;
+      const edge = !inside(x + 1, y) || !inside(x - 1, y) || !inside(x, y + 1) || !inside(x, y - 1);
+      const col = edge ? [0x5E, 0x63, 0x66] : y < 7 ? [0xF0, 0xF2, 0xF4] : [0xC9, 0xCD, 0xD0];
+      DUST.data.set(col.concat(255), (y * 24 + x) * 4);
+    }
+  }
+  c.getContext('2d').putImageData(DUST, 0, 0);
+  return c;
+}
+
 // Tiny WebAudio synth: band-passed noise sweep (whoosh) + noise crack with a low thump (smack).
 class SlapAudio {
   constructor() { this.ctx = null; this.muted = false; }
@@ -191,6 +250,15 @@ class SlapAudio {
   whoosh(vol = 1) {
     if (this.muted || !this.ctx) return;
     this._noise(this.ctx.currentTime, 0.16, 'bandpass', 500, 2600, 0.25 * vol, 1.4);
+  }
+  thud() {   // body hitting the pavement: low sine drop + muffled noise
+    if (this.muted || !this.ctx) return;
+    const c = this.ctx, t = c.currentTime;
+    this._noise(t, 0.16, 'lowpass', 600, 120, 0.55, 0.7);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.2);
+    g.gain.setValueAtTime(0.7, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.26);
   }
   smack() {
     if (this.muted || !this.ctx) return;

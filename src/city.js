@@ -24,8 +24,10 @@ export function generateCity(scene) {
   const solid = new Bucket();
   const colliders = [];
   const blocks = [];
-  const addCollider = (cx, cz, hx, hz) =>
-    colliders.push({ minX: cx - hx, maxX: cx + hx, minZ: cz - hz, maxZ: cz + hz });
+  // top: world height of a LOW prop (fence, bush, bench...) the player can jump over; omitted = tall (always blocks)
+  const addCollider = (cx, cz, hx, hz, top) =>
+    colliders.push(top === undefined ? { minX: cx - hx, maxX: cx + hx, minZ: cz - hz, maxZ: cz + hz }
+      : { minX: cx - hx, maxX: cx + hx, minZ: cz - hz, maxZ: cz + hz, top, stand: Math.min(hx, hz) >= 0.25 });
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshLambertMaterial({ color: P.sky }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; ground.receiveShadow = true;
@@ -122,7 +124,7 @@ export function generateCity(scene) {
   // Trees / lamps / benches on sidewalks
   tree(a + 3, R + 1.2); props.autumnTree(a + 13, R + 1.2, 1.05); props.blossomTree(R + 1.2, a + 13);
   tree(-R - 1.2, -a - 4, 1.1); tree(-a - 5, R + 1.2); props.autumnTree(R + 1.2, -a - 6, 0.95);
-  props.conifer(-R - 1.2, -a - 9, 1.0); tree(-R - 1.2, a + 12, 1.05); tree(a + 13, -R - 1.2);
+  props.conifer(-R - 1.2, -a - 9, 1.0); tree(-R - 1.2, b + 0.2, 1.05); tree(a + 13, -R - 1.2);
   props.conifer(33 - R - 1.2, a + 16, 1.05); props.blossomTree(a + 17, 33 - R - 1.2, 1.05); tree(33 + R + 1.2, a + 16);
   for (const [x, z] of [[R + 1, R + 1], [-R - 1, R + 1], [R + 1, -R - 1], [-R - 1, -R - 1],
     [a + 9, R + 1], [R + 1, a + 9], [-a - 8, -R - 1], [-R - 1, a + 6],
@@ -130,8 +132,9 @@ export function generateCity(scene) {
   bench(a + 6, R + 0.9, Math.PI); bench(R + 0.9, -a - 2.5, -Math.PI / 2);
 
   // ---- street detail (densifies the existing blocks; keeps clear of NPC walking lanes) ----
-  // Park on the empty lot behind the white building (far side of the camera, nothing tall in front).
-  props.park(-a - 10, a + 10, -a, b);
+  // Park on the empty lot behind the white building, stretched west to the map edge (20 x 8):
+  // wide open east gate onto the x = -6 sidewalk, fountain plaza in the west half.
+  props.park(-a - 20, a + 10, -a, b);
   // Bus stop + vending machine + bin on the north sidewalk of the main east-west street
   props.busStop(12.8, -6.75, 0); props.vending(15.9, -6.95, 0); props.bin(9.4, -5.9, 0);
   props.bin(R + 1.0, -a - 4.3, 1); props.blockBench(-R - 0.95, -a - 13, Math.PI / 2, 2.0);

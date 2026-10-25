@@ -12,7 +12,7 @@ import * as THREE from 'three';
 export const TUNING = {
   slapTour: { count: 5, time: 60 },
   rejected: { time: 90, bias: 0.6 },
-  bully: { speed: 6.65, accel: 9, react: 0.55, safe: { x: -12.5, z: 18.6, r: 1.5 } },
+  bully: { speed: 6.65, accel: 9, react: 0.55, safe: { x: -11.0, z: 21.5, r: 1.8 } },
   ball: { speed: 5.7, accel: 7, react: 0.75, escapeDist: 15, surviveTime: 12, pickup: 0.75 },
   cap: { time: 90, spot: { x: 12.8, y: 2.8, z: -6.3 }, reach: 1.35, jumpMin: 0.6, giveBack: 2.4, clickGive: 4.5 },
 };
@@ -144,6 +144,14 @@ export const MISSIONS = [
       S.phase = 'caught';
       g.fail('MBAPPE: "mine. obviously."');
       g.dialogue.shout(n, 'mine. obviously.', 2000);
+    },
+    onTrip(S, n, g) {                    // tripped over someone mid-escape: the ball rolls off, he takes it back
+      if (S.phase !== 'run') return;
+      S.phase = 'caught';
+      const b = S.ball.position, p = g.player.position;
+      b.x = p.x + S.dir.x * 1.4; b.z = p.z + S.dir.z * 1.4; b.y = g.city.groundHeight(b.x, b.z) + 0.11;
+      g.fail('you tripped. MBAPPE: "thanks."');
+      g.later(0.5, () => g.dialogue.shout(S.m, 'thanks for the ball!', 1800));
     },
     cleanup(S, g, result) {
       g.resetBall();
@@ -397,6 +405,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     npcs.on('slap', (n) => active?.def.onSlap?.(active.S, n, g));
     npcs.on('hitPlayer', (n) => active?.def.onHitPlayer?.(active.S, n, g));
     npcs.on('caught', (n) => active?.def.onCaught?.(active.S, n, g));
+    npcs.on('playerTrip', (n) => active?.def.onTrip?.(active.S, n, g));
   }
 
   window.addEventListener('keydown', (e) => {
