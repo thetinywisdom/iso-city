@@ -2,7 +2,7 @@
 // Empty lots fill up with fenced building sites, scaffolding and finally new buildings + a rent billboard.
 // Free roam never calls this, so the sandbox city stays exactly as it was.
 import * as THREE from 'three';
-import { COMIC, SCHEMES, P } from './palette.js?v=20261025i';
+import { COMIC, SCHEMES, P } from './palette.js?v=20261025j';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 const CURB = 0.2;
@@ -21,7 +21,7 @@ const NAMES = { site: 'A BUILDING SITE', rise3: 'SCAFFOLDING', tower4: 'A NEW TO
 const mats = new Map();
 const M = (c) => { let m = mats.get(c); if (!m) { m = new THREE.MeshLambertMaterial({ color: c, flatShading: true }); mats.set(c, m); } return m; };
 const BOX = new THREE.BoxGeometry(1, 1, 1);
-function box(g, x, y, z, w, h, d, c, ry = 0) {
+export function box(g, x, y, z, w, h, d, c, ry = 0) {
   const m = new THREE.Mesh(BOX, M(c)); m.position.set(x, y, z); m.scale.set(w, h, d); m.rotation.y = ry;
   m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
 }
@@ -36,7 +36,7 @@ function signTex(text, fg, bg, w = 64, h = 16) {
   x.putImageData(id, 0, 0);
   const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-function sign(g, text, x, y, z, w, h, ry, fg = N[0], bg = Y[1]) {
+export function sign(g, text, x, y, z, w, h, ry, fg = N[0], bg = Y[1]) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: signTex(text, fg, bg, Math.max(32, text.length * 9), 16) }));
   m.position.set(x, y, z); m.rotation.y = ry; g.add(m); return m;
 }

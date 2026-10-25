@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025i';
+import { COMIC } from './palette.js?v=20261025j';
 
 // ---------------------------------------------------------------------------
 // 3D pixel-art pipeline (t3ssel8r-style)

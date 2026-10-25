@@ -260,3 +260,11 @@ canvas { image-rendering: pixelated; }
 body.story-on #wanted { top: 120px; }
 body.story-hunt #wanted { top: 168px; }
 body.story-on #pixelHud { top: 120px; }
+/* story finale: the 7:00 clock in the landlady's house */
+#finale-hud { position: fixed; left: 15px; top: 15px; display: none; font-family: 'PressStart2P', ui-monospace, monospace; text-align: left; color: #F0F2F4; background: #292C2E;
+  padding: 9px 12px 9px; box-shadow: 0 6px 0 0 #FF5491; white-space: nowrap; pointer-events: auto; z-index: 9; }
+#finale-hud.on { display: block; }
+#finale-hud .fh-t { font-size: 32px; line-height: 32px; color: #FFCC3F; margin-bottom: 6px; }
+#finale-hud .fh-t.low { color: #FF5491; }
+#finale-hud .fh-k { font-size: 16px; line-height: 16px; color: #B0E9FF; margin-bottom: 9px; }
+#finale-hud .fh-give { font-size: 16px; }
