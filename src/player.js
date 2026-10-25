@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261025e';
+import { P } from './palette.js?v=20261025f';
 
 // Silhouette shown only where the player is hidden behind buildings.
 const ghostMat = new THREE.MeshBasicMaterial({ color: P.ghost, depthWrite: false });

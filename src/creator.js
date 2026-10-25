@@ -1,9 +1,11 @@
 // Character creator page (creator.html). Builds custom characters with the same builder + pixel
 // pipeline as the game and saves them to localStorage; the city tab picks them up live.
 import * as THREE from 'three';
-import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025e';
-import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025e';
-import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025e';
+import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025f';
+import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025f';
+import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025f';
+import * as CH from '../characters/characters.js?v=20261025f';
+import { CITY_ROSTER, OVERRIDE_KEY, cityBaseDef, loadOverrides, saveOverride, clearOverride } from './citychars.js?v=20261025f';
 
 const MAX = 30;
 const $ = (s) => document.querySelector(s);
@@ -65,7 +67,7 @@ renderer.setAnimationLoop(() => {
 });
 
 // ------------------------------------------------------------------ state ----
-let cur = customDefaults('man'), editingId = null;
+let cur = customDefaults('man'), editingId = null, editingCity = null;
 const status = (msg, err = false) => { const s = $('#status'); s.textContent = msg; s.classList.toggle('err', err); clearTimeout(status.t); status.t = setTimeout(() => (s.textContent = ''), 3500); };
 
 // ------------------------------------------------------------------- form ----
@@ -184,6 +186,12 @@ function validate() {
 }
 function save(asCopy) {
   const err = validate(); if (err) return status(err, true);
+  if (editingCity && !asCopy) {   // a built-in city character: write the look override, the game applies it live
+    const def = normalizeCustom(cur);
+    saveOverride(editingCity, def); cur = def;
+    status(`${def.name} updated in the city.`); changed(); return renderCity();
+  }
+  if (asCopy && editingCity) { editingCity = null; editingId = null; renderCity(); }
   const list = loadCustom();
   const def = { ...normalizeCustom(cur) };
   if (editingId && !asCopy) {
@@ -204,7 +212,7 @@ $('#btnKimata').onclick = () => {   // Kimata's look: keeps name, lines and home
   cur = normalizeCustom({ ...cur, ...structuredClone(KIMATA_STYLE), ...keep }); changed(); status('Kimata style!');
 };
 $('#btnRandom').onclick = () => { const keepId = editingId; cur = normalizeCustom(randomCustom()); editingId = keepId; changed(); status('Randomized!'); };
-$('#btnNew').onclick = () => { cur = customDefaults(cur.gender); editingId = null; changed(); renderList(); };
+$('#btnNew').onclick = () => { cur = customDefaults(cur.gender); editingId = null; editingCity = null; changed(); renderList(); renderCity(); };
 
 function renderList() {
   const ul = $('#saved'); ul.textContent = '';
@@ -226,7 +234,7 @@ function renderList() {
       status(`${d.name} deleted.`); renderList();
     });
     del.dataset.act = 'del';
-    const edit = btn('EDIT', () => { cur = normalizeCustom(d); editingId = d.id; changed(); renderList(); status(`Editing ${d.name}.`); }); edit.dataset.act = 'edit';
+    const edit = btn('EDIT', () => { cur = normalizeCustom(d); editingId = d.id; editingCity = null; changed(); renderList(); renderCity(); status(`Editing ${d.name}.`); }); edit.dataset.act = 'edit';
     const dup = btn('DUP', () => {
       const L = loadCustom(); if (L.length >= MAX) return status(`Max ${MAX} characters.`, true);
       L.push({ ...d, id: newId(), name: String(d.name).slice(0, 15) + ' 2' }); saveCustom(L); status(`${d.name} duplicated.`); renderList();
@@ -241,6 +249,38 @@ function renderList() {
     li.append(dot, el('span', { className: 'nm', textContent: d.name }), play, edit, dup, del);
     ul.append(li);
   }
+}
+
+// -------------------------------------------------------- city characters ----
+const cityDef = (key) => { const o = loadOverrides()[key]; return o ? normalizeCustom(o) : cityBaseDef(key, CH); };
+function editCity(key) {
+  const r = CITY_ROSTER.find((o) => o.key === key); if (!r) return;
+  cur = cityDef(key); editingCity = key; editingId = null;
+  changed(); renderList(); renderCity(); status(`Editing ${r.name} (city).`);
+}
+function resetCity(key) {
+  clearOverride(key);
+  if (editingCity === key) { cur = cityDef(key); changed(); }
+  const r = CITY_ROSTER.find((o) => o.key === key); status(`${r ? r.name : key} is back to the original.`); renderCity();
+}
+function renderCity() {
+  const ul = $('#city'); if (!ul) return; ul.textContent = '';
+  const ov = loadOverrides();
+  $('#btnSave').textContent = editingCity ? 'SAVE TO CITY' : 'SAVE';
+  for (const r of CITY_ROSTER) {
+    const edited = !!ov[r.key], d = cityDef(r.key);
+    const li = el('li', { className: (r.key === editingCity ? 'editing ' : '') + (edited ? 'edited' : '') }); li.dataset.key = r.key;
+    const dot = el('span', { className: 'dot' }); dot.style.background = d ? d.topColor : '#F0F2F4';
+    const btn = (t, fn, cls = '') => { const b = el('button', { className: 'pbtn sm ' + cls, type: 'button', textContent: t }); b.onclick = fn; return b; };
+    const edit = btn('EDIT', () => editCity(r.key)); edit.dataset.act = 'cedit';
+    const reset = btn('RESET', () => resetCity(r.key)); reset.dataset.act = 'creset'; reset.disabled = !edited;
+    reset.title = 'Reset to original';
+    const name = edited && d && d.name.toUpperCase() !== r.name ? `${d.name} (${r.name})` : r.name;
+    li.append(dot, el('span', { className: 'nm', textContent: name + (edited ? ' *' : '') }), edit, reset);
+    ul.append(li);
+  }
+  const r = CITY_ROSTER.find((o) => o.key === editingCity);
+  const note = $('#cityNote'); if (note) note.textContent = r ? `Editing ${r.name} — ${r.note || 'keeps their role.'} Dance style: specials keep their own dance.` : '* = edited';
 }
 
 // ---------------------------------------------------------- export/import ----
@@ -266,9 +306,9 @@ $('#importFile').onchange = async (e) => {
     saveCustom(list); renderList(); status(`Imported ${n} character${n === 1 ? '' : 's'}.`, n === 0);
   } catch (err) { status('That file is not character JSON.', true); }
 };
-addEventListener('storage', (e) => { if (e.key === null || e.key === 'isoCity.customChars.v1' || e.key === PLAYER_KEY) renderList(); });
+addEventListener('storage', (e) => { if (e.key === null || e.key === 'isoCity.customChars.v1' || e.key === PLAYER_KEY) renderList(); if (e.key === null || e.key === OVERRIDE_KEY) renderCity(); });
 
 $('#playDefault').onclick = () => { setPlayerChar(null); status('Back to the bald guy.'); renderList(); };
 // go
-changed(); renderList();
-window.__creator = { get cur() { return cur; }, set cur(v) { cur = v; changed(); }, get ch() { return ch; }, get editingId() { return editingId; }, renderList, save };
+changed(); renderList(); renderCity();
+window.__creator = { get cur() { return cur; }, set cur(v) { cur = v; changed(); }, get ch() { return ch; }, get editingId() { return editingId; }, get editingCity() { return editingCity; }, renderList, renderCity, editCity, resetCity, save };

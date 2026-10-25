@@ -6,7 +6,7 @@
 // Units: ~2.0 tall, feet at y=0, facing +Z. Rotate `root` to steer.
 import * as THREE from 'three';
 
-import { PALETTE, COMIC } from './palette.js?v=20261025e';
+import { PALETTE, COMIC } from './palette.js?v=20261025f';
 export { PALETTE, COMIC };
 
 export const OUTFITS = ['shirt', 'tee', 'coat', 'blouse', 'apron',
@@ -1487,6 +1487,26 @@ export function normalizeCustom(d = {}) {
   for (const k of CUSTOM.accs) o.acc[k] = !!o.acc[k];
   return o;
 }
+/** Map a modular NPC look (createNPC opts) onto creator parts, as close as the creator's parts allow. */
+const NPC_OUTFIT = { shirt: ['shirt', 'pants'], tee: ['tee', 'pants'], coat: ['coat', 'pants'], blouse: ['blouse', 'pants'], apron: ['tee', 'pants'],
+  hoodie: ['hoodie', 'pants'], blazer: ['blazer', 'pants'], sweater: ['sweater', 'pants'], shortsTee: ['tee', 'shorts'], dress: ['none', 'dress'],
+  overalls: ['shirt', 'pants'], suit: ['blazer', 'pants'], cardigan: ['cardigan', 'pants'], tank: ['tank', 'pants'] };
+export function npcLookToCustom(opts = {}, extra = {}) {
+  const cfg = npcConfig(opts), K = cfg.colors, o = cfg.outfit;
+  let [top, bottom] = NPC_OUTFIT[o] || ['tee', 'pants'];
+  if (o === 'tank' && K.shorts) bottom = 'shorts';
+  const body = cfg.build < 0.88 ? 'skinny' : cfg.build >= 1.28 ? 'fat' : 'average';
+  const acc = cfg.accessories || [];
+  return normalizeCustom({ gender: extra.gender || 'man', body, height: cfg.height, skin: cfg.skin, hair: cfg.hair, hairColor: cfg.hairColor,
+    hat: cfg.hat || 'none', hatColor: cfg.hatColor,
+    top, topColor: o === 'apron' ? PALETTE.white : o === 'dress' ? K.top : K.top, innerColor: o === 'overalls' ? K.inner : K.inner,
+    bottom, bottomColor: o === 'dress' ? K.top : o === 'suit' ? K.top : o === 'apron' ? PALETTE.black : K.bottom,
+    shoes: o === 'dress' ? 'flats' : 'sneakers', shoeColor: ['hoodie', 'shortsTee'].includes(o) || (o === 'tank' && K.shorts) ? PALETTE.white : o === 'blazer' || o === 'suit' ? PALETTE.black : K.shoe,
+    acc: { glasses: !!cfg.glasses, sunglasses: false, moustache: false, beard: false, earrings: false, bag: acc.includes('tote') || acc.includes('backpack') },
+    accColor: cfg.accColor, held: 'none', heldColor: COMIC.pinks[1], dance: 'disco', home: 'fountain', ...extra });
+}
+/** A cap mesh group (used when a character has no hat of his own, e.g. an edited Kimata). */
+export function capModel(color = PALETTE.white) { const g = new THREE.Group(); buildHat(g, 'cap', color, color); return g; }
 /** Random definition drawing from EVERY option (seeded when a seed is given). */
 export function randomCustom(seed) {
   const r = seed === undefined ? Math.random : mulberry32(seed);
@@ -1514,6 +1534,13 @@ function customTop(P, d, T) {
   const c = d.topColor, inner = d.innerColor, top = d.top;
   if (top === 'none') return;
   if (top === 'tee') { mesh(lathe(shell(0.87, 1.07), 8, TORSO_Z), c, T); sleeves(P, c, 0.25, 0, [0.07, 0.066]); }
+  else if (top === 'stripetee') {   // Kimata's striped crew-neck tee: body colour + stripes / collar rib / cuffs in the inner colour
+    mesh(lathe(shell(0.87, 1.07), 8, TORSO_Z), c, T);
+    for (const y of [0.96, 1.12, 1.28, 1.44, 1.6]) mesh(lathe(clip(TORSO, y, y + 0.075, 1.085), 8, TORSO_Z), inner, T);
+    mesh(lathe(clip(TORSO, 1.655, 1.672, 1.09), 8, TORSO_Z), inner, T, { double: true });
+    sleeves(P, c, 0.22, 0, [0.07, 0.066]);
+    for (const side of ['L', 'R']) for (const y of [-0.05, -0.16]) mesh(limb(0.0725, 0.071, 0.05, 7, y), inner, P['arm' + side]);
+  }
   else if (top === 'shirt') {
     const prof = shell(0.87, 1.07); mesh(lathe(prof, 8, TORSO_Z), c, T);
     frontLine(T, prof, 0.87, 1.64, TORSO_Z, PALETTE.npcLine);
@@ -1715,11 +1742,12 @@ export function createCustom(input = {}) {
     for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.08, 0.05, 0.14), d.top === 'none' || d.top === 'tank' ? d.skin : fill, T, { pos: [sx * 0.1, 1.66, -0.01], rot: [0, 0, sx * -0.45] });   // traps
   }
   buildHair(P.headCenter, d.hair, d.hairColor, PALETTE.npcLine, mulberry32(String(cfg.seed) + d.hair));
+  let capG = null;   // every hat lives in its own group (ch.cap) so missions can take it off / copy it
   if (d.hat === 'backcap') {   // Kimata's cap, worn backward, hair showing through the strap opening
-    const capG = group(P.headCenter); capG.rotation.y = Math.PI;
+    capG = group(P.headCenter); capG.rotation.y = Math.PI;
     buildHat(capG, 'cap', d.hatColor, d.hatColor);
     mesh(new THREE.BoxGeometry(0.06, 0.035, 0.012), d.hairColor, capG, { pos: [0, 0.075, -0.112], rot: [0.35, 0, 0] });
-  } else if (d.hat !== 'none') buildHat(P.headCenter, d.hat, d.hatColor, d.hatColor === PALETTE.slate ? PALETTE.black : PALETTE.slate);
+  } else if (d.hat !== 'none') { capG = group(P.headCenter); buildHat(capG, d.hat, d.hatColor, d.hatColor === PALETTE.slate ? PALETTE.black : PALETTE.slate); }
   customFace(P, d);
   if (d.acc.bag) {   // cross-body bag at the left hip
     const zf = 0.155 * shape.tz + (d.body === 'fat' ? 0.06 : 0);
@@ -1743,7 +1771,7 @@ export function createCustom(input = {}) {
     ring = watermelonRing(); P.root.add(ring); ring.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   } else if (held !== 'none') { item = heldModel(held, d.heldColor); P.body.add(item); }
   const ch = new Character(P, cfg);
-  ch.def = d; ch.heldItem = item; ch.guitar = guitar; ch.dog = dog; ch.ring = ring;
+  ch.def = d; ch.heldItem = item; ch.guitar = guitar; ch.dog = dog; ch.ring = ring; ch.cap = capG; ch.idleHula = true;
   // dances / poses written for a standard body: keep hands clear of wider shoulders and bigger bellies
   ch.armOff = { x: 0.11 * (shape.sh - 1), z: zF };
   const pose = HELD_POSE[held];
@@ -1763,7 +1791,7 @@ export function createCustom(input = {}) {
     }
     if (dog) return;
     if (ring) {   // hand rests on the ring at the left hip; standing still a while -> hula-hoop it (Kimata's idle)
-      c._ringIdle = idle && !c.slapping && !c._dance ? (c._ringIdle || 0) + (c._lastD || 0.016) : 0;
+      c._ringIdle = ch.idleHula !== false && idle && !c.slapping && !c._dance ? (c._ringIdle || 0) + (c._lastD || 0.016) : 0;
       const e = smooth(1.2, 2.0, c._ringIdle || 0);
       c._ringE = e;
       if (e > 0.001) {

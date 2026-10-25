@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261025e';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025e';
-import { registerPools } from './french.js?v=20261025e';
+import { addGhosts } from './player.js?v=20261025f';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025f';
+import { registerPools } from './french.js?v=20261025f';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261025f';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -25,36 +26,6 @@ const IDLERS = [
   { seed: 909, pos: [-6.4, -14.0], face: [-8, -14.0] },  // window-shopping at the teal tower
   { seed: 1010, pos: [-24.4, 22.7], face: [-21.5, 21.5] }, // watching the fountain (west side of the plaza)
   { seed: 1111, pos: [13.4, -6.1], face: [16, -6.1] },     // waiting at the bus stop
-];
-// The women of the neighbourhood: modular NPC looks (blue-grey base, palette clothes), names on hover, own lines.
-const WOMEN = [
-  { seed: 1201, name: 'BRENDA', walk: { path: loop(33, 33, 7.15), start: 0, dir: -1, speed: 1.3, along: 0.5 },
-    look: { outfit: 'dress', hair: 'ponytail', hairColor: '#292C2E', colors: { top: '#FF5491', accent: '#292C2E', shoe: '#292C2E' }, accessories: ['tote'], accColor: '#FFCC3F' },
-    role: 'spy', chatLines: ['i see EVERYTHING.', 'the landlady pays me in cookies.', 'writing that down...'], lines: ['ew.', 'my husband is a cop. sort of.', 'not today, sweaty.', 'do i KNOW you?', 'move it, b*tch.'] },
-  { seed: 1202, name: 'TIFF', walk: { path: loop(33, 0), start: 1, dir: 1, speed: 1.25, along: 0.5 },
-    look: { outfit: 'blouse', hair: 'longStraight', hairColor: '#93616B', glasses: false, hat: 'none', accessories: ['headphones'] },
-    plain: true },
-  { seed: 1203, name: 'MRS. ITO', walk: { path: loop(0, 0), start: 1, dir: 1, speed: 1.1, along: 0.2 },
-    look: { outfit: 'cardigan', hair: 'bob', hairColor: '#363E47', glasses: true, colors: { top: '#A7BFA4', inner: '#F0F2F4', bottom: '#363E47', shoe: '#292C2E' }, height: 0.94 },
-    plain: true },
-  { seed: 1204, name: 'LINDA', pos: [15.2, -6.2], face: [13.4, -6.1],
-    look: { outfit: 'apron', hair: 'bun', hairColor: '#363E47', glasses: false },
-    plain: true },
-  { seed: 1205, name: 'GRANDMA FUMIKO', pos: [12.7, 9.3], face: [8.0, 5.0],   // by the plaza bench next to the spawn crossing: easy to find when the cop is on you
-    look: { outfit: 'cardigan', hair: 'bun', hairColor: '#F0F2F4', glasses: true, colors: { top: '#F8C0C5', inner: '#F0F2F4', bottom: '#292C2E', shoe: '#292C2E' }, height: 0.88, build: 0.95, accessories: ['tote'], accColor: '#A92D59' },
-    role: 'oracle', chatLines: ['cop bothering you? come to grandma.', 'this week feels... familiar.', 'my hip says rain. again.', 'eat something, you noodle!', 'back in my day...'], lines: ["i'll hit you with my purse.", 'in trouble? hide behind grandma, dear.', 'back in my day we slapped HARDER', 'eat something, you look like a noodle', 'speak up, dummy!'] },
-  { seed: 1206, name: 'KIKO', pos: [-18.6, 27.5], face: [-19.2, 26.6],
-    look: { outfit: 'dress', hair: 'bob', hairColor: '#292C2E', colors: { top: '#00B4BC', accent: '#FFCC3F', shoe: '#F0F2F4' }, height: 0.95 },
-    plain: true },
-  { seed: 1207, name: 'ROSA', pos: [-6.4, -14.9], face: [-8, -14.9],
-    look: { outfit: 'blazer', hair: 'curlyLong', hairColor: '#4C3F42', colors: { top: '#FF7DAF', inner: '#F0F2F4', bottom: '#292C2E' } },
-    plain: true },
-  { seed: 1208, name: 'DORIS', pos: [-13.4, 19.6], face: [-12.6, 20.2],
-    look: { outfit: 'coat', hair: 'braids', hairColor: '#4C3F42', glasses: false },
-    plain: true },
-  { seed: 1209, name: 'BIG DEB', pos: [-12.6, 20.2], face: [-13.4, 19.6],
-    look: { outfit: 'sweater', hair: 'ponytail', hairColor: '#292C2E', colors: { top: '#FFE166', bottom: '#2A5B94', shoe: '#F0F2F4' }, build: 1.3, height: 1.03 },
-    role: 'deb', chatLines: ['who wants to arm wrestle?', 'i bench-pressed a bus once.', 'protein is a personality.'], lines: ['wanna arm wrestle? no? coward.', 'i eat guys like you for brunch', 'beat it, shrimp.', 'oh h*ll naw.'] },
 ];
 // The cop walks a big beat around four blocks (outer sidewalk lane).
 const COP_BEAT = { path: [[-7.15, -7.15], [10.4, -7.15], [10.9, -5.0], [17.0, -5.0], [17.3, -7.15], [40.15, -7.15], [40.15, 40.15], [-7.15, 40.15], [-7.15, 17.2], [-4.6, 16.7], [-4.6, 12.6], [-7.15, 12.1]], start: 0, dir: 1, speed: 1.2, along: 0.15 };   // detours round the bus shelter and the bench
@@ -119,7 +90,7 @@ export class NPCs {
     }
     for (const w of WOMEN) {
       const n = this._wrap(charMod.createNPC({ seed: w.seed, ...w.look }), w.seed);
-      Object.assign(n, { tag: w.name, woman: true }, w.plain ? {} : { lines: w.lines, chatLines: w.chatLines, role: w.role, important: true });
+      Object.assign(n, { tag: w.name, woman: true, cityKey: w.key, _origBuild: () => charMod.createNPC({ seed: w.seed, ...w.look }) }, w.plain ? {} : { lines: w.lines, chatLines: w.chatLines, role: w.role, important: true });
       if (w.walk) {
         const W = w.walk, a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4], t = W.along || 0;
         n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
@@ -135,7 +106,7 @@ export class NPCs {
     if (charMod.createSpecial) for (const s of SPECIAL_SPOTS) {
       const n = this._wrap(charMod.createSpecial(s.key), 0);
       const sp = charMod.SPECIALS[s.key];
-      Object.assign(n, { important: true, special: s.key, tag: sp.tag, danceName: sp.dance, icon: sp.icon, role: sp.role || null, temper: sp.temper || 'timid', walker: false, idleT: 0 });
+      Object.assign(n, { cityKey: s.key, _origBuild: () => charMod.createSpecial(s.key), important: true, special: s.key, tag: sp.tag, danceName: sp.dance, icon: sp.icon, role: sp.role || null, temper: sp.temper || 'timid', walker: false, idleT: 0 });
       n.root.position.set(s.pos[0], 0, s.pos[1]);
       n.heading = n.root.rotation.y = Math.atan2(s.face[0] - s.pos[0], s.face[1] - s.pos[1]);
       n.home = { x: s.pos[0], z: s.pos[1], heading: n.heading };
@@ -149,8 +120,8 @@ export class NPCs {
     }
     if (charMod.SPECIALS?.cop) {
       const n = this._wrap(charMod.createSpecial('cop'), 0), sp = charMod.SPECIALS.cop, W = COP_BEAT;
-      Object.assign(n, { important: true, special: 'cop', tag: sp.tag, role: 'cop', temper: 'timid', idleT: 0,
-        lines: ['move along.', "i've got my eye on you, punk.", '*munch munch*', 'nothing to see here.', 'is that a donut? no? then beat it.'] });
+      Object.assign(n, { cityKey: 'cop', _origBuild: () => charMod.createSpecial('cop'), important: true, special: 'cop', tag: sp.tag, role: 'cop', temper: 'timid', idleT: 0,
+        lines: COP_LINES.slice() });
       const a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4];
       n.root.position.set(a[0] + (b[0] - a[0]) * W.along, 0, a[1] + (b[1] - a[1]) * W.along);
       Object.assign(n, { path: W.path, idx: (W.start + W.dir + 4) % 4, dir: W.dir, speed: W.speed, walker: true });
@@ -166,6 +137,10 @@ export class NPCs {
       this.list.push(n);
     }
     if (charMod.createCustom) {
+      // built-in city characters edited in the creator (looks only; roles / specials are kept)
+      for (const n of this.list) if (n.cityKey) n._orig = { tag: n.tag, lines: n.lines };
+      this.applyOverrides();
+      addEventListener('storage', (e) => { if (e.key === OVERRIDE_KEY || e.key === null) this.applyOverrides(); });
       this.syncCustom();
       addEventListener('storage', (e) => { if (e.key === STORE_KEY || e.key === PLAYER_KEY || e.key === null) this.syncCustom(); });
     }
@@ -188,6 +163,41 @@ export class NPCs {
     n.heading = n.root.rotation.y = Math.atan2(face[0] - x, face[1] - z);
     n.home = { x, z, heading: n.heading };
     n.walker = false; n.idleT = Math.random() * 3;
+  }
+  /** Apply / revert the creator's look overrides for the built-in city characters. Returns the keys now overridden. */
+  applyOverrides() {
+    const C = this.charMod, ov = loadOverrides(), on = [];
+    for (const n of this.list) {
+      if (!n.cityKey || n.removed) continue;
+      const raw = ov[n.cityKey];
+      const sig = raw ? JSON.stringify(raw) : '';
+      if (raw) on.push(n.cityKey);
+      if ((n._ovSig || '') === sig) continue;
+      let c, d = null;
+      try {
+        if (raw) { d = C.normalizeCustom(raw); c = C.createCustom({ ...d, id: 'city-' + n.cityKey }); }
+        else c = n._origBuild();
+      } catch (e) { console.warn('city override skipped:', n.cityKey, e.message); continue; }
+      n._ovSig = sig; n.override = d;
+      this._swapModel(n, c);
+      if (n.special && c.ring) c.idleHula = false;
+      if (n.special === 'syoya' && !c.cap && C.capModel) {   // edited Kimata without a hat: the cap mission still needs one (hidden until he gets it back)
+        const cap = C.capModel(C.PALETTE.white); cap.rotation.y = Math.PI; cap.visible = false; c.parts.headCenter.add(cap); c.cap = cap; this.toonify?.(cap);
+      }   // Kimata keeps his ring at the hip until clicked (hula = his dance)
+      n.tag = d ? d.name.toUpperCase() : n._orig.tag;
+      const base = d && cityBaseDef(n.cityKey, C);
+      n.lines = d && base && !sameLines(d.lines, base.lines) ? d.lines.slice() : n._orig.lines;
+    }
+    return on;
+  }
+  _swapModel(n, c) {
+    const old = n.c;
+    if (old.dancing) old.stopDance?.();
+    if (old.cap && old.cap.visible === false && c.cap) c.cap.visible = false;   // mid cap-mission: stay capless
+    old.root.removeFromParent();
+    n.root.add(c.root); addGhosts(c.root);
+    n.c = c; c.update?.(0, 0);
+    this.toonify?.(c.root);
   }
   /** (Re)spawn the creator's saved characters from localStorage. Returns the number spawned. */
   syncCustom() {
