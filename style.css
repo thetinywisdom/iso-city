@@ -1,0 +1,88 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: #EFFAFA;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#app canvas { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#controls { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); pointer-events: none;
+  background: #292C2E; color: #F0F2F4; padding: 8px 18px; border-radius: 999px; font-size: 13px;
+  white-space: nowrap; letter-spacing: .01em; }
+#controls b { color: #FFCC3F; font-weight: 600; }
+
+#pixelHud {
+  position: fixed; top: 14px; right: 14px; padding: 6px 10px; border-radius: 4px;
+  background: #292C2E; color: #FFCC3F; font: 600 13px/1 ui-monospace, monospace;
+  opacity: 0; transition: opacity .3s; pointer-events: none;
+}
+canvas { image-rendering: pixelated; }
+
+/* ---- NPC chat bubbles (pixel-art) ---------------------------------------- */
+@font-face { font-family: 'PressStart2P'; src: url('fonts/PressStart2P-Regular.ttf') format('truetype'); font-display: block; }
+#bubbles { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.bubble { position: absolute; left: 0; top: 0; will-change: transform; }
+.bubble > span {
+  position: absolute; left: 0; bottom: 18px; display: block; white-space: nowrap;
+  transform-origin: 50% 100%;
+  font: 16px/16px 'PressStart2P', ui-monospace, monospace; color: #292C2E;
+  background: #F0F2F4; padding: 6px 9px 6px 9px;
+  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
+  /* 3px pixel border with notched (pixel-rounded) corners */
+  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E,
+              0 6px 0 0 #5B6A7B; /* hard drop "shadow" row in palette slate */
+  animation: bubble-pop .22s steps(4, end) backwards;
+}
+/* stepped pixel tail (3px art pixels; covers the border under it and steps down to a point) */
+.bubble > span::after {
+  content: ''; position: absolute; left: calc(50% - 6px); top: 100%; width: 15px; height: 18px;
+  background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='5' height='6' shape-rendering='crispEdges'><rect x='1' y='0' width='1' height='1' fill='%23F0F2F4'/><rect x='2' y='0' width='1' height='1' fill='%23F0F2F4'/><rect x='3' y='0' width='1' height='1' fill='%23F0F2F4'/><rect x='0' y='1' width='1' height='1' fill='%23292C2E'/><rect x='1' y='1' width='1' height='1' fill='%23F0F2F4'/><rect x='2' y='1' width='1' height='1' fill='%23F0F2F4'/><rect x='3' y='1' width='1' height='1' fill='%23F0F2F4'/><rect x='4' y='1' width='1' height='1' fill='%23292C2E'/><rect x='1' y='2' width='1' height='1' fill='%23292C2E'/><rect x='2' y='2' width='1' height='1' fill='%23F0F2F4'/><rect x='3' y='2' width='1' height='1' fill='%23F0F2F4'/><rect x='4' y='2' width='1' height='1' fill='%23292C2E'/><rect x='2' y='3' width='1' height='1' fill='%23292C2E'/><rect x='3' y='3' width='1' height='1' fill='%23F0F2F4'/><rect x='4' y='3' width='1' height='1' fill='%23292C2E'/><rect x='3' y='4' width='1' height='1' fill='%23292C2E'/><rect x='4' y='4' width='1' height='1' fill='%23292C2E'/><rect x='4' y='5' width='1' height='1' fill='%23292C2E'/></svg>") 0 0 / 15px 18px no-repeat; image-rendering: pixelated;
+}
+@keyframes bubble-pop {
+  0% { transform: scale(.2); }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* ---- SHOUT bubbles (angry / scared NPCs) ---------------------------------- */
+.bubble.shout { z-index: 2; }
+.bubble.shout > span {
+  font-size: 16px; line-height: 16px; color: #A92D59; background: #F9F0F1; padding: 9px 12px;
+  /* faux-bold: glyph repeated 1-2px to the right */
+  text-shadow: 1px 0 0 #A92D59, 2px 0 0 #A92D59;
+  box-shadow: 0 -3px 0 0 #A92D59, 0 3px 0 0 #A92D59, -3px 0 0 0 #A92D59, 3px 0 0 0 #A92D59,
+              0 -6px 0 0 #292C2E, 0 6px 0 0 #292C2E, -6px 0 0 0 #292C2E, 6px 0 0 0 #292C2E,
+              0 9px 0 0 #5B6A7B;
+  bottom: 24px;
+  animation: bubble-pop .22s steps(4, end) backwards, shout-shake .3s steps(2, end) .22s 6;
+}
+.bubble.shout > span::after { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='5' height='6' shape-rendering='crispEdges'><path d='M1 0h3v1h-3z M1 1h3v1h-3z M2 2h2v1h-2z M3 3h1v1h-1z' fill='%23F9F0F1'/><path d='M0 1h1v1h-1z M4 1h1v1h-1z M1 2h1v1h-1z M4 2h1v1h-1z M2 3h1v1h-1z M4 3h1v1h-1z M3 4h2v1h-2z M4 5h1v1h-1z' fill='%23A92D59'/></svg>"); top: calc(100% + 3px); }
+@keyframes shout-shake {
+  0% { translate: -3px 0; } 50% { translate: 3px -3px; } 100% { translate: 0 0; }
+}
+/* long-press charge ring (15x15 art pixels drawn per-pixel, shown at 3x) */
+#bubbles canvas.charge { position: absolute; left: 0; top: 0; width: 45px; height: 45px; display: none; image-rendering: pixelated; }
+/* SLAP! impact burst */
+.impact { position: absolute; left: 0; top: 0; will-change: transform; z-index: 3; }
+.impact > div { position: absolute; left: -66px; top: -48px; width: 132px; height: 96px; animation: impact-pop .5s steps(5, end) forwards; }
+.impact canvas { position: absolute; inset: 0; width: 132px; height: 96px; image-rendering: pixelated; }
+.impact b {
+  position: absolute; left: 0; right: 0; top: 39px; text-align: center; font: 16px/16px 'PressStart2P', monospace; color: #F0F2F4;
+  -webkit-font-smoothing: none;
+  text-shadow: 3px 0 0 #292C2E, -3px 0 0 #292C2E, 0 3px 0 #292C2E, 0 -3px 0 #292C2E, 3px 3px 0 #292C2E, -3px 3px 0 #292C2E, 3px -3px 0 #292C2E, -3px -3px 0 #292C2E;
+}
+@keyframes impact-pop {
+  0% { transform: scale(.4) rotate(-8deg); opacity: 1; }
+  30% { transform: scale(1.15) rotate(3deg); }
+  70% { transform: scale(1) rotate(0); opacity: 1; }
+  100% { transform: scale(1.05); opacity: 0; }
+}
+#hud-mute { position: fixed; right: 12px; bottom: 12px; font: 8px/8px 'PressStart2P', monospace; color: #F0F2F4; background: #292C2E; padding: 6px; z-index: 6; pointer-events: none; display: none; }
+
+/* ---- special NPCs: floating pixel icon bubble + hover name tag ---------------- */
+.bubble.icon > span { padding: 6px 9px; line-height: 0; animation: bubble-pop .22s steps(4, end) backwards, icon-bob 1s steps(2, end) .22s infinite; }
+.bubble.icon canvas { display: block; image-rendering: pixelated; }
+@keyframes icon-bob { 0% { translate: 0 0; } 50% { translate: 0 -3px; } }
+.nametag {
+  position: absolute; left: 0; top: 0; display: none; white-space: nowrap; will-change: transform;
+  font: 16px/16px 'PressStart2P', ui-monospace, monospace; color: #F0F2F4; background: #292C2E; padding: 6px 6px 6px 9px;
+  margin-top: -33px; /* sits above the anchor point (just over the head) */
+  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
+  box-shadow: 0 3px 0 0 #5B6A7B;
+}

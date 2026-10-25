@@ -1,0 +1,233 @@
+import * as THREE from 'three';
+import { generateCity } from './city.js';
+import { Player, JUMP } from './player.js';
+import { P } from './palette.js';
+import { PixelPipeline, placeSnappedSun } from './pixel.js';
+import { NPCs, NPC_RADIUS } from './npcs.js';
+import { initExtras } from './extras.js';
+
+// ---- Renderer / scene --------------------------------------------------------
+const SKY = new THREE.Color(P.sky);
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(1); // pixel art: one canvas pixel per CSS pixel, chunky pixels come from the low-res target
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.BasicShadowMap; // hard, crisp shadow edges;
+document.getElementById('app').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = SKY;
+
+// ---- Isometric orthographic camera ------------------------------------------
+const VIEW = 30;                         // world units visible vertically at zoom 1
+const YAW = THREE.MathUtils.degToRad(45);
+const PITCH = Math.atan(1 / Math.SQRT2); // 35.264° true isometric
+const DIST = 160;
+const camOffset = new THREE.Vector3(
+  Math.cos(PITCH) * Math.sin(YAW), Math.sin(PITCH), Math.cos(PITCH) * Math.cos(YAW)).multiplyScalar(DIST);
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 600);
+let zoom = 1.6;
+// ---- Pixel-art pipeline --------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const pixel = new PixelPipeline(renderer, {
+  scale: parseInt(params.get('px') || '3', 10),
+  enabled: params.get('pixel') !== '0',
+});
+pixel.dither = params.get('dither') === '1';
+pixel.outlines = params.get('outlines') === '1'; // default: no outlines
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  pixel.setSize(window.innerWidth, window.innerHeight);
+}
+resize();
+window.addEventListener('resize', resize);
+scene.fog = new THREE.Fog(SKY, DIST + 20, DIST + 90);
+
+// Screen-relative ground axes for WASD
+const camForward = new THREE.Vector3(-camOffset.x, 0, -camOffset.z).normalize();
+const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize();
+
+// ---- Lights ------------------------------------------------------------------
+// Flat-vector look: strong ambient fill, gentle key light, light shadows.
+scene.add(new THREE.HemisphereLight('#ffffff', '#dfe4e8', 2.2));
+const sun = new THREE.DirectionalLight('#ffffff', 1.4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024); // low-res shadow map reads as chunky pixel shadows
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 220 });
+sun.shadow.bias = -0.0012;
+sun.shadow.normalBias = 0.06;
+if ('intensity' in sun.shadow) sun.shadow.intensity = 0.5;
+const SUN_OFFSET = new THREE.Vector3(-40, 70, 25);
+scene.add(sun, sun.target);
+
+// ---- World -------------------------------------------------------------------
+const city = generateCity(scene);
+pixel.toonify(scene);
+let npcs = null;
+const player = new Player(); // placeholder capsule until a character model loads
+
+player.position.copy(city.spawn);
+player.heading = Math.PI / 4 + Math.PI; // face "up" the screen
+scene.add(player.root);
+
+// ---- Character hook ----------------------------------------------------------
+// Real characters live in ../characters/characters.js and export
+// createMainCharacter() and createNPC(options). If the file exists we swap the
+// placeholder capsule for the main character; otherwise the capsule stays.
+import('../characters/characters.js')
+  .then((mod) => {
+    if (mod?.createMainCharacter) player.setModel(mod.createMainCharacter());
+    if (mod?.createNPC) npcs = new NPCs(scene, mod, city);
+    pixel.toonify(scene);
+  })
+  .catch((e) => console.info('Character module not loaded, using placeholder:', e.message));
+
+// Click-to-move target marker
+const marker = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.7, 24),
+  new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, depthWrite: false }));
+marker.material.color.set(P.marker);
+marker.rotation.x = -Math.PI / 2; marker.visible = false;
+scene.add(marker);
+
+// ---- Input ---------------------------------------------------------------------
+const keys = new Set();
+const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left',
+  KeyD: 'right', ArrowRight: 'right', ShiftLeft: 'run', ShiftRight: 'run' };
+const hud = document.getElementById('pixelHud');
+let hudTimer = 0;
+function showHud() {
+  if (!hud) return;
+  hud.textContent = pixel.enabled ? `Pixel ×${pixel.scale}${pixel.dither ? ' · dither' : ''}${pixel.outlines ? '' : ' · no outlines'}` : 'Pixel off';
+  hud.style.opacity = 1; clearTimeout(hudTimer); hudTimer = setTimeout(() => (hud.style.opacity = 0), 1400);
+}
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'BracketLeft') { pixel.setScale(pixel.scale - 1); showHud(); return; }
+  if (e.code === 'BracketRight') { pixel.setScale(pixel.scale + 1); showHud(); return; }
+  if (e.code === 'KeyP') { pixel.setEnabled(!pixel.enabled); showHud(); return; }
+  if (e.code === 'KeyB') { pixel.dither = !pixel.dither; showHud(); return; }
+  if (e.code === 'KeyO') { pixel.outlines = !pixel.outlines; showHud(); return; }
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !extras?.combat.stun) player.jump(); return; }
+  const k = KEYMAP[e.code];
+  if (k) { keys.add(k); e.preventDefault(); if (k !== 'run') clickTarget = null; }
+});
+window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) keys.delete(k); });
+window.addEventListener('blur', () => keys.clear());
+
+let clickTarget = null, stuckTime = 0;
+const raycaster = new THREE.Raycaster();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hit = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(groundPlane, hit)) {
+    clickTarget = hit; stuckTime = 0;
+    marker.position.set(hit.x, city.groundHeight(hit.x, hit.z) + 0.05, hit.z);
+    marker.visible = true;
+  }
+});
+renderer.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoom = THREE.MathUtils.clamp(zoom * Math.exp(-e.deltaY * 0.0012), 0.55, 3);
+}, { passive: false });
+
+// ---- Collision -----------------------------------------------------------------
+const RADIUS = 0.42;
+function blocked(x, z) {
+  for (const c of city.colliders) {
+    const nx = Math.max(c.minX, Math.min(x, c.maxX));
+    const nz = Math.max(c.minZ, Math.min(z, c.maxZ));
+    const dx = x - nx, dz = z - nz;
+    if (dx * dx + dz * dz < RADIUS * RADIUS) return true;
+  }
+  if (npcs) {
+    const rr = (RADIUS + NPC_RADIUS) ** 2, p = player.position;
+    for (const q of npcs.positions) {
+      const d0 = (p.x - q.x) ** 2 + (p.z - q.z) ** 2, d1 = (x - q.x) ** 2 + (z - q.z) ** 2;
+      if (d1 < rr && d1 < d0) return true; // only block moves that get closer (never trap)
+    }
+  }
+  return false;
+}
+function tryMove(dx, dz) {
+  const p = player.position;
+  const b = city.bounds;
+  const nx = THREE.MathUtils.clamp(p.x + dx, b.min, b.max);
+  if (!blocked(nx, p.z)) p.x = nx;
+  const nz = THREE.MathUtils.clamp(p.z + dz, b.min, b.max);
+  if (!blocked(p.x, nz)) p.z = nz;
+}
+
+// ---- Loop ------------------------------------------------------------------------
+const camTarget = player.position.clone();
+const clock = new THREE.Clock();
+const move = new THREE.Vector3();
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  let running = keys.has('run');
+  let speed = running ? 7 : 3.2; // walk/run speeds matched to the character's natural stride
+
+  move.set(0, 0, 0);
+  if (keys.has('up')) move.add(camForward);
+  if (keys.has('down')) move.sub(camForward);
+  if (keys.has('right')) move.add(camRight);
+  if (keys.has('left')) move.sub(camRight);
+
+  if (move.lengthSq() === 0 && clickTarget) {
+    move.set(clickTarget.x - player.position.x, 0, clickTarget.z - player.position.z);
+    if (move.length() < 0.25) { clickTarget = null; move.set(0, 0, 0); }
+  }
+  // slap: walk into reach of the target NPC, then freeze input during the swing / when hit
+  const ctl = extras ? extras.combat.control(dt, keys.has('up') || keys.has('down') || keys.has('left') || keys.has('right')) : null;
+  if (ctl?.lock) { move.set(0, 0, 0); clickTarget = null; }
+  else if (ctl?.dir) { move.set(ctl.dir.x, 0, ctl.dir.z); clickTarget = null; speed = ctl.speed; running = speed > 5; }
+  if (!clickTarget) marker.visible = false;
+
+  const moving = move.lengthSq() > 0;
+  let actualSpeed = 0;
+  let targetHeading = null;
+  if (moving) { move.normalize(); targetHeading = Math.atan2(move.x, move.z); }
+  // momentum: accelerate/brake toward the wanted velocity (little air control mid-jump)
+  const vel = player.vel;
+  const accel = player.airborne ? JUMP.airControl : (moving ? 12 : 14);
+  vel.lerp(move.clone().multiplyScalar(moving ? speed : 0), 1 - Math.exp(-accel * dt));
+  if (vel.lengthSq() > 1e-4) {
+    const before = player.position.clone();
+    tryMove(vel.x * dt, vel.z * dt);
+    actualSpeed = dt > 0 ? before.distanceTo(player.position) / dt : 0;
+    if (actualSpeed < vel.length() * 0.5) vel.multiplyScalar(0.5); // bumped into something
+  }
+  if (moving) {
+    if (clickTarget) {
+      const progressed = actualSpeed * dt;
+      stuckTime = progressed < speed * dt * 0.2 ? stuckTime + dt : 0;
+      if (stuckTime > 0.35) clickTarget = null; // walked into a wall
+    }
+  }
+  const gy = city.groundHeight(player.position.x, player.position.z);
+  player.stepVertical(dt, gy + 0.02); // gravity + jump; step-height smoothing on the ground
+  player.animate(dt, actualSpeed > 0.2, running, targetHeading, actualSpeed);
+
+  if (marker.visible) {
+    const s = 1 + Math.sin(performance.now() * 0.008) * 0.15;
+    marker.scale.set(s, s, s);
+  }
+
+  // Camera follow (smooth)
+  camTarget.lerp(player.position, 1 - Math.exp(-dt * 6));
+  if (npcs) npcs.update(dt, player.position, RADIUS);
+  pixel.placeCamera(camera, camTarget, camOffset, VIEW / zoom); // snaps to the low-res pixel grid
+
+  // Sun + shadow frustum follow the player (snapped to shadow texels: no crawling)
+  placeSnappedSun(sun, camTarget, SUN_OFFSET);
+
+  pixel.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// Expose a little debug handle (used by the headless smoke test).
+window.__game = { player, city, camera, renderer, keys, pixel, get npcs() { return npcs; }, setZoom: (z) => (zoom = z) };
+const extras = window.__game.extras = initExtras({ scene, camera, renderer, pixel, city, player, keys, getNPCs: () => npcs });

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" href="data:," />
+<title>Iso City — character showcase</title>
+<style>
+  html,body{margin:0;height:100%;background:#fbfbfb;font:13px system-ui,sans-serif;color:#363E47;overflow:hidden}
+  #ui{position:fixed;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  button{border:0;border-radius:6px;padding:7px 11px;background:#363E47;color:#F0F2F4;cursor:pointer}
+  button.on{background:#ED612B}
+  #info{position:fixed;left:12px;bottom:10px;opacity:.7}
+  canvas{image-rendering:pixelated}
+</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="ui">
+  <button id="bWalk">Walk (1)</button><button id="bRun">Run (2)</button><button id="bJump">Jump (Space)</button><button id="bSpin" class="on">Turntable</button>
+  <button id="bShuffle">Shuffle NPCs</button>
+  <button id="bPixel">Pixel art</button>
+  <button data-view="lineup">Lineup</button><button data-view="close">Close-up</button><button data-view="crowd">Crowd</button><button data-view="v2">New looks</button><button data-view="specials">Specials</button><button id="bDance">Dance (D)</button>
+</div>
+<div id="info"></div>
+<script type="module">
+import * as THREE from 'three';
+import { createMainCharacter, createNPC, createCrowd, PRESETS, PRESETS_V2, JumpMotor, createSpecial, SPECIALS } from './characters.js';
+import { PixelPipeline, rampUniforms } from '../src/pixel.js';
+rampUniforms.uSunI.value = 1.1; // matches this page's sun
+
+const q = new URLSearchParams(location.search);
+const state = {
+  view: q.get('view') || 'lineup',
+  walk: q.get('walk') === '1' || q.get('run') === '1',
+  run: q.get('run') === '1',
+  travel: q.get('travel') === '1',   // move the characters across the floor (foot-slide check)
+  manual: q.get('manual') === '1',   // frames are stepped by window.__step()
+  spin: q.get('spin') !== '0',
+  angle: q.has('angle') ? parseFloat(q.get('angle')) : null,   // fixed turntable angle
+  phase: q.has('phase') ? parseFloat(q.get('phase')) : null,   // frozen walk phase
+  seed: parseInt(q.get('seed') || '7', 10),
+};
+
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.BasicShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#fbfbfb');
+scene.add(new THREE.HemisphereLight('#ffffff', '#d5dbe0', 2.6));
+const sun = new THREE.DirectionalLight('#ffffff', 1.1);
+sun.position.set(4, 8, 6); sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0015;
+Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 0.5, far: 30 });
+scene.add(sun);
+
+// true isometric orthographic camera (looking down the (1,1,1) diagonal)
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+let zoom = 3;
+function frame() {
+  const a = innerWidth / innerHeight;
+  cam.left = -zoom * a; cam.right = zoom * a; cam.top = zoom; cam.bottom = -zoom;
+  cam.updateProjectionMatrix();
+}
+let target = new THREE.Vector3(0, 1, 0);
+function placeCam() { cam.position.copy(target).add(new THREE.Vector3(10, 10, 10)); cam.lookAt(target); }
+// 3D pixel-art pipeline (shared with the game): ?pixel=0 to start with it off, ?px=N pixel size
+const pixel = new PixelPipeline(renderer, { scale: parseInt(q.get('px') || '3', 10), enabled: q.get('pixel') !== '0' });
+pixel.outlines = q.get('outlines') === '1';
+pixel.dither = q.get('dither') === '1';
+const CAM_OFFSET = new THREE.Vector3(10, 10, 10);
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); pixel.setSize(innerWidth, innerHeight); frame(); });
+addEventListener('keydown', (e) => {
+  if (e.code === 'BracketLeft') pixel.setScale(pixel.scale - 1);
+  else if (e.code === 'BracketRight') pixel.setScale(pixel.scale + 1);
+  else if (e.code === 'KeyP') togglePixel();
+  else if (e.code === 'KeyB') pixel.dither = !pixel.dither;
+  else if (e.code === 'Digit1') setGait('walk');
+  else if (e.code === 'Digit2') setGait('run');
+  else if (e.code === 'Digit0') setGait('idle');
+  else if (e.code === 'Space') { e.preventDefault(); jumpAll(); }
+  else if (e.code === 'KeyD') danceAll();
+});
+function togglePixel() { pixel.setEnabled(!pixel.enabled); document.getElementById('bPixel').classList.toggle('on', pixel.enabled); }
+
+let stage = new THREE.Group(); scene.add(stage);
+let chars = [], pedestals = [];
+
+function pedestal(x, z, r = 0.42) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.04, 0.08, 10),
+    new THREE.MeshLambertMaterial({ color: '#eef0f2', flatShading: true }));
+  disc.position.y = -0.04; disc.receiveShadow = true; g.add(disc);
+  stage.add(g); pedestals.push(g); return g;
+}
+
+function build() {
+  stage.removeFromParent(); pixel._toonRoots.delete(stage); stage = new THREE.Group(); scene.add(stage);
+  chars = []; pedestals = [];
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: 0.12 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.081; ground.receiveShadow = true; stage.add(ground);
+
+  if (state.view === 'close') {
+    const p = pedestal(0, 0, 0.6);
+    if (state.travel) {   // floor ticks every 0.5u along the walking line (foot-slide check)
+      const mat = new THREE.MeshBasicMaterial({ color: '#c9d0d6' });
+      for (let i = -6; i < 120; i++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.004, 0.025), mat);
+        m.position.set(0, -0.078, i * 0.5); p.add(m);
+        if (i % 2 === 0) { const n = m.clone(); n.scale.set(0.15, 1, 0.12); n.position.y = -0.076; n.position.x = 0.5; p.add(n); }
+      }
+    }
+    const c = createMainCharacter(); p.add(c.root); chars.push(c);
+    zoom = 1.25; target.set(0, 1.05, 0);
+  } else if (state.view === 'crowd') {
+    const crowd = createCrowd(24, state.seed);
+    crowd.forEach((c, i) => {
+      const p = pedestal((i % 6) * 1.25 - 3.1, Math.floor(i / 6) * 1.25 - 1.9, 0.5);
+      p.add(c.root); chars.push(c);
+    });
+    zoom = 4.6; target.set(0, 0.8, 0);
+  } else if (state.view === 'v2') {
+    // the new v2 looks: outfits, hair, hats, accessories, body variation
+    const list = [createMainCharacter(), ...Object.keys(PRESETS_V2).map((k) => createNPC({ ...PRESETS_V2[k], seed: k }))];
+    const dir = new THREE.Vector3(1, 0, -1).normalize();
+    list.forEach((c, i) => {
+      const t = (i - (list.length - 1) / 2) * 1.12;
+      const p = pedestal(dir.x * t, dir.z * t, 0.4);
+      p.add(c.root); chars.push(c);
+    });
+    zoom = 3.0; target.set(0, 0.95, 0);
+  } else if (state.view === 'specials') {
+    // easter-egg NPCs next to the main character (?only=mbappe|syoya)
+    const keys = q.get('only') ? q.get('only').split(',') : Object.keys(SPECIALS);
+    const list = [createMainCharacter(), ...keys.map((k) => createSpecial(k))];
+    const dir = new THREE.Vector3(1, 0, -1).normalize();
+    list.forEach((c, i) => {
+      const t = (i - (list.length - 1) / 2) * 1.5;
+      const p = pedestal(dir.x * t, dir.z * t, 0.5);
+      p.add(c.root); chars.push(c);
+    });
+    zoom = list.length > 2 ? 2.4 : 1.9; target.set(0, 1.0, 0);
+  } else {
+    // lineup: main character + the 5 looks from the sheet + 2 random NPCs, along the camera's horizontal
+    const list = [createMainCharacter()];
+    for (const k of Object.keys(PRESETS)) list.push(createNPC({ ...PRESETS[k], seed: k }));
+    const r = createCrowd(2, state.seed); list.push(...r);
+    const dir = new THREE.Vector3(1, 0, -1).normalize();
+    list.forEach((c, i) => {
+      const t = (i - (list.length - 1) / 2) * 1.12;
+      const p = pedestal(dir.x * t, dir.z * t, 0.4);
+      p.add(c.root); chars.push(c);
+    });
+    zoom = 2.6; target.set(0, 0.95, 0);
+  }
+  if (q.has('zoom')) zoom = parseFloat(q.get('zoom'));
+  frame(); placeCam();
+  pixel.toonify(stage);
+  document.getElementById('info').textContent = chars.map((c) =>
+    `${c.config.name}${c.config.outfit && c.config.name !== 'main' ? `(${c.config.outfit}/${c.config.hair}${c.config.glasses ? '/glasses' : ''}${c.config.hat && c.config.hat !== 'none' ? '/' + c.config.hat : ''}${(c.config.accessories || []).map((a) => '/' + a).join('')})` : ''} ${c.triangles}▲`).join('  ·  ');
+  window.__chars = chars;
+}
+
+const WALK_SPEED = parseFloat(q.get('ws') || '1.6'), RUN_SPEED = parseFloat(q.get('rs') || '7');
+function setGait(g) {
+  state.walk = g !== 'idle' && !(g === 'walk' && state.walk && !state.run) && !(g === 'run' && state.run);
+  state.run = state.walk && g === 'run';
+  document.getElementById('bWalk').classList.toggle('on', state.walk && !state.run);
+  document.getElementById('bRun').classList.toggle('on', state.run);
+}
+function danceAll() { for (const c of chars) if (c.config.special) c.dance(SPECIALS[c.config.special].dance); }
+function jumpAll() { chars.forEach((c, i) => setTimeout(() => c.motor?.jump(), state.view === 'crowd' ? i * 40 : 0)); }
+document.getElementById('bWalk').onclick = () => setGait('walk');
+document.getElementById('bRun').onclick = () => setGait('run');
+document.getElementById('bJump').onclick = jumpAll;
+document.getElementById('bDance').onclick = danceAll;
+document.getElementById('bSpin').onclick = (e) => { state.spin = !state.spin; e.target.classList.toggle('on', state.spin); };
+document.getElementById('bShuffle').onclick = () => { state.seed = (Math.random() * 1e6) | 0; build(); };
+document.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => { state.view = b.dataset.view; build(); });
+document.getElementById('bPixel').onclick = togglePixel;
+document.getElementById('bPixel').classList.toggle('on', pixel.enabled);
+document.getElementById('bWalk').classList.toggle('on', state.walk && !state.run);
+document.getElementById('bRun').classList.toggle('on', state.run);
+document.getElementById('bSpin').classList.toggle('on', state.spin);
+
+build();
+const clock = new THREE.Clock();
+let spinA = Math.PI / 4;   // start facing the camera
+let travel = 0;
+function step(dt) {
+  if (state.spin && state.angle === null) spinA += dt * 0.6;
+  const a = state.angle !== null ? state.angle : spinA;
+  const speed = state.walk ? (state.run ? RUN_SPEED : WALK_SPEED) : 0;
+  travel += speed * dt;
+  pedestals.forEach((p) => p.rotation.y = a);
+  for (const c of chars) {
+    if (!c.motor) c.motor = new JumpMotor();
+    const m = c.motor; m.step(dt, 0);
+    c.root.position.y = m.y;
+    if (state.travel) { const pd = c.root.parent; c.root.position.z = travel; pd.children[0].visible = false; }
+    if (state.phase !== null && state.walk) c.setWalkPose(state.phase, speed);
+    else c.update(dt, { speed, ...m.state });
+  }
+  if (state.travel && chars[0]) { chars[0].root.getWorldPosition(target); target.y = 1.0 + (state.view === 'close' ? 0 : 0); }
+}
+function draw() {
+  pixel.placeCamera(cam, target, CAM_OFFSET, zoom * 2);
+  pixel.render(scene, cam);
+}
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!state.manual) step(dt);
+  draw();
+  requestAnimationFrame(tick);
+}
+// deterministic stepping for captures: __step(seconds, substeps)
+window.__step = (sec, n = 1) => { for (let i = 0; i < n; i++) step(sec / n); draw(); };
+window.__jump = () => jumpAll();
+window.__dance = () => danceAll();
+window.__chars = chars;
+window.__setTarget = (x, y, z) => { target.set(x, y, z); };
+tick();
+if (state.manual) document.getElementById('ui').style.display = 'none';
+window.__ready = true;
+</script>
+</body>
+</html>

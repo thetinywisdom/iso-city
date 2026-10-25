@@ -1,0 +1,205 @@
+import * as THREE from 'three';
+import { TUNE } from './npcs.js';
+
+// SLAP: long-press an NPC (dialogue.js fires onLongPress) -> the player walks into
+// reach, winds up and slaps. Impact = pixel "SLAP!" burst, screen shake, a synthesized
+// whoosh + smack, and the NPC's reaction (npcs.js: aggressive slaps back and chases,
+// timid runs away). NPC slaps on the player go through the same impact code.
+const APPROACH_SPEED = 4.6, APPROACH_TIMEOUT = 4;
+const PLAYER_STUN = 0.32, KNOCKBACK = 8;
+
+export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, dialogue, keys }) {
+  const canvas = renderer.domElement;
+  const layer = document.getElementById('bubbles');
+  const audio = new SlapAudio();
+  let target = null, approachT = 0, bestD = Infinity, stuckT = 0, slapping = null, stun = 0, shake = 0;
+  const bursts = [];
+  const tmp = new THREE.Vector3();
+  const charOf = () => player.model?.userData?.character || null;
+
+  // ---- wiring ----
+  dialogue.onLongPress = (npc) => { audio.unlock(); target = npc; approachT = 0; bestD = Infinity; stuckT = 0; };
+  let wired = null;
+  function wire(npcs) {
+    if (!npcs || wired === npcs) return;
+    wired = npcs;
+    npcs.onShout = (n, text) => dialogue.shout(n, text);
+    npcs.onSlapPlayer = (n) => hitPlayer(n);
+  }
+  window.addEventListener('pointerdown', () => audio.unlock(), true);
+  const muteHud = document.createElement('div'); muteHud.id = 'hud-mute'; document.body.appendChild(muteHud);
+  let muteTimer = 0;
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyM') return;
+    audio.muted = !audio.muted;
+    muteHud.textContent = audio.muted ? 'SOUND OFF' : 'SOUND ON';
+    muteHud.style.display = 'block'; clearTimeout(muteTimer); muteTimer = setTimeout(() => (muteHud.style.display = 'none'), 1200);
+  });
+
+  // ---- impacts ----
+  function burstAt(pos) {
+    const el = document.createElement('div'); el.className = 'impact';
+    const inner = document.createElement('div');
+    inner.appendChild(starCanvas());
+    const b = document.createElement('b'); b.textContent = 'SLAP!'; inner.appendChild(b);
+    el.appendChild(inner); layer.appendChild(el);
+    bursts.push({ el, pos: pos.clone(), until: performance.now() + 520 });
+    placeBursts();
+  }
+  function impact(a, b) {            // a slaps b (Object3D roots)
+    tmp.copy(a.position).lerp(b.position, 0.65); tmp.y = b.position.y + 1.55;
+    burstAt(tmp);
+    shake = 0.22;
+    audio.smack();
+  }
+  function hitPlayer(n) {
+    const p = player.position, q = n.root.position;
+    const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz) || 1;
+    impact(n.root, player.root);
+    charOf()?.hit(-1);
+    stun = PLAYER_STUN; slapping = null; target = null;
+    player.vel.set(dx / d * KNOCKBACK, 0, dz / d * KNOCKBACK);
+    player.heading = Math.atan2(-dx, -dz);       // knocked while facing the slapper
+  }
+
+  // ---- per frame: called by main.js before the player moves ----
+  // returns { lock } to freeze input, or { dir, speed } to auto-walk, or null
+  function control(dt, keyMoving) {
+    const npcs = getNPCs(); wire(npcs);
+    if (stun > 0) { stun -= dt; return { lock: true }; }
+    if (slapping) {
+      const n = slapping.npc, ch = charOf();
+      slapping.t += dt;
+      turnToward(n.root.position, dt, 20);
+      if (!slapping.done && slapping.t >= slapping.hitAt) {
+        slapping.done = true;
+        const d = player.position.distanceTo(n.root.position);
+        if (d < TUNE.reach + 0.5) { impact(player.root, n.root); dialogue.clear(n); npcs.slapped(n, player.position); }
+        else audio.whoosh(0.5);
+      }
+      if (slapping.t >= slapping.hitAt + 0.25 || (ch && !ch.slapping && slapping.done)) slapping = null;
+      return { lock: true };
+    }
+    if (!target) return null;
+    if (keyMoving) { target = null; return null; }   // WASD cancels a pending slap
+    approachT += dt;
+    const p = player.position, q = target.root.position;
+    const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
+    if (d <= TUNE.reach) {
+      const ch = charOf();
+      const hitAt = ch ? ch.slap() : 0.25;
+      slapping = { npc: target, t: 0, hitAt, done: false };
+      setTimeout(() => audio.whoosh(1), Math.max(0, (hitAt - 0.12) * 1000));
+      target = null;
+      player.vel.multiplyScalar(0.2);
+      return { lock: true };
+    }
+    // give up if we cannot get there (timeout, or no progress for a while: walled off)
+    if (d < bestD - 0.05) { bestD = d; stuckT = 0; } else stuckT += dt;
+    if (approachT > APPROACH_TIMEOUT || stuckT > 0.8) { target = null; return null; }
+    return { dir: { x: dx / d, z: dz / d }, speed: d > 4 ? 7 : APPROACH_SPEED };
+  }
+  function turnToward(q, dt, rate) {
+    const want = Math.atan2(q.x - player.position.x, q.z - player.position.z);
+    let diff = want - player.heading; diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    player.heading += diff * Math.min(1, dt * rate);
+  }
+
+  // ---- screen shake (whole art pixels) + burst placement ----
+  function placeBursts() {
+    const now = performance.now(), w = canvas.clientWidth, h = canvas.clientHeight;
+    const g = pixel && pixel.enabled ? pixel.scale : 1;
+    for (let i = bursts.length - 1; i >= 0; i--) {
+      const b = bursts[i];
+      if (now > b.until) { b.el.remove(); bursts.splice(i, 1); continue; }
+      tmp.copy(b.pos).project(camera);
+      const x = Math.round(((tmp.x + 1) / 2 * w) / g) * g, y = Math.round(((1 - tmp.y) / 2 * h) / g) * g;
+      b.el.style.transform = `translate(${x}px, ${y}px)`;
+    }
+  }
+  let last = performance.now();
+  const prev = scene.onBeforeRender;
+  scene.onBeforeRender = (...a) => {
+    prev.apply(scene, a);
+    const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (shake > 0) {
+      shake -= dt;
+      const g = pixel && pixel.enabled ? pixel.scale : 1, amp = shake > 0.1 ? 2 : 1;
+      const sx = (Math.random() < 0.5 ? -1 : 1) * amp * g, sy = (Math.random() < 0.5 ? -1 : 1) * Math.round(amp / 2) * g;
+      const t = shake > 0 ? `translate(${sx}px, ${sy}px)` : '';
+      canvas.style.transform = t; layer.style.transform = t;
+    }
+    placeBursts();
+  };
+
+  return {
+    control, audio,
+    get target() { return target; }, get slapping() { return slapping; }, get stun() { return stun; },
+    slap: (npc) => dialogue.onLongPress(npc),      // debug / tests
+  };
+}
+
+// 44x32 art-pixel star burst, drawn per pixel so the edges stay crisp.
+let STAR = null;
+function starCanvas() {
+  const c = document.createElement('canvas'); c.width = 44; c.height = 32;
+  if (!STAR) {
+    const W = 44, H = 32, cx = 21.5, cy = 15.5, spikes = 9;
+    const r = (a, R0, R1) => {   // radius of a spiky star at angle a
+      const s = (a / (Math.PI * 2)) * spikes, f = s - Math.floor(s);
+      const tri = 1 - Math.abs(f - 0.5) * 2;
+      const jag = 1 + 0.18 * Math.sin(Math.floor(s) * 2.7);        // irregular spikes read as comic
+      return (R0 + (R1 - R0) * tri) * jag;
+    };
+    const inside = (x, y, k) => {
+      const dx = (x - cx) / 1.25, dy = y - cy, a = Math.atan2(dy, dx) + Math.PI;
+      return Math.hypot(dx, dy) <= r(a, 8.5 * k, 15 * k);
+    };
+    STAR = new ImageData(W, H);
+    const put = (x, y, hex) => {
+      const i = (y * W + x) * 4; STAR.data.set([1, 3, 5].map((j) => parseInt(hex.slice(j, j + 2), 16)).concat(255), i);
+    };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!inside(x, y, 1)) continue;
+      const edge = !inside(x + 1, y, 1) || !inside(x - 1, y, 1) || !inside(x, y + 1, 1) || !inside(x, y - 1, 1);
+      put(x, y, edge ? '#292C2E' : inside(x, y, 0.62) ? '#FF5491' : '#FFCC3F');
+    }
+  }
+  c.getContext('2d').putImageData(STAR, 0, 0);
+  return c;
+}
+
+// Tiny WebAudio synth: band-passed noise sweep (whoosh) + noise crack with a low thump (smack).
+class SlapAudio {
+  constructor() { this.ctx = null; this.muted = false; }
+  unlock() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    try { this.ctx = new AC(); } catch { this.ctx = null; return; }
+    const n = this.ctx.sampleRate * 0.5;
+    this.noise = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+    const d = this.noise.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  _noise(t0, dur, type, f0, f1, gain, q = 1) {
+    const c = this.ctx, src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    src.buffer = this.noise; f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(gain, t0 + Math.min(0.02, dur * 0.3));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f).connect(g).connect(c.destination); src.start(t0); src.stop(t0 + dur + 0.02);
+  }
+  whoosh(vol = 1) {
+    if (this.muted || !this.ctx) return;
+    this._noise(this.ctx.currentTime, 0.16, 'bandpass', 500, 2600, 0.25 * vol, 1.4);
+  }
+  smack() {
+    if (this.muted || !this.ctx) return;
+    const c = this.ctx, t = c.currentTime;
+    this._noise(t, 0.09, 'highpass', 1800, 900, 0.7);
+    this._noise(t, 0.05, 'bandpass', 3200, 2000, 0.4, 2);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(190, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.12);
+    g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.16);
+  }
+}

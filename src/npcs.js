@@ -1,0 +1,344 @@
+import * as THREE from 'three';
+import { addGhosts } from './player.js';
+
+// Ambient pedestrians: walkers loop around intersections along the sidewalks and
+// over the crosswalks; a few others idle / chat. They yield to the player.
+// Lane offset from an intersection centre: on the sidewalk, inside the crosswalk stripes.
+// Clockwise and counter-clockwise walkers use different lanes so they pass instead of overlapping.
+const loop = (cx, cz, L = 6.65) => [[cx - L, cz - L], [cx + L, cz - L], [cx + L, cz + L], [cx - L, cz + L]];
+
+const WALKERS = [
+  { seed: 101, path: loop(0, 0), start: 0, dir: 1, speed: 1.35 },
+  { seed: 202, path: loop(0, 0, 7.15), start: 2, dir: -1, speed: 1.25, along: 0.4 },
+  { seed: 303, path: loop(0, 0), start: 3, dir: 1, speed: 1.6, along: 0.55 },
+  { seed: 404, path: loop(33, 0, 7.15), start: 1, dir: -1, speed: 1.4 },
+  { seed: 505, path: loop(0, 33), start: 0, dir: 1, speed: 1.3, along: 0.3 },
+  { seed: 606, path: loop(33, 33), start: 2, dir: 1, speed: 1.5 },
+  { seed: 111, path: loop(33, 0), start: 3, dir: 1, speed: 1.2, along: 0.5 },
+  { seed: 222, path: loop(0, 33, 7.15), start: 1, dir: -1, speed: 1.45, along: 0.6 },
+];
+const IDLERS = [
+  { seed: 707, pos: [-6.5, 22.0], face: [-5.8, 23.1] },   // chatting pair on the sunny sidewalk past the white building
+  { seed: 808, pos: [-5.8, 23.1], face: [-6.5, 22.0] },
+  { seed: 909, pos: [-6.4, -14.0], face: [-8, -14.0] },  // window-shopping at the teal tower
+  { seed: 1010, pos: [-14.4, 21.5], face: [-12.5, 21.5] }, // watching the fountain in the park (west path; front path left clear for SYOYA)
+  { seed: 1111, pos: [13.4, -6.1], face: [16, -6.1] },     // waiting at the bus stop
+];
+// Named easter-egg NPCs (characters.js SPECIALS): stand idle, dance when clicked, always timid.
+const SPECIAL_SPOTS = [
+  { key: 'mbappe', pos: [-8.5, 2.2], face: [-5.5, 5.0], ball: [0.14, 0.42] },    // quiet west arm of the spawn crossing: clear sightline, kit reads on dark asphalt
+  { key: 'syoya', pos: [-14.3, 23.5], face: [-11.3, 26.3] },                       // park lawn left of the front path, out of the blossom tree's shade
+];
+export const NPC_RADIUS = 0.35;
+// ---- slap reactions (tuning) ----
+export const TUNE = {
+  aggressiveChance: 0.35,
+  reach: 1.2,            // slap reach (player and NPC)
+  reactDelay: 0.3,       // aggressive: pause before slapping back
+  chaseSpeed: 6.2,       // between player walk 3.2 and run 7
+  chaseAccel: 8,         // units/s² ramp after stopping / slapping
+  chaseCooldown: 1.2,    // between slaps while chasing
+  shoutEvery: 2.3,       // repeat the chase shout
+  giveUpDist: 12, giveUpTime: 10,
+  fleeSpeed: 5.6, fleeTime: [4, 6], fleeDist: 10,
+  staggerDist: 0.7, staggerTime: 0.28,
+};
+export const SHOUTS = { chase: 'you motherf**ker!', giveUp: 'yeah run away p**sy!', help: 'help!' };
+const hash01 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const forced = new URLSearchParams(location.search).get('temper');   // ?temper=aggressive|timid
+// Generous invisible click targets (raycasters still hit invisible meshes).
+const HIT_GEO = new THREE.CylinderGeometry(0.62, 0.62, 2.3, 8).translate(0, 1.15, 0);
+const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
+
+export class NPCs {
+  constructor(scene, charMod, city) {
+    this.city = city; this.list = [];
+    this.group = new THREE.Group(); scene.add(this.group);
+    this.slapHit = charMod.SLAP_HIT || 0.3;
+    // hooks wired by combat.js
+    this.onShout = null;        // (npc, text) => void
+    this.onSlapPlayer = null;   // (npc) => void, called when an NPC's hand connects
+    for (const w of WALKERS) {
+      const c = charMod.createNPC({ seed: w.seed });
+      const n = this._wrap(c, w.seed);
+      const a = w.path[w.start], b = w.path[(w.start + w.dir + 4) % 4];
+      const t = w.along || 0;
+      n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
+      Object.assign(n, { path: w.path, idx: (w.start + w.dir + 4) % 4, dir: w.dir, speed: w.speed, walker: true });
+      this.list.push(n);
+    }
+    for (const i of IDLERS) {
+      const n = this._wrap(charMod.createNPC({ seed: i.seed }), i.seed);
+      n.root.position.set(i.pos[0], 0, i.pos[1]);
+      n.heading = Math.atan2(i.face[0] - i.pos[0], i.face[1] - i.pos[1]);
+      n.home = { x: i.pos[0], z: i.pos[1], heading: n.heading };
+      n.walker = false; n.idleT = Math.random() * 3;
+      this.list.push(n);
+    }
+    if (charMod.createSpecial) for (const s of SPECIAL_SPOTS) {
+      const n = this._wrap(charMod.createSpecial(s.key), 0);
+      const sp = charMod.SPECIALS[s.key];
+      Object.assign(n, { special: s.key, tag: sp.tag, danceName: sp.dance, icon: sp.icon, temper: 'timid', walker: false, idleT: 0 });
+      n.root.position.set(s.pos[0], 0, s.pos[1]);
+      n.heading = n.root.rotation.y = Math.atan2(s.face[0] - s.pos[0], s.face[1] - s.pos[1]);
+      n.home = { x: s.pos[0], z: s.pos[1], heading: n.heading };
+      if (s.ball) {   // a football resting at his feet (stays put in the world)
+        const b = football(), h = n.heading;
+        b.position.set(s.pos[0] + Math.sin(h) * s.ball[1] + Math.cos(h) * s.ball[0], 0, s.pos[1] + Math.cos(h) * s.ball[1] - Math.sin(h) * s.ball[0]);
+        b.position.y = city.groundHeight(b.position.x, b.position.z) + 0.11;
+        this.group.add(b); n.ball = b;
+      }
+      this.list.push(n);
+    }
+    for (const n of this.list) n.root.position.y = city.groundHeight(n.root.position.x, n.root.position.z);
+  }
+  _wrap(c, seed) {
+    const root = new THREE.Group(); root.add(c.root); addGhosts(c.root); this.group.add(root);
+    const hit = new THREE.Mesh(HIT_GEO, HIT_MAT); hit.visible = false; root.add(hit);
+    // temperament is rolled at spawn (seeded, so the same person is always the same) and kept secret
+    const temper = forced === 'aggressive' || forced === 'timid' ? forced
+      : hash01(seed) < TUNE.aggressiveChance ? 'aggressive' : 'timid';
+    const n = { c, root, hit, heading: 0, curSpeed: 0, wait: 0, talkT: 0, lastLine: null, seed,
+      temper, mode: null, modeT: 0, stagger: null, pendingHit: -1, cooldown: 0, shoutT: 0 };
+    hit.userData.npc = n;
+    return n;
+  }
+  get positions() { return this.list.map((n) => n.root.position); }
+  get hitboxes() { return this.list.map((n) => n.hit); }
+  get roots() { return this.list.map((n) => n.root); }
+  get TUNE() { return TUNE; }
+  // debug: move an NPC (and its idle home) somewhere else
+  place(i, x, z, heading = 0) {
+    const n = typeof i === 'number' ? this.list[i] : i;
+    n.root.position.set(x, n.root.position.y, z); n.heading = heading;
+    if (n.home) Object.assign(n.home, { x, z, heading });
+  }
+  /** Start a special NPC's dance (faces the player, stands still). Returns the duration in s, 0 if busy. */
+  dance(n, playerPos) {
+    if (!n.special || n.mode || n.stagger || n.c.dancing) return 0;
+    n.talkT = 0; n.danceTo = playerPos;
+    return n.c.dance(n.danceName);
+  }
+  get specials() { return this.list.filter((n) => n.special); }
+  setTemperament(i, t) { (typeof i === 'number' ? this.list[i] : i).temper = t; }
+  // Stop, turn to face the player for `secs`, then resume what they were doing.
+  // Ignored while an NPC is angry / scared (they keep chasing / fleeing).
+  talk(n, secs, playerPos) { if (n.mode) return; n.talkT = secs; n.talkTo = playerPos; }
+  endTalk(n) { n.talkT = 0; }
+  _shout(n, key) { this.onShout?.(n, SHOUTS[key]); }
+
+  /** The player's hand connected. `from` = player position. */
+  slapped(n, from) {
+    const p = n.root.position;
+    const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
+    if (n.c.dancing) n.c.stopDance(0.12);     // a slap cuts a dance short
+    n.c.hit(-1);                               // player's right hand -> head snaps to the NPC's right
+    n.stagger = { t: TUNE.staggerTime, x: dx / d, z: dz / d };
+    n.talkT = 0;
+    n.root.rotation.y = Math.atan2(-dx, -dz);  // face the slapper
+    if (n.temper === 'aggressive') {
+      if (n.mode !== 'chase') { n.mode = 'react'; n.modeT = TUNE.reactDelay + TUNE.staggerTime * 0.5; }
+      n.chaseT = 0;
+    } else {
+      n.mode = 'flee'; n.modeT = TUNE.fleeTime[0] + Math.random() * (TUNE.fleeTime[1] - TUNE.fleeTime[0]);
+      this._shout(n, 'help');
+    }
+  }
+
+  // ---- collision for NPCs that leave their lane (reuses the city colliders) ----
+  _blocked(x, z, r = NPC_RADIUS) {
+    const b = this.city.bounds;
+    if (x < b.min || x > b.max || z < b.min || z > b.max) return true;
+    for (const c of this.city.colliders)
+      if (x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r) return true;
+    return false;
+  }
+  // move with slide-along-walls; returns the distance actually moved
+  _move(p, dx, dz) {
+    if (!this._blocked(p.x + dx, p.z + dz)) { p.x += dx; p.z += dz; return Math.hypot(dx, dz); }
+    let m = 0;
+    if (!this._blocked(p.x + dx, p.z)) { p.x += dx; m += Math.abs(dx); }
+    if (!this._blocked(p.x, p.z + dz)) { p.z += dz; m += Math.abs(dz); }
+    return m;
+  }
+  // steer toward (hx,hz) but pick the nearest free direction if an obstacle is ahead
+  _steer(n, hx, hz, look = 1.1) {
+    const p = n.root.position, base = Math.atan2(hx, hz);
+    const prefer = n.steerSide || 1;
+    for (const off of [0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.6, -1.6, 2.1, -2.1, 2.6, -2.6]) {
+      const a = base + off * prefer;
+      const sx = Math.sin(a), sz = Math.cos(a);
+      if (!this._blocked(p.x + sx * look, p.z + sz * look) && !this._blocked(p.x + sx * look * 0.5, p.z + sz * look * 0.5)) {
+        if (off !== 0) n.steerSide = Math.sign(off) * prefer;   // keep circling the same way round
+        return [sx, sz];
+      }
+    }
+    return [hx, hz];
+  }
+  _nearestWaypoint(n) {
+    const p = n.root.position;
+    if (!n.walker) return { i: -1, x: n.home.x, z: n.home.z };
+    let best = 0, bd = Infinity;
+    n.path.forEach((w, i) => { const d = Math.hypot(w[0] - p.x, w[1] - p.z); if (d < bd) { bd = d; best = i; } });
+    return { i: best, x: n.path[best][0], z: n.path[best][1] };
+  }
+
+  // returns the move speed this frame
+  _combat(n, dt, pp, playerR) {
+    const p = n.root.position;
+    const dx = pp.x - p.x, dz = pp.z - p.z, dist = Math.hypot(dx, dz) || 1e-6;
+    n.modeT -= dt; n.cooldown -= dt;
+    // the hand of an NPC slap connects a moment after the swing starts
+    if (n.pendingHit >= 0) {
+      n.pendingHit -= dt;
+      if (n.pendingHit < 0 && dist < TUNE.reach + 0.45) this.onSlapPlayer?.(n);
+    }
+    if (n.stagger) {                         // knocked back a step
+      n.chaseV = 0;
+      const s = n.stagger, step = (TUNE.staggerDist / TUNE.staggerTime) * Math.min(dt, s.t);
+      this._move(p, s.x * step, s.z * step);
+      s.t -= dt; if (s.t <= 0) n.stagger = null;
+      return 0;
+    }
+    const faceP = () => { n.targetHeading = Math.atan2(dx, dz); };
+    const trySlap = () => {
+      if (dist < TUNE.reach && n.cooldown <= 0 && !n.c.slapping) {
+        n.c.slap(); n.pendingHit = this.slapHit; n.cooldown = TUNE.chaseCooldown;
+        return true;
+      }
+      return false;
+    };
+    if (n.mode === 'react') {                // glare for a beat, then slap back
+      faceP();
+      if (n.modeT <= 0) {
+        trySlap();
+        n.mode = 'chase'; n.chaseT = 0; n.shoutT = 0.35;
+      }
+      return 0;
+    }
+    if (n.mode === 'chase') {
+      n.chaseT += dt; n.shoutT -= dt;
+      faceP();
+      if (n.shoutT <= 0) { this._shout(n, 'chase'); n.shoutT = TUNE.shoutEvery; }
+      if (dist > TUNE.giveUpDist || n.chaseT > TUNE.giveUpTime) {
+        this._shout(n, 'giveUp');
+        n.mode = 'return'; n.modeT = 1.4;   // stand and yell first
+        n.target = this._nearestWaypoint(n);
+        return 0;
+      }
+      if (n.c.slapping) { n.chaseV = 0; return 0; }
+      if (trySlap()) { n.chaseV = 0; return 0; }
+      const stopAt = TUNE.reach * 0.75 + playerR * 0.2;
+      if (dist <= stopAt) return 0;
+      const [sx, sz] = this._steer(n, dx / dist, dz / dist);
+      n.targetHeading = Math.atan2(sx, sz);
+      // ramp up (gives a slapped player a head start to break away)
+      n.chaseV = Math.min(TUNE.chaseSpeed, (n.chaseV || 0) + TUNE.chaseAccel * dt);
+      const step = Math.min(n.chaseV * dt, dist - stopAt);
+      this._move(p, sx * step, sz * step);
+      return n.chaseV;
+    }
+    if (n.mode === 'flee') {
+      if (n.modeT <= 0 || dist > TUNE.fleeDist) {
+        n.mode = 'return'; n.modeT = 0.8; n.target = this._nearestWaypoint(n);
+        return 0;
+      }
+      // away from the player, nudged toward the nearest sidewalk lane / waypoint so they stay on paths
+      let hx = -dx / dist, hz = -dz / dist;
+      const wp = this._nearestWaypoint(n), wx = wp.x - p.x, wz = wp.z - p.z, wd = Math.hypot(wx, wz) || 1;
+      if (wx / wd * hx + wz / wd * hz > -0.2) { hx += wx / wd * 0.35; hz += wz / wd * 0.35; }
+      const hl = Math.hypot(hx, hz); hx /= hl; hz /= hl;
+      const [sx, sz] = this._steer(n, hx, hz, 1.4);
+      n.targetHeading = Math.atan2(sx, sz);
+      this._move(p, sx * TUNE.fleeSpeed * dt, sz * TUNE.fleeSpeed * dt);
+      return TUNE.fleeSpeed;
+    }
+    if (n.mode === 'return') {              // calm down, walk back to the route and carry on
+      if (n.modeT > 0) { if (n.temper === 'aggressive') faceP(); return 0; }
+      const t = n.target, tx = t.x - p.x, tz = t.z - p.z, td = Math.hypot(tx, tz);
+      n.returnT = (n.returnT || 0) + dt;
+      if (td < 0.15 || n.returnT > 12) {
+        n.mode = null; n.returnT = 0;
+        if (n.walker) { n.idx = t.i; n.wait = 0.5; }
+        else { if (td < 1.5) { p.x = t.x; p.z = t.z; } n.heading = n.home.heading; n.idleT = 0; }
+        return 0;
+      }
+      const [sx, sz] = this._steer(n, tx / td, tz / td, Math.min(1.1, td));
+      n.targetHeading = Math.atan2(sx, sz);
+      const spd = n.walker ? Math.max(n.speed, 1.4) : 1.4, step = Math.min(spd * dt, td);
+      this._move(p, sx * step, sz * step);
+      return spd;
+    }
+    n.mode = null;
+    return 0;
+  }
+
+  update(dt, playerPos, playerR) {
+    for (const n of this.list) {
+      const p = n.root.position;
+      let speed = 0;
+      if (n.mode || n.stagger) {
+        n.talkT = 0;
+        speed = this._combat(n, dt, playerPos, playerR);
+      } else if (n.c.dancing) {               // dancing on the spot, facing the player
+        const tp = n.danceTo || playerPos;
+        n.targetHeading = Math.atan2(tp.x - p.x, tp.z - p.z);
+      } else if (n.talkT > 0) {
+        n.talkT -= dt;
+        const tp = n.talkTo || playerPos;
+        n.targetHeading = Math.atan2(tp.x - p.x, tp.z - p.z);
+      } else if (n.walker) {
+        const tgt = n.path[n.idx];
+        const dx = tgt[0] - p.x, dz = tgt[1] - p.z, dist = Math.hypot(dx, dz);
+        if (dist < 0.08) { n.idx = (n.idx + n.dir + 4) % 4; n.wait = Math.random() < 0.25 ? 0.6 + Math.random() : 0; }
+        else {
+          const hx = dx / dist, hz = dz / dist;
+          n.targetHeading = Math.atan2(hx, hz);
+          // yield to the player if they stand in the way
+          const px = playerPos.x - p.x, pz = playerPos.z - p.z, pd = Math.hypot(px, pz);
+          const ahead = (px * hx + pz * hz) / (pd || 1);
+          const blocked = pd < NPC_RADIUS + playerR + 0.45 && ahead > 0.3;
+          if (n.wait > 0) n.wait -= dt;
+          else if (!blocked) {
+            speed = n.speed;
+            const step = Math.min(dist, speed * dt);
+            p.x += hx * step; p.z += hz * step;
+          }
+        }
+      } else if (n.special) {                 // special idlers: stand at their spot
+        n.idleT += dt;
+        n.targetHeading = n.heading + Math.sin(n.idleT * 0.5) * 0.12;
+      } else {
+        n.idleT += dt;
+        // chatting: small turns of the head/body every few seconds
+        n.targetHeading = n.heading + Math.sin(n.idleT * 0.7) * 0.25;
+      }
+      if (n.targetHeading !== undefined) {
+        let d = n.targetHeading - n.root.rotation.y;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        n.root.rotation.y += d * Math.min(1, dt * (n.mode ? 14 : 8));
+      }
+      // chase / flee accelerate fast so the run animation kicks in right away
+      n.curSpeed += (speed - n.curSpeed) * Math.min(1, dt * (n.mode ? 14 : 10));
+      const gy = this.city.groundHeight(p.x, p.z);
+      p.y += (gy + 0.02 - p.y) * Math.min(1, dt * 15);
+      n.c.update(dt, n.curSpeed > 0.15 ? n.curSpeed : 0);
+    }
+  }
+}
+
+// low-poly football: white icosphere with black pentagon patches
+const BALL = { white: new THREE.MeshLambertMaterial({ color: '#F0F2F4', flatShading: true }), black: new THREE.MeshLambertMaterial({ color: '#292C2E', flatShading: true }) };
+function football() {
+  const g = new THREE.Group();
+  const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), BALL.white); ball.castShadow = true; g.add(ball);
+  const ico = new THREE.IcosahedronGeometry(1, 0).getAttribute('position'), seen = [];
+  for (let i = 0; i < ico.count; i++) {
+    const v = new THREE.Vector3().fromBufferAttribute(ico, i).normalize();
+    if (seen.some((o) => o.distanceTo(v) < 0.01)) continue; seen.push(v);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.012, 5), BALL.black);
+    m.position.copy(v).multiplyScalar(0.104); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v); g.add(m);
+  }
+  g.rotation.set(0.4, 0.7, 0.2);
+  return g;
+}
