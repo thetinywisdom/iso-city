@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TUNE, NPC_RADIUS } from './npcs.js?v=20261025o';
+import { TUNE, NPC_RADIUS } from './npcs.js?v=20261025p';
 
 // SLAP: long-press an NPC (dialogue.js fires onLongPress) -> the player walks into
 // reach, winds up and slaps. Impact = pixel "SLAP!" burst, screen shake, a synthesized
@@ -15,14 +15,15 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   const audio = new SlapAudio();
   let target = null, approachT = 0, bestD = Infinity, stuckT = 0, slapping = null, stun = 0, shake = 0;
   // menu actions (actions.js): walk up to `target`, then run actCb instead of a slap; `hold` freezes input for a clip
-  let actCb = null, actReach = 0, lockT = 0, lockFace = null, lockCancel = null;
+  let actCb = null, actReach = 0, lockT = 0, lockFace = null, lockCancel = null, actSlack = 0;
   const bursts = [];
   const tmp = new THREE.Vector3();
   const charOf = () => player.model?.userData?.character || null;
 
   // ---- wiring ----
   dialogue.onLongPress = (npc) => { audio.unlock(); interrupt(); target = npc; actCb = null; approachT = 0; bestD = Infinity; stuckT = 0; };
-  function approach(npc, reach, cb) { audio.unlock(); interrupt(); target = npc; actCb = cb; actReach = reach; approachT = 0; bestD = Infinity; stuckT = 0; }
+  function approach(npc, reach, cb, slack = 0) { audio.unlock(); interrupt(); target = npc; actCb = cb; actReach = reach; actSlack = slack; approachT = 0; bestD = Infinity; stuckT = 0; }
+  dialogue.approach = approach;         // far-away talks walk up first (dialogue.talkTo)
   function hold(sec, face = null, onCancel = null) { lockT = sec; lockFace = face; lockCancel = onCancel; }
   function interrupt() { const f = lockCancel; lockT = 0; lockCancel = null; f?.(); }
   let wired = null;
@@ -173,7 +174,10 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     }
     // give up if we cannot get there (timeout, or no progress for a while: walled off)
     if (d < bestD - 0.05) { bestD = d; stuckT = 0; } else stuckT += dt;
-    if (approachT > APPROACH_TIMEOUT || stuckT > 0.8) { target = null; return null; }
+    if (approachT > APPROACH_TIMEOUT || stuckT > 0.8) {
+      if (actCb && actSlack && d <= actReach + actSlack) { const cb = actCb, n = target; actCb = null; target = null; cb(n); return { lock: true }; }   // close enough after all (a prop in the way)
+      target = null; actCb = null; return null;
+    }
     return { dir: { x: dx / d, z: dz / d }, speed: d > 4 ? 7 : APPROACH_SPEED };
   }
   function turnToward(q, dt, rate) {

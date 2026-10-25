@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261025o';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025o';
-import { registerPools } from './french.js?v=20261025o';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261025o';
+import { addGhosts } from './player.js?v=20261025p';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025p';
+import { registerPools } from './french.js?v=20261025p';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261025p';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -63,7 +63,7 @@ registerPools({ chase: [SHOUTS.chase], giveUp: [SHOUTS.giveUp], help: [SHOUTS.he
 const hash01 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const forced = new URLSearchParams(location.search).get('temper');   // ?temper=aggressive|timid
 // Generous invisible click targets (raycasters still hit invisible meshes).
-const HIT_GEO = new THREE.CylinderGeometry(0.62, 0.62, 2.3, 8).translate(0, 1.15, 0);
+const HIT_GEO = new THREE.CylinderGeometry(0.72, 0.72, 2.7, 8).translate(0, 1.35, 0);   // whole body + head, a bit enlarged
 const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
 
 export class NPCs {
@@ -509,7 +509,8 @@ export class NPCs {
     }
     if (n.mode === 'return') {              // calm down, walk back to the route and carry on
       if (n.modeT > 0) { if (n.temper === 'aggressive') faceP(); return 0; }
-      const t = n.target, tx = t.x - p.x, tz = t.z - p.z, td = Math.hypot(tx, tz);
+      const t = n.target; if (!t) { n.mode = null; return 0; }
+      const tx = t.x - p.x, tz = t.z - p.z, td = Math.hypot(tx, tz);
       n.returnT = (n.returnT || 0) + dt;
       if (td < 0.15 || n.returnT > 25) {
         n.mode = null; n.returnT = 0;

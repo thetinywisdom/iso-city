@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261025o';
+import { registerPools } from './french.js?v=20261025p';
 
 // Right-click an NPC -> small pixel context menu: DANCE-OFF / PUSH / SLAP / FART (+ MISSION on the giver).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
@@ -46,7 +46,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   function openMenu(npc) {
     menu.innerHTML = '';
     if (npc.tag) { const h = document.createElement('div'); h.className = 'nm-head'; h.textContent = npc.tag; menu.appendChild(h); }
-    const items = npc.menuItems || (npc.special === 'giver' ? [['mission', 'MISSION']] : []).concat(ITEMS);   // cats: just PET
+    const items = (npc.menuItems || (npc.special === 'giver' ? [['mission', 'MISSION']] : []).concat(ITEMS)).concat(hooks.extraItems?.(npc) || []);   // cats: just PET; story hunt: + THAT'S WEIRD!
     for (const [k, label] of items) {
       const b = document.createElement('button'); b.className = 'nm-item'; b.dataset.act = k; b.textContent = label;
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); });
@@ -73,7 +73,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (open && !menu.contains(e.target)) closeMenu();        // a click anywhere else closes it (and still does its thing)
     if (e.target !== canvas || e.button !== 2) return;
     const npc = hooks.pickExtra?.(e.clientX, e.clientY) || dialogue.pick(e.clientX, e.clientY);   // cats first (pickExtra)
-    if (!npc) return;                                          // right click on the ground: nothing
+    if (!npc) { e.preventDefault(); hooks.groundRight?.(e); return; }   // right click on the ground: drop a banana
     e.stopImmediatePropagation(); e.preventDefault();
     dialogue.hideAll();
     openMenu(npc);
@@ -89,6 +89,12 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   function choose(kind) {
     if (!open) return;
     const n = open.npc; closeMenu();
+    act(n, kind);
+  }
+  // left double-click on someone = PUSH (dialogue.js); also the menu's way in
+  dialogue.onDoubleClick = (n) => { if (n.onChoose) return; dialogue.hideAll(); act(n, 'push'); };
+  function act(n, kind) {
+    if (hooks.onExtra?.(n, kind)) return;
     combat.audio.unlock();
     if (n.onChoose) { n.onChoose(kind); return; }
     if (kind === 'mission') { missions.clickGiver(); return; }
@@ -423,5 +429,5 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     }
   };
 
-  return { hooks, openMenu, closeMenu, choose, get open() { return open; }, menu, force, state, clouds, cloud, danceOff, push, fart, get party() { return P; }, get gathering() { return gathering; }, endParty, PARTY_R };
+  return { hooks, openMenu, closeMenu, choose, act, get open() { return open; }, menu, force, state, clouds, cloud, danceOff, push, fart, get party() { return P; }, get gathering() { return gathering; }, endParty, PARTY_R };
 }

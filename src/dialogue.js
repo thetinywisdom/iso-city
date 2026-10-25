@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { isFrench, frLine } from './french.js?v=20261025o';
+import { isFrench, frLine } from './french.js?v=20261025p';
 
 // Click an NPC -> pixel-art chat bubble with a random line above their head.
 // The listener runs in the capture phase on window, so a click that hits an NPC
@@ -8,6 +8,8 @@ export const LINES = ['hi', 'hello', 'who are you?', 'excuse me?', 'not interest
   'go away', 'yes?', '?', 'free Palestine'];
 const SHOW_MS = 2500;
 export const LONG_PRESS_MS = 400;
+export const DBL_MS = 250;            // a second click inside this turns a talk into a push
+const TALK_R = 6, TALK_REACH = 3;   // talk from up to TALK_R away; further = walk up to TALK_REACH first
 const RING_N = 15;
 
 export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }) {
@@ -132,10 +134,23 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     }
     rctx.putImageData(img, 0, 0);
   }
-  function endPress(talk) {
+  // Mouse: click = talk (held back DBL_MS so a double-click can win), double-click = push (api.onDoubleClick),
+  // hold = slap (api.onLongPress). Too far to talk: walk up first (api.approach, set by combat.js).
+  let pend = null;
+  function cancelPending() { if (pend) { clearTimeout(pend.timer); pend = null; } }
+  function talkTo(npc) {
+    if (npc.removed) return;
+    const q = npc.root.position, d = Math.hypot(q.x - player.position.x, q.z - player.position.z);
+    if (d > TALK_R && api.approach) { api.approach(npc, TALK_REACH, () => say(npc), TALK_R - TALK_REACH - 0.5); api.onFar?.(npc); return; }
+    say(npc);
+  }
+  function endPress(click) {
     if (!press) return;
     const p = press; press = null; ring.style.display = 'none';
-    if (talk && !p.fired) say(p.npc);
+    if (!click || p.fired) return;
+    if (pend && pend.npc === p.npc) { cancelPending(); api.onDoubleClick?.(p.npc); return; }
+    if (pend) { const n = pend.npc; cancelPending(); talkTo(n); }
+    pend = { npc: p.npc, timer: setTimeout(() => { const n = pend?.npc; pend = null; if (n) talkTo(n); }, DBL_MS) };
   }
   function tickPress() {
     if (!press) return;
@@ -148,7 +163,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
       drawRing(f);
     }
     if (f >= 1 && !press.fired) {
-      press.fired = true;
+      press.fired = true; cancelPending();
       api.onLongPress?.(press.npc);
       setTimeout(() => { if (press && press.fired) endPress(false); }, 160);
     }
@@ -178,19 +193,21 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     if (hoverQueued) return; hoverQueued = true;
     requestAnimationFrame(() => {
       hoverQueued = false;
-      const n = pick(lastMove.clientX, lastMove.clientY);
+      const x = lastMove.clientX, y = lastMove.clientY;
+      let n = null, label = null;
+      for (const f of api.hoverables) { const r = f(x, y); if (r) { n = r.target; label = r.label; break; } }   // cats, bins, pickups first (same order as clicks)
+      if (!n) n = pick(x, y);
       canvas.style.cursor = n ? 'pointer' : '';
-      hoverNPC = n && n.tag ? n : null;
-      setTag(hoverNPC);
+      setTag(n, label);
     });
   });
-  canvas.addEventListener('pointerleave', () => { hoverNPC = null; setTag(null); });
+  canvas.addEventListener('pointerleave', () => { setTag(null); canvas.style.cursor = ''; });
   // hover name tag for named NPCs + a story "mark" (LANDLADY / ¥ RENT ¥): the same comic bubble, small
   let hoverNPC = null;
   const tagB = makeBubble('tag'); tagB.el.style.display = 'none';
   const markB = makeBubble('tag mark'); markB.el.style.display = 'none';
   let markNPC = null;
-  function setTag(n) { hoverNPC = n && n.tag ? n : null; tagB.bb.textContent = hoverNPC ? hoverNPC.tag : ''; }
+  function setTag(n, label) { hoverNPC = n && (label || n.tag) ? n : null; const t = hoverNPC ? label || n.tag : ''; if (tagB.bb.textContent !== t) tagB.bb.textContent = t; }
   function setMark(n, text) {
     markNPC = n || null;
     if (markNPC && markB.bb.textContent !== text) markB.bb.textContent = text;
@@ -290,6 +307,6 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     const nb = bubbles.get(npc); nb.chat = true; nb.prio = 0.8; nb.el.classList.add('chat'); nb.bb.querySelector('.who')?.remove();
     place(); return true;
   }
-  const api = { say, chat, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n) { setTag(n); }, setMark, anchor, headNode, place, modal: null, story: (n, line, opt = {}) => { const b = show(n, line, 1e9, false, { ...opt, story: true }); place(); return b; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false, opt) => { show(n, t, ms, sh, opt); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
+  const api = { say, chat, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n, label) { setTag(n, label); }, hoverables: [], onDoubleClick: null, approach: null, talkTo, get pending() { return pend; }, DBL_MS, setMark, anchor, headNode, place, modal: null, story: (n, line, opt = {}) => { const b = show(n, line, 1e9, false, { ...opt, story: true }); place(); return b; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false, opt) => { show(n, t, ms, sh, opt); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
   return api;
 }

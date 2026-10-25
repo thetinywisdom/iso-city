@@ -1,10 +1,14 @@
 // One in-game menu (Esc or the MENU button): CONTROLS · CHARACTERS · CREATOR. The game pauses while it is open.
-import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261025o';
+import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261025p';
 
 const CONTROLS = [
-  ['WASD / ARROWS', 'walk'], ['SHIFT', 'run'], ['SPACE', 'jump'], ['CLICK', 'walk / talk'], ['HOLD CLICK', 'slap'],
-  ['RIGHT-CLICK', 'more (talk, slap, dance...)'], ['B', 'drop a banana'], ['E', 'pet cat / hide in bin'], ['F', 'slap (story finale)'],
-  ['ENTER', 'ok / accept'], ['WHEEL', 'zoom'], ['C', 'character creator'], ['ESC', 'this menu'],
+  ['MOUSE', '— the main controls —'],
+  ['CLICK GROUND', 'walk there'], ['CLICK PERSON', 'talk (far away: walk up first)'], ['DOUBLE-CLICK PERSON', 'push'],
+  ['HOLD CLICK ON PERSON', 'slap'], ['RIGHT-CLICK PERSON', 'menu: dance-off, push, slap, fart'], ['RIGHT-CLICK GROUND', 'drop a banana'],
+  ['CLICK CAT', 'pet'], ['CLICK TRASH BIN', 'hide in / climb out'], ['WHEEL', 'zoom'],
+  ['KEYBOARD', '— still works too —'],
+  ['WASD / ARROWS', 'walk'], ['SHIFT', 'run'], ['SPACE', 'jump'], ['B', 'drop a banana'], ['E', 'pet cat / hide in bin'],
+  ['Q', "that's weird! (story; also in the right-click menu)"], ['F', 'slap (story finale)'], ['ENTER', 'ok / accept'], ['C', 'character creator'], ['ESC', 'this menu'],
 ];
 
 export function initGameMenu({ onPick, getStory, onOpen }) {

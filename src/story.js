@@ -3,11 +3,11 @@
 // oddity hunt ("THAT'S WEIRD!" [Q], 7 of 10 per loop). Free roam is the untouched sandbox.
 // Saves to localStorage isoCity.story.v1. The hidden house + the 7:00 finale come in Phase C.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025o';
-import { initGrowth } from './growth.js?v=20261025o';
-import { initFinale } from './finale.js?v=20261025o';
-import { APARTMENT } from './fill.js?v=20261025o';
-import { initGlitch } from './glitch.js?v=20261025o';
+import { COMIC } from './palette.js?v=20261025p';
+import { initGrowth } from './growth.js?v=20261025p';
+import { initFinale } from './finale.js?v=20261025p';
+import { APARTMENT } from './fill.js?v=20261025p';
+import { initGlitch } from './glitch.js?v=20261025p';
 
 export const STORY_KEY = 'isoCity.story.v1';
 export const RENT = 77777;
@@ -476,6 +476,11 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     return g;
   }
   let weirdCd = 0;
+  // the right-click menu gets THAT'S WEIRD! while hunting (same as Q / the HUD button)
+  if (actions?.hooks) {
+    actions.hooks.extraItems = () => (mode === 'story' && S?.phase === 'hunt' ? [['weird', "THAT'S WEIRD!"]] : []);
+    actions.hooks.onExtra = (n, k) => { if (k !== 'weird') return false; weird(); return true; };
+  }
   function weird() {
     if (mode !== 'story' || S.phase !== 'hunt' || busy || weirdCd > performance.now()) return;
     weirdCd = performance.now() + 700;

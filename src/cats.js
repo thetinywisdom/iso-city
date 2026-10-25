@@ -58,7 +58,7 @@ function buildCat(coat, seed) {
     box(0.05, 0.05, 0.1, C.stripe && i === 3 ? C.stripe : C.base, g, 0, 0, -0.045);
     tail.push(g); par = g;
   }
-  const hit = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.6, 0.8), new THREE.MeshBasicMaterial({ visible: false }));
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 1.05), new THREE.MeshBasicMaterial({ visible: false })); // generous: easy to click
   hit.position.set(0, 0.3, 0); root.add(hit);
   return { root, body, torso, head, legs, tail, hit, coat: C };
 }
@@ -113,6 +113,7 @@ export function initCats({ scene, city, player, getNPCs, dialogue, combat, actio
   const prevPre = dialogue.preClick;
   dialogue.preClick = (x, y) => { const c = pickCat(x, y); if (c) { petRequest(c); return true; } return !!prevPre?.(x, y); };
   if (actions?.hooks) actions.hooks.pickExtra = pickCat;
+  dialogue.hoverables?.push((x, y) => { const c = pickCat(x, y); return c ? { target: c, label: 'PET' } : null; });
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'KeyE' || e.repeat || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return;
     let best = null, bd = CAT.eR;

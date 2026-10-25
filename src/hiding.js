@@ -170,6 +170,7 @@ export function initHiding({ scene, camera, city, player, keys, getNPCs, dialogu
     if (Math.hypot(b.x - player.position.x, b.z - player.position.z) <= BIN.clickR + 0.25) { hop(b); return; }
     combat.approach({ root: b.root, bin: true }, BIN.clickR, () => hop(b));
   }
+  dialogue.hoverables?.push((x, y) => { const b = pickBin(x, y); if (!b) return null; b.bubbleY ??= BIN.h + 0.35; return { target: b, label: state.hidden ? 'EXIT' : 'HIDE' }; });
   const prevPre = dialogue.preClick;
   dialogue.preClick = (x, y) => {
     const b = pickBin(x, y);

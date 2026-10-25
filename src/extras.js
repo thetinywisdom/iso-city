@@ -1,17 +1,17 @@
 // Gameplay extras hooked from main.js with one line: contact shadows that show
 // through roofs (task 4), click-to-talk NPC chat bubbles (task 7), and long-press SLAP (combat.js).
-import { ContactShadows } from './shadows.js?v=20261025o';
-import { initDialogue } from './dialogue.js?v=20261025o';
-import { initCombat } from './combat.js?v=20261025o';
-import { initMissions } from './missions.js?v=20261025o';
-import { initActions } from './actions.js?v=20261025o';
-import { initChatter } from './chatter.js?v=20261025o';
-import { initPolice } from './police.js?v=20261025o';
-import { initBananas } from './bananas.js?v=20261025o';
-import { initCats } from './cats.js?v=20261025o';
-import { initHiding } from './hiding.js?v=20261025o';
-import { initGrandma } from './grandma.js?v=20261025o';
-import { initStory } from './story.js?v=20261025o';
+import { ContactShadows } from './shadows.js?v=20261025p';
+import { initDialogue } from './dialogue.js?v=20261025p';
+import { initCombat } from './combat.js?v=20261025p';
+import { initMissions } from './missions.js?v=20261025p';
+import { initActions } from './actions.js?v=20261025p';
+import { initChatter } from './chatter.js?v=20261025p';
+import { initPolice } from './police.js?v=20261025p';
+import { initBananas } from './bananas.js?v=20261025p';
+import { initCats } from './cats.js?v=20261025p';
+import { initHiding } from './hiding.js?v=20261025p';
+import { initGrandma } from './grandma.js?v=20261025p';
+import { initStory } from './story.js?v=20261025p';
 
 export function initExtras({ scene, camera, renderer, pixel, city, player, getNPCs, keys }) {
   const shadows = new ContactShadows(scene, city);
@@ -34,5 +34,6 @@ export function initExtras({ scene, camera, renderer, pixel, city, player, getNP
   const hiding = initHiding({ scene, camera, city, player, keys, getNPCs, dialogue, combat, police, missions, shadows, pixel });
   const grandma = initGrandma({ scene, player, getNPCs, dialogue, combat, police });
   const story = initStory({ scene, camera, city, player, getNPCs, dialogue, combat, missions, police, pixel, actions, bananas, cats });   // last: wraps dialogue hooks
+  actions.hooks.groundRight = () => bananas.drop();   // right-click the ground = drop a banana (B still works)
   return { shadows, dialogue, combat, missions, actions, chatter, police, bananas, cats, hiding, grandma, story };
 }
