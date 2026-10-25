@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { Bucket, mat } from './bucket.js?v=20261025l';
-import { P, SCHEMES, COMIC } from './palette.js?v=20261025l';
-import { makeProps } from './props.js?v=20261025l';
-import { resolveFace, faceFrame } from './facing.js?v=20261025l';
-import { addFill } from './fill.js?v=20261025l';
+import { Bucket, mat } from './bucket.js?v=20261025m';
+import { P, SCHEMES, COMIC } from './palette.js?v=20261025m';
+import { makeProps } from './props.js?v=20261025m';
+import { resolveFace, faceFrame } from './facing.js?v=20261025m';
+import { addFill } from './fill.js?v=20261025m';
+import { markInk } from './pixel.js?v=20261025m';
 
 // Small art-direction test scene: a main intersection at (0,0) plus two
 // streets on the near (+x / +z) side, so the block nearest the camera has
@@ -24,6 +25,7 @@ const G = {
 
 export function generateCity(scene) {
   const solid = new Bucket();
+  const bsolid = new Bucket();   // buildings only: the one mesh that gets cartoon ink
   const colliders = [];
   const blocks = [];
   // top: world height of a LOW prop (fence, bush, bench...) the player can jump over; omitted = tall (always blocks)
@@ -81,8 +83,8 @@ export function generateCity(scene) {
     const face = resolveFace(L, door);
     const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const h = floors * 3, base = CURB;
-    solid.add(G.box, mat(cx, base + h / 2, cz, w, h, d), C.body);
-    solid.add(G.box, mat(cx, base + h + 0.18, cz, w + 0.3, 0.36, d + 0.3), P.roof);
+    bsolid.add(G.box, mat(cx, base + h / 2, cz, w, h, d), C.body);
+    bsolid.add(G.box, mat(cx, base + h + 0.18, cz, w + 0.3, 0.36, d + 0.3), P.roof);
     const faces = new Set(['+x', '+z', face]);
     for (let f = 1; f < floors; f++) {
       const wy = base + f * 3 + 1.7;
@@ -90,12 +92,12 @@ export function generateCity(scene) {
         const F = faceFrame(L, fc);
         for (let u = F.lo + 1.5; u <= F.lo + F.len - 1.2; u += 2.2) {
           const [px, pz] = F.pos(u + 0.35 - F.mid, 0.02), [sx, sz] = F.size(1.1, 0.06);
-          solid.add(G.box, mat(px, wy, pz, sx, 1.4, sz), C.win);
+          bsolid.add(G.box, mat(px, wy, pz, sx, 1.4, sz), C.win);
         }
       }
     }
     const F = faceFrame(L, face), put = (u, y, out, along, hh, thick, color, rx = 0, rz = 0) => {
-      const [px, pz] = F.pos(u, out), [sx, sz] = F.size(along, thick); solid.add(G.box, mat(px, y, pz, sx, hh, sz, 0, rx, rz), color);
+      const [px, pz] = F.pos(u, out), [sx, sz] = F.size(along, thick); bsolid.add(G.box, mat(px, y, pz, sx, hh, sz, 0, rx, rz), color);
     };
     put(-F.len * 0.25, base + 1.15, 0.03, 1.3, 2.3, 0.06, C.door);
     put(F.len * 0.15, base + 1.4, 0.03, F.len * 0.4, 1.5, 0.06, C.win);
@@ -157,10 +159,11 @@ export function generateCity(scene) {
   props.blockBench(a + 6.5, 33 - R - 0.9, Math.PI); props.bin(a + 9.6, 33 - R - 0.8, 0);
   props.railing(b - 2.2, b + 0.45, 3.6, 0);
 
-  addFill({ solid, addCollider, props, building, lamp, CURB, scene });
+  addFill({ solid, bsolid, addCollider, props, building, lamp, CURB, scene });
 
   const cityMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   scene.add(solid.build(cityMat));
+  const bMesh = bsolid.build(cityMat); bMesh.name = 'city-buildings'; scene.add(markInk(bMesh));
   const treeMesh = treeSolid.build(cityMat); treeMesh.name = 'city-trees'; scene.add(treeMesh);
 
   function groundHeight(x, z) {

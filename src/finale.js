@@ -3,8 +3,8 @@
 // and dodges, a time machine (a black hole floating in the middle of the room), a bowl of bananas and (soon enough) Officer Dough.
 // Slap her (F) to stun her, push her (E) into the black hole. GIVE UP any time: ACCEPT FATE.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025l';
-import { box, sign } from './growth.js?v=20261025l';
+import { COMIC } from './palette.js?v=20261025m';
+import { box, sign } from './growth.js?v=20261025m';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 export const HOUSE = { x0: -28, x1: -21, z0: 8.5, z1: 14, door: { x: -24.5, z: 14.9, r: 1.1 } };
@@ -41,6 +41,7 @@ export function initFinale(ctx) {
     for (const u of [-2.4, 1.8]) box(body, u, 2.9, d / 2 + 0.04, 1.2, 1.1, 0.06, B[3]);
     box(body, w / 2 + 0.04, 2.9, -0.8, 0.06, 1.1, 1.4, B[3]);
     sign(body, 'RENT', HOUSE.door.x - cx, 2.75, d / 2 + 0.1, 1.4, 0.5, 0, N[0], Y[1]);
+    body.traverse((m) => m.layers.enable(5));   // the house exterior is a building: it keeps its ink
   }
   const outCol = { minX: HOUSE.x0, maxX: HOUSE.x1, minZ: HOUSE.z0, maxZ: HOUSE.z1, house: 'outside' };
   toon(outside);

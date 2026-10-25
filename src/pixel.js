@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025l';
+import { COMIC } from './palette.js?v=20261025m';
 
 // ---------------------------------------------------------------------------
 // Full-resolution cartoon pipeline (the old low-res pixel-art pass is gone)
@@ -69,10 +69,11 @@ void neighbour(vec2 o, float d, vec3 n, bool hasN, inout float edge){
 void main(){
   vec3 col = texture2D(tColor, vUv).rgb;   // linear
   float d0 = texture2D(tDepth, vUv).r;
-  if (uOutlines && d0 < 0.99999) {
+  vec4 nt0 = texture2D(tNormal, vUv);
+  if (uOutlines && d0 < 0.99999 && nt0.a > 0.5) {   // only building pixels get ink
     float d = linDepth(d0);
-    vec4 nt = texture2D(tNormal, vUv);
-    vec3 n = nt.rgb * 2.0 - 1.0; bool hasN = nt.a > 0.5;
+    vec4 nt = nt0;
+    vec3 n = nt.rgb * 2.0 - 1.0; bool hasN = true;
     float e = 0.0;
     neighbour(vec2( 1.0, 0.0), d, n, hasN, e); neighbour(vec2(-1.0, 0.0), d, n, hasN, e);
     neighbour(vec2( 0.0, 1.0), d, n, hasN, e); neighbour(vec2( 0.0,-1.0), d, n, hasN, e);
@@ -168,6 +169,11 @@ void main() {`)
   return r;
 }
 
+// Ink (cartoon outlines) is drawn ONLY on buildings: building meshes join INK_LAYER, the normal pass
+// renders just that layer (depth-tested against everything), and the post pass only inks building pixels.
+export const INK_LAYER = 5;
+export function markInk(o) { o?.traverse?.((m) => m.layers.enable(INK_LAYER)); return o; }
+
 export class PixelPipeline {
   constructor(renderer, opts = {}) {
     this.renderer = renderer;
@@ -182,6 +188,7 @@ export class PixelPipeline {
     };
     this.colorRT = rt(true); this.normalRT = rt(false);
     this.normalMat = new THREE.MeshNormalMaterial({ flatShading: true });
+    this.depthMat = new THREE.MeshBasicMaterial({ colorWrite: false });   // depth-only pre-pass so hidden building bits get no ink
     this.postMat = new THREE.ShaderMaterial({
       vertexShader: FS_VERT, fragmentShader: POST_FRAG, depthTest: false, depthWrite: false,
       uniforms: {
@@ -264,7 +271,12 @@ export class PixelPipeline {
       const noInk = scene.userData.noInk, hid = [];
       if (noInk) for (const o of noInk) if (o.visible) { o.visible = false; hid.push(o); }
       r.setClearColor(0x000000, 0);
-      r.setRenderTarget(this.normalRT); r.render(scene, camera);
+      r.setRenderTarget(this.normalRT);
+      scene.overrideMaterial = this.depthMat; r.render(scene, camera);            // everything: depth only
+      const mask = camera.layers.mask, ac = r.autoClear;
+      camera.layers.set(INK_LAYER); scene.overrideMaterial = this.normalMat; r.autoClear = false;
+      r.render(scene, camera);                                                     // buildings: normals, a = 1
+      camera.layers.mask = mask; r.autoClear = ac;
       for (const o of hid) o.visible = true;
       scene.background = bg; scene.fog = fog; scene.overrideMaterial = ov;
       r.setClearColor(cc, ca);

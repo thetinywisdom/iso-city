@@ -2,8 +2,8 @@
 // Empty lots fill up with fenced building sites, scaffolding and finally new buildings + a rent billboard.
 // Free roam never calls this, so the sandbox city stays exactly as it was.
 import * as THREE from 'three';
-import { COMIC, SCHEMES, P } from './palette.js?v=20261025l';
-import { frontFor, faceFrame } from './facing.js?v=20261025l';
+import { COMIC, SCHEMES, P } from './palette.js?v=20261025m';
+import { frontFor, faceFrame } from './facing.js?v=20261025m';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 const CURB = 0.2;
@@ -44,7 +44,8 @@ export function sign(g, text, x, y, z, w, h, ry, fg = N[0], bg = Y[1]) {
 // every lot's front (door, shopfront, awning, signs) faces its nearest road: see facing.js
 export const faceOfLot = (L) => frontFor(L);
 function fput(g, F, u, y, out, along, h, thick, c) { const [px, pz] = F.pos(u, out), [sx, sz] = F.size(along, thick); return box(g, px, y, pz, sx, h, sz, c); }
-function building(g, L, floors, s, { face = frontFor(L), sideWin = true } = {}) {
+function building(g, L, floors, s, opts) { const n0 = g.children.length, h = building0(g, L, floors, s, opts); for (const m of g.children.slice(n0)) m.layers.enable(5); return h; }
+function building0(g, L, floors, s, { face = frontFor(L), sideWin = true } = {}) {
   const w = L.x1 - L.x0, d = L.z1 - L.z0, cx = (L.x0 + L.x1) / 2, cz = (L.z0 + L.z1) / 2, h = floors * 3;
   box(g, cx, CURB + h / 2, cz, w, h, d, s.body);
   box(g, cx, CURB + h + 0.18, cz, w + 0.3, 0.36, d + 0.3, P.roof);

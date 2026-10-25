@@ -5,9 +5,9 @@
 // (spawn, the run-down apartment's door, the landlady's house lot west of the white building, the park).
 // Every building's front faces its nearest road (facing.js). All baked into the city's single draw call.
 import * as THREE from 'three';
-import { mat } from './bucket.js?v=20261025l';
-import { COMIC, P } from './palette.js?v=20261025l';
-import { faceFrame } from './facing.js?v=20261025l';
+import { mat } from './bucket.js?v=20261025m';
+import { COMIC, P } from './palette.js?v=20261025m';
+import { faceFrame } from './facing.js?v=20261025m';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 const G = {
@@ -18,7 +18,7 @@ const G = {
 // the run-down apartment the hero lives in (story wake / sleep spot is right outside its door)
 export const APARTMENT = { x0: -29, x1: -21, z0: -16, z1: -7.6, door: { x: -27, z: -6.6 } };
 
-export function addFill({ solid, addCollider, props, building, lamp, CURB, scene }) {
+export function addFill({ solid, bsolid = solid, addCollider, props, building, lamp, CURB, scene }) {
   const y0 = CURB;
   const part = (x, z, ry, lx, ly, lz, sx, sy, sz, color, geo = G.box, rx = 0, rz = 0) => {
     const c = Math.cos(ry), s = Math.sin(ry);
@@ -84,7 +84,7 @@ export function addFill({ solid, addCollider, props, building, lamp, CURB, scene
   {
     const F = faceFrame(A, '+z'), put = (fc, u, y, out, along, h, thick, color, rr = 0) => {
       const Fr = faceFrame(A, fc), [px, pz] = Fr.pos(u, out), [sx, sz] = Fr.size(along, thick);
-      const [rx, rz] = Fr.ax ? [rr, 0] : [0, rr]; solid.add(G.box, mat(px, y, pz, sx, h, sz, 0, rx, rz), color);
+      const [rx, rz] = Fr.ax ? [rr, 0] : [0, rr]; bsolid.add(G.box, mat(px, y, pz, sx, h, sz, 0, rx, rz), color);
     };
     // grime: a dark wet streak band + cracks (zig-zag segments) on the street-side walls
     put('+z', 0, y0 + 0.3, 0.025, F.len, 0.6, 0.02, N[2]);
@@ -103,8 +103,8 @@ export function addFill({ solid, addCollider, props, building, lamp, CURB, scene
     solid.add(G.box, mat(A.x1 - 0.9, y0 + 1.25, A.z1 + 1.2, 1.5, 0.12, 1.1, 0.1, 0.12), T[1]);
     addCollider(A.x1 - 0.9, A.z1 + 1.2, 0.75, 0.6, y0 + 1.3);
     for (let f = 1; f < 3; f++) {
-      solid.add(G.box, mat(A.x1 + 0.55, y0 + f * 3, (A.z0 + A.z1) / 2 + 1.5, 1.1, 0.08, 3.2, 0, 0.06), N[1]);
-      solid.add(G.box, mat(A.x1 + 1.08, y0 + f * 3 + 0.5, (A.z0 + A.z1) / 2 + 1.5, 0.05, 1.0, 3.2), N[1]);
+      bsolid.add(G.box, mat(A.x1 + 0.55, y0 + f * 3, (A.z0 + A.z1) / 2 + 1.5, 1.1, 0.08, 3.2, 0, 0.06), N[1]);
+      bsolid.add(G.box, mat(A.x1 + 1.08, y0 + f * 3 + 0.5, (A.z0 + A.z1) / 2 + 1.5, 0.05, 1.0, 3.2), N[1]);
     }
     // the flickering sign (its own mesh so it can buzz on and off); a letter is dead
     const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
@@ -116,8 +116,8 @@ export function addFill({ solid, addCollider, props, building, lamp, CURB, scene
     const [sx, sz] = F.pos(0.4, 0.12); sgn.position.set(sx, y0 + 3.0, sz); sgn.rotation.y = F.ry; sgn.name = 'apartment-sign';
     const dim = new THREE.Color('#5B6A7B'), on = new THREE.Color('#ffffff');
     sgn.onBeforeRender = () => { const t = performance.now() / 1000; const flick = Math.sin(t * 23) * Math.sin(t * 7.1) > 0.55 || (t % 4.3) < 0.25; sm.color.copy(flick ? dim : on); };
-    scene.add(sgn);
-    solid.add(G.box, mat(sx, y0 + 3.0, sz - 0.04, 4.6, 1.3, 0.06), N[0]);
+    scene.add(sgn); sgn.layers.enable(5);
+    bsolid.add(G.box, mat(sx, y0 + 3.0, sz - 0.04, 4.6, 1.3, 0.06), N[0]);
   }
   bike(A.x0 - 0.4, A.z1 + 1.0, 0.2, B[2]);
   props.bin(A.x1 - 2.6, A.z1 + 0.9, 1);
