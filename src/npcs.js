@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261025h';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025h';
-import { registerPools } from './french.js?v=20261025h';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261025h';
+import { addGhosts } from './player.js?v=20261025i';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025i';
+import { registerPools } from './french.js?v=20261025i';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261025i';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -561,7 +561,10 @@ export class NPCs {
         n.c.update(dt, 0);
         continue;
       }
-      if (n.mode || n.stagger) {
+      if (n.drive) {                           // scripted brain (story finale: the landlady); returns its speed
+        n.talkT = 0;
+        speed = n.drive(dt, playerPos, this) || 0;
+      } else if (n.mode || n.stagger) {
         n.talkT = 0;
         speed = this._combat(n, dt, playerPos, playerR);
       } else if (n.c.dancing) {               // dancing on the spot, facing the player
@@ -600,10 +603,10 @@ export class NPCs {
       if (n.targetHeading !== undefined) {
         let d = n.targetHeading - n.root.rotation.y;
         d = Math.atan2(Math.sin(d), Math.cos(d));
-        n.root.rotation.y += d * Math.min(1, dt * (n.mode ? 14 : 8));
+        n.root.rotation.y += d * Math.min(1, dt * (n.mode || n.drive ? 14 : 8));
       }
       // chase / flee accelerate fast so the run animation kicks in right away
-      n.curSpeed += (speed - n.curSpeed) * Math.min(1, dt * (n.mode ? 14 : 10));
+      n.curSpeed += (speed - n.curSpeed) * Math.min(1, dt * (n.mode || n.drive ? 14 : 10));
       const gy = this.city.groundHeight(p.x, p.z);
       p.y += (gy + 0.02 - p.y) * Math.min(1, dt * 15);
       n.c.update(dt, n.curSpeed > 0.15 ? n.curSpeed : 0);

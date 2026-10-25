@@ -1,4 +1,4 @@
-import { registerPools } from './french.js?v=20261025h';
+import { registerPools } from './french.js?v=20261025i';
 // OFFICER DOUGH: patrols the streets. Slap / push / fart on / trip someone where he can see it (or where a
 // witness yells for him) and he chases you, WEE-OO. Break line of sight or get far away for a few seconds
 // and he gives up. If he catches you: GAME OVER, "START AGAIN?" reloads the scene (saved missions are kept).

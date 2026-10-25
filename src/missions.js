@@ -229,6 +229,8 @@ const GIVER_LINES = {
   menace: 'ok you\'re officially a menace. more coming soon.',
   later: 'coward. i\'ll be here.',
 };
+// story mode (RENT'S DUE): the same 5 gigs, but as paid jobs. No stars, no unlocks, no free-roam save.
+const JOB_LINES = { first: 'psst. need rent money? i got jobs.', again: ['you again? rent\'s not gonna pay itself.', 'back for more? same jobs. obviously.', 'pick one. any one. they all pay.'], later: 'broke AND a coward. ok.' };
 const SAVE_KEY = 'isoCity.missions.v1';
 
 // tiny per-pixel art (crisp at any pixel scale)
@@ -254,7 +256,12 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   let save = blank();
   if (new URLSearchParams(location.search).get('reset') === '1') { try { localStorage.removeItem(SAVE_KEY); } catch {} }
   try { save = { ...blank(), ...JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') }; } catch {}
-  const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} };
+  // play mode: null (title up: nothing shows), 'free' (the old 5-mission tracker + stars, saved), 'story' (paid jobs only,
+  // a throwaway in-memory record; the free-roam save is never read or written while the story runs)
+  let mode = null;
+  let freeSave = save;
+  const storyBlank = () => ({ stars: [], unlocked: MISSIONS.length - 1, turnIn: [], met: false, story: true });
+  const persist = () => { if (mode === 'story' || save.story) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} };
 
   let active = null;     // { def, S }
   let lastFailed = null; // def, for R = retry
@@ -316,23 +323,24 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   let offer = null;   // { idx, line }
   function openOffer(line) {
     const list = available();
-    const firstNew = list.find(({ d }) => !save.stars.includes(d.id));
+    const firstNew = mode === 'story' ? list.find(({ d }) => !save.stars.includes(d.id)) || list[Math.floor(Math.random() * list.length)] : list.find(({ d }) => !save.stars.includes(d.id));
     offer = { idx: (firstNew || list[list.length - 1]).i, line };
     renderOffer();
   }
   function renderOffer() {
     if (!offer) { panel.style.display = 'none'; return; }
-    const d = MISSIONS[offer.idx], done = save.stars.includes(d.id), list = available();
+    const d = MISSIONS[offer.idx], job = mode === 'story', done = !job && save.stars.includes(d.id), list = available();
     panel.innerHTML = '';
     const q = document.createElement('div'); q.className = 'mo-line'; q.textContent = `"${offer.line}"`; panel.appendChild(q);
     const t = document.createElement('div'); t.className = 'mo-title';
-    t.textContent = `#${offer.idx + 1} ${d.name}`; if (done) t.appendChild(artCanvas('star', 2)); panel.appendChild(t);
+    t.textContent = job ? `JOB: ${d.name}` : `#${offer.idx + 1} ${d.name}`; if (done) t.appendChild(artCanvas('star', 2)); panel.appendChild(t);
     const o = document.createElement('div'); o.className = 'mo-goal'; o.textContent = d.offer; panel.appendChild(o);
     const gl = document.createElement('div'); gl.className = 'mo-goal'; gl.textContent = 'GOAL: ' + d.goal; panel.appendChild(gl);
+    const pay = job && hooks.jobPay?.(d); if (pay) { const pd = document.createElement('div'); pd.className = 'mo-goal mo-pay'; pd.textContent = 'PAYS ' + pay; panel.appendChild(pd); }
     const row = document.createElement('div'); row.className = 'mo-row';
     const btn = (label, fn, cls = '') => { const b = document.createElement('button'); b.className = 'mo-btn ' + cls; b.textContent = label; b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); fn(); }); row.appendChild(b); return b; };
     if (list.length > 1) btn('<', () => cycle(-1), 'mo-small');
-    btn(done ? 'REPLAY [ENTER]' : 'ACCEPT [ENTER]', accept, 'mo-yes');
+    btn(job ? 'TAKE JOB [ENTER]' : done ? 'REPLAY [ENTER]' : 'ACCEPT [ENTER]', accept, 'mo-yes');
     btn('LATER [ESC]', later_);
     if (list.length > 1) btn('>', () => cycle(1), 'mo-small');
     panel.appendChild(row);
@@ -340,7 +348,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   }
   function cycle(dir) { const list = available(); const k = list.findIndex(({ i }) => i === offer.idx); offer.idx = list[(k + dir + list.length) % list.length].i; renderOffer(); }
   function accept() { if (!offer) return; const i = offer.idx; offer = null; renderOffer(); start(MISSIONS[i].id); }
-  function later_() { if (!offer) return; offer = null; renderOffer(); const gv = g.special('giver'); if (gv) dialogue.show(gv, GIVER_LINES.later, 1800); }
+  function later_() { if (!offer) return; offer = null; renderOffer(); const gv = g.special('giver'); if (gv) dialogue.show(gv, mode === 'story' ? JOB_LINES.later : GIVER_LINES.later, 1800); }
 
   function clickGiver(n) {
     combat.audio?.unlock?.();
@@ -349,7 +357,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     const no = hooks.canOffer?.(n);   // story mode: a refusal line (e.g. two jobs a day) instead of an offer
     if (typeof no === 'string') { dialogue.clear(n); dialogue.show(n, no, 2600); getNPCs()?.talk(n, 2.6, player.position); return; }
     let line;
-    if (save.turnIn.length) {
+    if (mode === 'story') line = !save.met ? JOB_LINES.first : JOB_LINES.again[Math.floor(Math.random() * JOB_LINES.again.length)];
+    else if (save.turnIn.length) {
       save.turnIn = [];
       line = save.stars.length >= MISSIONS.length ? GIVER_LINES.menace : GIVER_LINES.turnIn;
     } else if (!save.met) line = GIVER_LINES.first;
@@ -378,7 +387,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     def.cleanup?.(S, g, result);
     if (result === 'complete') {
       const i = MISSIONS.indexOf(def);
-      if (!save.stars.includes(def.id)) { save.stars.push(def.id); save.turnIn.push(def.id); }
+      if (mode !== 'story' && !save.stars.includes(def.id)) { save.stars.push(def.id); save.turnIn.push(def.id); }
       save.unlocked = Math.max(save.unlocked, Math.min(MISSIONS.length - 1, i + 1));
       persist();
       showBanner(true, line); jingle(true);
@@ -393,11 +402,12 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     banner.innerHTML = '';
     banner.className = ok ? 'ok' : 'bad';
     const h = document.createElement('div'); h.className = 'mb-head';
-    h.append(ok ? 'MISSION COMPLETE ' : 'MISSION FAILED'); if (ok) h.appendChild(artCanvas('star', 3));
+    const job = mode === 'story';
+    h.append(job ? (ok ? 'JOB DONE ' : 'JOB FAILED') : ok ? 'MISSION COMPLETE ' : 'MISSION FAILED'); if (ok && !job) h.appendChild(artCanvas('star', 3));
     banner.appendChild(h);
     if (line) { const l = document.createElement('div'); l.className = 'mb-line'; l.textContent = line; banner.appendChild(l); }
     const s = document.createElement('div'); s.className = 'mb-sub';
-    if (ok) s.textContent = save.stars.length >= MISSIONS.length ? 'ALL STARS. TALK TO THE GUY.' : 'TURN IN AT THE SHADY GUY';
+    if (ok) s.textContent = job ? '' : save.stars.length >= MISSIONS.length ? 'ALL STARS. TALK TO THE GUY.' : 'TURN IN AT THE SHADY GUY';
     else {
       const b = document.createElement('button'); b.className = 'mo-btn mo-yes'; b.textContent = 'RETRY [R]';
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); retry(); });
@@ -457,9 +467,11 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   function project(p, dy = 0) { v.set(p.x, p.y + dy, p.z).project(camera); return { x: (v.x + 1) / 2 * canvas.clientWidth, y: (1 - v.y) / 2 * canvas.clientHeight, z: v.z }; }
   function renderHud() {
     const parts = [];
-    const stars = document.createElement('div'); stars.className = 'mh-stars';
-    stars.appendChild(artCanvas(save.stars.length ? 'star' : 'starOff', 2)); stars.append(` ${save.stars.length}/${MISSIONS.length}`);
-    parts.push(stars);
+    if (mode === 'free') {   // the free-roam star tracker
+      const stars = document.createElement('div'); stars.className = 'mh-stars';
+      stars.appendChild(artCanvas(save.stars.length ? 'star' : 'starOff', 2)); stars.append(` ${save.stars.length}/${MISSIONS.length}`);
+      parts.push(stars);
+    }
     if (active) {
       const h = active.def.hud?.(active.S, g) || {};
       const t = document.createElement('div'); t.className = 'mh-title'; t.textContent = active.def.name; parts.push(t);
@@ -468,15 +480,16 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
       if (h.timer !== undefined) { const tm = document.createElement('span'); tm.className = h.timer < 10 ? 'mh-timer low' : 'mh-timer'; tm.textContent = ` ${Math.ceil(h.timer)}s`; p.appendChild(tm); }
       parts.push(p);
       for (const l of h.lines || []) { const d = document.createElement('div'); d.className = l.startsWith('-') ? 'mh-line off' : 'mh-line'; d.textContent = l; parts.push(d); }
-    } else if (save.stars.length < MISSIONS.length || save.turnIn.length) {
+    } else if (mode === 'free' && (save.stars.length < MISSIONS.length || save.turnIn.length)) {
       const d = document.createElement('div'); d.className = 'mh-line'; d.textContent = save.turnIn.length ? 'TURN IN: SHADY GUY' : 'FIND THE SHADY GUY (!)'; parts.push(d);
     }
     const key = parts.map((p) => p.textContent + p.className).join('|');
     if (key !== hud.dataset.key) { hud.replaceChildren(...parts); hud.dataset.key = key; }
+    hud.style.display = parts.length ? '' : 'none';
   }
   function renderMarker() {
     const gv = g.special('giver');
-    const kind = !gv || active ? null : save.turnIn.length ? 'star' : (save.unlocked < MISSIONS.length && MISSIONS.slice(0, save.unlocked + 1).some((d) => !save.stars.includes(d.id))) ? 'bang' : null;
+    const kind = !gv || active || !mode ? null : mode === 'story' ? null : save.turnIn.length ? 'star' : (save.unlocked < MISSIONS.length && MISSIONS.slice(0, save.unlocked + 1).some((d) => !save.stars.includes(d.id))) ? 'bang' : null;
     if (kind !== markKind) { markKind = kind; mark.replaceChildren(...(kind ? [artCanvas(kind, 3)] : [])); if (kind) mark.style.left = -Math.round(ART[kind][0].length / 2) * 3 + 'px'; }
     mark.style.display = kind && !offer ? 'block' : 'none';
     if (!kind) return;
@@ -528,8 +541,17 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     get offer() { return offer; },
     start, retry, accept, later: later_, openOffer, clickGiver: () => { const n = g.special('giver'); if (n) clickGiver(n); },
     complete: (l = 'debug') => g.complete(l), fail: (l = 'debug') => g.fail(l), abort: () => finish('abort'),
-    reset() { finish('abort'); save = blank(); try { localStorage.removeItem(SAVE_KEY); } catch {} offer = null; renderOffer(); hideBanner(); lastFailed = null; },
+    reset() { finish('abort'); save = mode === 'story' ? storyBlank() : (freeSave = blank()); if (mode !== 'story') try { localStorage.removeItem(SAVE_KEY); } catch {} offer = null; renderOffer(); hideBanner(); lastFailed = null; },
     unlockAll() { save.unlocked = MISSIONS.length - 1; persist(); },
+    get mode() { return mode; },
+    /** 'free' | 'story' | null. Story swaps in a blank paid-jobs record and never touches the free-roam save. */
+    setMode(m) {
+      if (m === mode) return;
+      finish('abort'); offer = null; renderOffer(); hideBanner(); lastFailed = null; zone.visible = false;
+      mode = m;
+      save = m === 'story' ? storyBlank() : freeSave;
+      hud.dataset.key = ''; markKind = undefined;
+    },
   };
   return api;
 }

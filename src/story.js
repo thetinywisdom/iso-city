@@ -3,13 +3,14 @@
 // oddity hunt ("THAT'S WEIRD!" [Q], 7 of 10 per loop). Free roam is the untouched sandbox.
 // Saves to localStorage isoCity.story.v1. The hidden house + the 7:00 finale come in Phase C.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025h';
+import { COMIC } from './palette.js?v=20261025i';
 
 export const STORY_KEY = 'isoCity.story.v1';
 export const RENT = 77777;
 export const JOBS_PER_DAY = 2;
 export const PAY = { 'slap-tour': 8800, rejected: 7700, bully: 12100, ball: 11000, cap: 9900 };
 const MODE_KEY = 'isoCity.mode';          // sessionStorage: same-tab reloads skip the title
+const NEW_KEY = 'isoCity.storyNew';      // sessionStorage: NEW STORY picked in free roam (survives the reload)
 const SLEEP = { x: 0, z: 0, r: 1.1 };     // the Z sits on the spawn point
 const yen = (v) => '¥' + Math.round(v).toLocaleString('en-US');
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -126,9 +127,12 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
   function begin(m, isNew = false) {
     ui.title.classList.remove('on');
     try { sessionStorage.setItem(MODE_KEY, m); } catch {}
-    if (m === 'free') { if (mode === 'story') { location.reload(); return; } mode = 'free'; hud(); return; }   // leaving a live story: reload into a clean sandbox
+    if (m === 'free') { if (mode === 'story') { location.reload(); return; } mode = 'free'; missions.setMode?.('free'); hud(); return; }   // leaving a live story: reload into a clean sandbox
+    // leaving free roam for the story: reload too, so nothing from the sandbox (a running mission, chases, props) leaks in
+    if (mode === 'free') { try { if (isNew) sessionStorage.setItem(NEW_KEY, '1'); } catch {} location.reload(); return; }
     if (!getNPCs()) { setTimeout(() => begin(m, isNew), 100); return; }   // the cast loads async
     if (isNew || !S) { S = fresh(); persist(); }
+    missions.setMode?.('story');   // paid jobs only: the old 5-mission tracker, stars and save stay in free roam
     mode = 'story'; setupStory(); hud();
     if (S.phase === 'intro') dayZero();
     else if (S.phase === 'choice') choiceCard();
@@ -232,6 +236,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     if (S.jobs >= JOBS_PER_DAY) return pick(['that\'s enough for today. go sleep.', 'two jobs a day, kid. go SLEEP.', 'come back tomorrow. same jobs. obviously.']);
     return true;
   };
+  missions.hooks.jobPay = (def) => yen(PAY[def.id] || 8000);
   missions.hooks.onComplete = (def, banner) => {
     if (mode !== 'story') return;
     const pay = PAY[def.id] || 8000;
@@ -453,7 +458,7 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     if (!m) try { m = sessionStorage.getItem(MODE_KEY); } catch {}
     if (!m && navigator.webdriver) m = 'free';   // automated test runs: straight into the sandbox
     if (m === 'free') begin('free');
-    else if (m === 'story') begin('story', params.get('new') === '1');
+    else if (m === 'story') { let nw = params.get('new') === '1'; try { if (sessionStorage.getItem(NEW_KEY)) { nw = true; sessionStorage.removeItem(NEW_KEY); } } catch {} begin('story', nw); }
     else showTitle();
   }
   // story needs the NPC list; the title can go up straight away

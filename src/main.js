@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261025h';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261025h';
-import { Player, JUMP } from './player.js?v=20261025h';
-import { P } from './palette.js?v=20261025h';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025h';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025h';
-import { initExtras } from './extras.js?v=20261025h';
+import { generateCity } from './city.js?v=20261025i';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261025i';
+import { Player, JUMP } from './player.js?v=20261025i';
+import { P } from './palette.js?v=20261025i';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025i';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025i';
+import { initExtras } from './extras.js?v=20261025i';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -103,7 +103,7 @@ playerBtn?.addEventListener('click', (e) => {
   applyPlayerChar(); npcs?.syncCustom?.();
 });
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261025h')
+import('../characters/characters.js?v=20261025i')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
@@ -235,7 +235,7 @@ const move = new THREE.Vector3();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   let running = keys.has('run');
-  let speed = running ? 7 : 3.2; // walk/run speeds matched to the character's natural stride
+  let speed = (running ? 7 : 3.2) * (extras?.story?.speedMul || 1); // walk/run speeds matched to the character's natural stride
 
   move.set(0, 0, 0);
   if (keys.has('up')) move.add(camForward);
