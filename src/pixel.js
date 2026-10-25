@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025d';
+import { COMIC } from './palette.js?v=20261025e';
 
 // ---------------------------------------------------------------------------
 // 3D pixel-art pipeline (t3ssel8r-style)
@@ -11,7 +11,7 @@ import { COMIC } from './palette.js?v=20261025d';
 //     the grid-snapped camera so pixels never swim while the camera glides.
 // ---------------------------------------------------------------------------
 
-// Palette exception: the two watermelon greens are used ONLY by SYOYA's pool-ring prop
+// Palette exception: the two watermelon greens are used ONLY by the watermelon pool ring (KIMATA's, and the creator's 'Watermelon ring' item)
 // (characters.js watermelonRing). Everything else in the scene stays on the Comic palette.
 export const PROP_GREENS = ['#4DBA5A', '#1F6B35'];
 export const PALETTE_HEX = [...Object.values(COMIC).flat(), ...PROP_GREENS];

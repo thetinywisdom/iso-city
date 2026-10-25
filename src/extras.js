@@ -1,14 +1,16 @@
 // Gameplay extras hooked from main.js with one line: contact shadows that show
 // through roofs (task 4), click-to-talk NPC chat bubbles (task 7), and long-press SLAP (combat.js).
-import { ContactShadows } from './shadows.js?v=20261025d';
-import { initDialogue } from './dialogue.js?v=20261025d';
-import { initCombat } from './combat.js?v=20261025d';
-import { initMissions } from './missions.js?v=20261025d';
-import { initActions } from './actions.js?v=20261025d';
-import { initChatter } from './chatter.js?v=20261025d';
-import { initPolice } from './police.js?v=20261025d';
-import { initBananas } from './bananas.js?v=20261025d';
-import { initCats } from './cats.js?v=20261025d';
+import { ContactShadows } from './shadows.js?v=20261025e';
+import { initDialogue } from './dialogue.js?v=20261025e';
+import { initCombat } from './combat.js?v=20261025e';
+import { initMissions } from './missions.js?v=20261025e';
+import { initActions } from './actions.js?v=20261025e';
+import { initChatter } from './chatter.js?v=20261025e';
+import { initPolice } from './police.js?v=20261025e';
+import { initBananas } from './bananas.js?v=20261025e';
+import { initCats } from './cats.js?v=20261025e';
+import { initHiding } from './hiding.js?v=20261025e';
+import { initGrandma } from './grandma.js?v=20261025e';
 
 export function initExtras({ scene, camera, renderer, pixel, city, player, getNPCs, keys }) {
   const shadows = new ContactShadows(scene, city);
@@ -28,5 +30,7 @@ export function initExtras({ scene, camera, renderer, pixel, city, player, getNP
   const police = initPolice({ scene, city, player, getNPCs, dialogue, combat, actions });
   const bananas = initBananas({ scene, city, player, getNPCs, dialogue, combat, missions, pixel });
   const cats = initCats({ scene, city, player, getNPCs, dialogue, combat, actions, police, pixel });
-  return { shadows, dialogue, combat, missions, actions, chatter, police, bananas, cats };
+  const hiding = initHiding({ scene, camera, city, player, keys, getNPCs, dialogue, combat, police, missions, shadows, pixel });
+  const grandma = initGrandma({ player, getNPCs, dialogue, combat, police });
+  return { shadows, dialogue, combat, missions, actions, chatter, police, bananas, cats, hiding, grandma };
 }

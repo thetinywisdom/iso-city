@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { registerPools } from './french.js?v=20261025e';
 
 // Right-click an NPC -> small pixel context menu: DANCE-OFF / PUSH / SLAP / FART (+ MISSION on the giver).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
@@ -22,6 +23,7 @@ const L = {
   faint: ['my eyes!!', '*gasp*', 'so... green...'],
   mad: ['you nasty little-', 'oh you\'re gonna PAY', 'that\'s it!!'],
 };
+registerPools(L);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const G1 = '#4DBA5A', G2 = '#1F6B35';   // ring greens: the stink cloud
 
@@ -109,7 +111,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (n.special === 'cop') { dialogue.shout(n, pick(L.copDance), 1800); return; }
     if (n.mode === 'chase' || n.mode === 'react') { npcs.provoke(n, 0.2); return; }
     const tag = { n };
-    const myDance = pick(MY_DANCES);
+    const myDance = ch?.def?.dance || pick(MY_DANCES);   // playing as a custom character: their own dance (e.g. "Bad")
     ch?.dance?.(myDance);
     if (n.c.dancing) n.c.stopDance(0.1);
     if (n.mode) n.mode = null;                       // even someone fleeing stops for a dance battle
@@ -129,7 +131,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (big) {
       state.lastOutcome = 'mayhem';
       later(1.7, () => { if (!n.down && !n.mode) startParty(n, crowd, center, DANCE_SECS + BIG_EXTRA - 1.7); else sendHome(); }, tag);
-      later(DANCE_SECS, () => { if (!charOf()?.dancing) charOf()?.dance?.('flail'); }, tag);
+      later(DANCE_SECS, () => { const c = charOf(); if (!c?.dancing) c?.dance?.(c?.def?.dance || 'flail'); }, tag);
       later(DANCE_SECS + BIG_EXTRA, () => { ch?.stopDance?.(0.3); if (!P) sendHome(); }, tag);
     } else later(DANCE_SECS, () => {
       ch?.stopDance?.(0.25);
@@ -143,7 +145,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   function party(n) {   // small-crowd mayhem: whoever's around joins in for a few seconds
     const c = new THREE.Vector3().copy(player.position).lerp(n.root.position, 0.5), PARTY = 4.4;
     startParty(n, crowdAt(c, n).slice(0, 8), c, PARTY);
-    const ch = charOf(); ch?.dance?.('flail');
+    const ch = charOf(); ch?.dance?.(ch?.def?.dance || 'flail');
     combat.hold(PARTY, null, () => ch?.stopDance?.(0.2));
     later(PARTY, () => ch?.stopDance?.(0.3));
     dialogue.showIcon(player, 'note', PARTY * 1000);

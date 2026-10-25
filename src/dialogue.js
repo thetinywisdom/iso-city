@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isFrench, frLine } from './french.js?v=20261025e';
 
 // Click an NPC -> pixel-art chat bubble with a random line above their head.
 // The listener runs in the capture phase on window, so a click that hits an NPC
@@ -33,7 +34,10 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     if (npc.special && npc.danceName) {                      // easter-egg NPCs dance instead of talking
       if (npc.c.dancing || npc.mode) return;   // clicks mid-dance (or while scared) do nothing
       const secs = getNPCs().dance(npc, player.position);
-      if (secs > 0) { showIcon(npc, npc.icon, secs * 1000 - 300); place(); }
+      if (secs > 0 && isFrench(npc)) {   // a cheeky french quip first, then the dance icon
+        show(npc, frLine(null, Math.random() < 0.5 ? 'talk' : 'dance'), 1800, false); place();
+        setTimeout(() => { if (npc.c.dancing && !npc.mode) { showIcon(npc, npc.icon, secs * 1000 - 2100); place(); } }, 1800);
+      } else if (secs > 0) { showIcon(npc, npc.icon, secs * 1000 - 300); place(); }
       return;
     }
     let line = api.pickLine?.(npc) || null;   // missions may bias the line
@@ -52,7 +56,13 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     if (b) b.el.remove();
     const el = document.createElement('div');
     el.className = isShout ? 'bubble shout' : 'bubble';
-    const span = document.createElement('span'); span.textContent = line; el.appendChild(span);
+    const span = document.createElement('span');
+    if (isFrench(npc)) {   // Mbappé: french line + a small english translation underneath
+      const [fr, en] = Array.isArray(line) ? line : frLine(line);
+      span.append(fr); const sub = document.createElement('small'); sub.className = 'en'; sub.textContent = '(' + en + ')'; span.append(sub);
+      el.classList.add('fr');
+    } else span.textContent = line;
+    el.appendChild(span);
     layer.appendChild(el);
     // centre on whole pixels (a -50% transform would land text on half pixels and blur it)
     span.style.left = -Math.round(span.offsetWidth / 2 / 3) * 3 + 'px';

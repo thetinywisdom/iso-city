@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261025d';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025d';
+import { addGhosts } from './player.js?v=20261025e';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261025e';
+import { registerPools } from './french.js?v=20261025e';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -39,9 +40,9 @@ const WOMEN = [
   { seed: 1204, name: 'LINDA', pos: [15.2, -6.2], face: [13.4, -6.1],
     look: { outfit: 'apron', hair: 'bun', hairColor: '#363E47', glasses: false },
     plain: true },
-  { seed: 1205, name: 'GRANDMA FUMIKO', pos: [-23.6, 23.5], face: [-24.4, 22.7],
-    look: { outfit: 'cardigan', hair: 'bun', hairColor: '#F0F2F4', glasses: true, colors: { top: '#F8C0C5', inner: '#F0F2F4', bottom: '#292C2E', shoe: '#292C2E' }, height: 0.88, build: 0.95 },
-    role: 'oracle', chatLines: ['this week feels... familiar.', 'my hip says rain. again.', 'eat something, you noodle!', 'back in my day...'], lines: ["i'll hit you with my purse.", 'back in my day we slapped HARDER', 'eat something, you look like a noodle', 'speak up, dummy!'] },
+  { seed: 1205, name: 'GRANDMA FUMIKO', pos: [12.7, 9.3], face: [8.0, 5.0],   // by the plaza bench next to the spawn crossing: easy to find when the cop is on you
+    look: { outfit: 'cardigan', hair: 'bun', hairColor: '#F0F2F4', glasses: true, colors: { top: '#F8C0C5', inner: '#F0F2F4', bottom: '#292C2E', shoe: '#292C2E' }, height: 0.88, build: 0.95, accessories: ['tote'], accColor: '#A92D59' },
+    role: 'oracle', chatLines: ['cop bothering you? come to grandma.', 'this week feels... familiar.', 'my hip says rain. again.', 'eat something, you noodle!', 'back in my day...'], lines: ["i'll hit you with my purse.", 'in trouble? hide behind grandma, dear.', 'back in my day we slapped HARDER', 'eat something, you look like a noodle', 'speak up, dummy!'] },
   { seed: 1206, name: 'KIKO', pos: [-18.6, 27.5], face: [-19.2, 26.6],
     look: { outfit: 'dress', hair: 'bob', hairColor: '#292C2E', colors: { top: '#00B4BC', accent: '#FFCC3F', shoe: '#F0F2F4' }, height: 0.95 },
     plain: true },
@@ -84,6 +85,7 @@ export const PUSH_CRY = ['MOMMY!!', 'WAAAAH!', "i'm telling!!", 'my spine!!'];
 export const PUSH_MAD = ["you're DEAD!", 'oh it is ON!', 'big mistake, pal!'];
 export const FAINT_LINES = ['wha... what happened', '*cough* *cough*', 'i saw the light...', 'never again...'];
 export const SHOUTS = { chase: 'you motherf**ker!', giveUp: 'yeah run away p**sy!', help: 'help!' };
+registerPools({ chase: [SHOUTS.chase], giveUp: [SHOUTS.giveUp], help: [SHOUTS.help] });
 const hash01 = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const forced = new URLSearchParams(location.search).get('temper');   // ?temper=aggressive|timid
 // Generous invisible click targets (raycasters still hit invisible meshes).
@@ -408,6 +410,7 @@ export class NPCs {
   // returns the move speed this frame
   _combat(n, dt, pp, playerR) {
     const p = n.root.position;
+    const cc0 = n.chaseCfg; if (cc0 && cc0.target) pp = cc0.target;   // searching a spot (player hidden): run there, never 'catch' air
     const dx = pp.x - p.x, dz = pp.z - p.z, dist = Math.hypot(dx, dz) || 1e-6;
     n.modeT -= dt; n.cooldown -= dt;
     // the hand of an NPC slap connects a moment after the swing starts
@@ -425,6 +428,7 @@ export class NPCs {
     const faceP = () => { n.targetHeading = Math.atan2(dx, dz); };
     const cc = n.chaseCfg || {};
     const trySlap = () => {
+      if (cc.target) return false;
       if (cc.catch) {                        // grabs instead of slapping (e.g. Mbappé taking his ball back)
         if (dist < TUNE.reach * 0.9) { this.emit('caught', n); return true; }
         return false;

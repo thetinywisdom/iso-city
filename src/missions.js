@@ -104,8 +104,8 @@ export const MISSIONS = [
     target: (S) => (S.phase === 'poke' ? S.b.root.position : new THREE.Vector3(TUNING.bully.safe.x, 0, TUNING.bully.safe.z)),
   },
   {
-    id: 'ball', name: 'STEAL MBAPPE\'S BALL', goal: 'grab the ball. escape (15m or 12s).',
-    offer: 'that football guy? take his ball.',
+    id: 'ball', name: 'STEAL MBAPPÉ\'S BALL', goal: 'grab the ball. escape (15m or 12s).',
+    offer: 'that french football guy? take his ball.',
     start(S, g) {
       S.m = g.special('mbappe'); S.ball = S.m.ball; S.phase = 'grab'; S.t = 0;
       g.resetBall(); S.dir = new THREE.Vector3(0, 0, 1);
@@ -148,7 +148,7 @@ export const MISSIONS = [
     onCaught(S, n, g) {
       if (n !== S.m || S.phase !== 'run') return;
       S.phase = 'caught';
-      g.fail('MBAPPE: "mine. obviously."');
+      g.fail('MBAPPÉ: "À moi. Évidemment." (mine. obviously.)');
       g.dialogue.shout(n, 'mine. obviously.', 2000);
     },
     onTrip(S, n, g) {                    // tripped over someone mid-escape: the ball rolls off, he takes it back
@@ -156,7 +156,7 @@ export const MISSIONS = [
       S.phase = 'caught';
       const b = S.ball.position, p = g.player.position;
       b.x = p.x + S.dir.x * 1.4; b.z = p.z + S.dir.z * 1.4; b.y = g.city.groundHeight(b.x, b.z) + 0.11;
-      g.fail('you tripped. MBAPPE: "thanks."');
+      g.fail('you tripped. MBAPPÉ: "Merci!" (thanks!)');
       g.later(0.5, () => g.dialogue.shout(S.m, 'thanks for the ball!', 1800));
     },
     cleanup(S, g, result) {
@@ -168,8 +168,8 @@ export const MISSIONS = [
     target: (S) => (S.phase === 'grab' ? S.ball.position : null),
   },
   {
-    id: 'cap', name: 'SYOYA\'S CAP', goal: 'find syoya\'s cap. bring it back.',
-    offer: 'someone yeeted syoya\'s cap. go fetch.',
+    id: 'cap', name: 'KIMATA\'S CAP', goal: 'find kimata\'s cap. bring it back.',
+    offer: 'someone yeeted kimata\'s cap. go fetch.',
     start(S, g) {
       S.s = g.special('syoya'); S.phase = 'find'; S.t = TUNING.cap.time;
       S.s.c.cap.visible = false;
@@ -181,7 +181,7 @@ export const MISSIONS = [
       g.later(0.2, () => g.dialogue.shout(S.s, 'MY CAP?! it\'s on the bus stop!!', 2600));
     },
     update(S, dt, g) {
-      S.t -= dt; if (S.t <= 0) return g.fail('syoya is capless forever. (until retry)');
+      S.t -= dt; if (S.t <= 0) return g.fail('kimata is capless forever. (until retry)');
       const p = g.player.position, T = TUNING.cap;
       if (S.phase === 'find') {
         S.cap.rotation.y += dt * 1.5; S.bob = (S.bob || 0) + dt;
@@ -216,7 +216,7 @@ export const MISSIONS = [
       return S.want;
     },
     cleanup(S, g) { S.s.c.cap.visible = true; S.cap.removeFromParent(); window.removeEventListener('keydown', S.onKey); },
-    hud: (S) => ({ progress: S.phase === 'find' ? 'GET THE CAP (JUMP / E / CLICK)' : 'BRING IT TO SYOYA', timer: S.t }),
+    hud: (S) => ({ progress: S.phase === 'find' ? 'GET THE CAP (JUMP / E / CLICK)' : 'BRING IT TO KIMATA', timer: S.t }),
     target: (S) => (S.phase === 'find' ? S.cap.position : S.s.root.position),
   },
 ];

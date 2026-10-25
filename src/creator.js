@@ -1,16 +1,17 @@
 // Character creator page (creator.html). Builds custom characters with the same builder + pixel
 // pipeline as the game and saves them to localStorage; the city tab picks them up live.
 import * as THREE from 'three';
-import { CUSTOM, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025d';
-import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025d';
-import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025d';
+import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025e';
+import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025e';
+import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025e';
 
 const MAX = 30;
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); for (const k of kids) e.append(k); return e; };
 const pretty = (s) => s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 const LABELS = { icecream: 'Ice cream', shopping: 'Shopping bag', dog: 'Dog on a leash', none: 'None', tee: 'T-shirt', tank: 'Tank top',
-  busstop: 'Bus stop', sneakers: 'Sneakers', barefoot: 'Barefoot', man: 'Man', woman: 'Woman' };
+  busstop: 'Bus stop', sneakers: 'Sneakers', barefoot: 'Barefoot', man: 'Man', woman: 'Woman',
+  backcap: 'Back cap', stripetee: 'Striped tee', ring: 'Watermelon ring', mbappe: 'Bad' };
 const label = (v) => LABELS[v] || pretty(v);
 
 // ---------------------------------------------------------------- preview ----
@@ -198,6 +199,10 @@ function save(asCopy) {
 }
 $('#btnSave').onclick = () => save(false);
 $('#btnCopy').onclick = () => save(true);
+$('#btnKimata').onclick = () => {   // Kimata's look: keeps name, lines and home
+  const keep = { name: cur.name, lines: cur.lines, bubble: cur.bubble, home: cur.home };
+  cur = normalizeCustom({ ...cur, ...structuredClone(KIMATA_STYLE), ...keep }); changed(); status('Kimata style!');
+};
 $('#btnRandom').onclick = () => { const keepId = editingId; cur = normalizeCustom(randomCustom()); editingId = keepId; changed(); status('Randomized!'); };
 $('#btnNew').onclick = () => { cur = customDefaults(cur.gender); editingId = null; changed(); renderList(); };
 

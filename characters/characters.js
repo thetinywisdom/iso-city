@@ -6,7 +6,7 @@
 // Units: ~2.0 tall, feet at y=0, facing +Z. Rotate `root` to steer.
 import * as THREE from 'three';
 
-import { PALETTE, COMIC } from './palette.js?v=20261025d';
+import { PALETTE, COMIC } from './palette.js?v=20261025e';
 export { PALETTE, COMIC };
 
 export const OUTFITS = ['shirt', 'tee', 'coat', 'blouse', 'apron',
@@ -715,7 +715,7 @@ class Character {
     const speed = Math.max(0, st.speed || 0);
     const grounded = st.grounded !== false, vy = st.vy || 0;
     const P = this.parts, D = dt || 0;
-    this.t += D;
+    this.t += D; this._lastD = D;
     // landing: squash spring kicked by impact speed
     if (grounded && !this.grounded) { this.landV += clamp(-this.vy, 2, 12) * 0.55; }
     this.grounded = grounded; if (!grounded) this.vy = vy;
@@ -899,8 +899,9 @@ class Character {
     P.torso.rotation.y = ty;
     const h = p.head || [0, 0, 0];
     P.head.rotation.set(h[0], h[1] + ty * 0.5, h[2]);
-    if (p.L) this._armIK('L', p.L.w, p.L.e, p.L.r || 0, p.L.f || 0, ty);
-    if (p.R) this._armIK('R', p.R.w, p.R.e, p.R.r || 0, p.R.f || 0, ty);
+    const ao = this.armOff, adj = (a, sx) => (ao ? [a[0] + sx * ao.x, a[1], a[2] + ao.z] : a);   // custom bodies: wider / deeper
+    if (p.L) this._armIK('L', adj(p.L.w, 1), adj(p.L.e, 1), p.L.r || 0, p.L.f || 0, ty);
+    if (p.R) this._armIK('R', adj(p.R.w, -1), adj(p.R.e, -1), p.R.r || 0, p.R.f || 0, ty);
   }
   /** Two-bone arm IK in body space: wrist target W, elbow pole E (points, torso space), wrist roll/flex. */
   _armIK(side, W, E, roll = 0, flex = 0, ty = 0) {
@@ -1200,7 +1201,7 @@ export function createMbappe(opts = {}) {
   return ch;
 }
 
-// ---- Syoya: backward white cap, pink striped tee, navy shorts, barefoot, watermelon pool ring ----
+// ---- Syoya (shown as KIMATA): backward white cap, pink striped tee, navy shorts, barefoot, watermelon pool ring ----
 function watermelonRing({ R = 0.37, r = 0.105 } = {}) {
   const g = new THREE.Group(); g.name = 'watermelonRing';
   const G1 = '#4DBA5A', G2 = '#1F6B35';                     // palette exception (prop only): bright + dark green
@@ -1309,7 +1310,7 @@ export function createCop(opts = {}) {
 
 export const SPECIALS = {
   mbappe: { create: createMbappe, tag: 'MBAPPÉ', dance: 'mbappe', icon: 'note' },
-  syoya: { create: createSyoya, tag: 'SYOYA', dance: 'hula', icon: 'heart' },
+  syoya: { create: createSyoya, tag: 'KIMATA', dance: 'hula', icon: 'heart' },
   giver: { create: createGiver, tag: '???', dance: null, role: 'giver' },
   bully: { create: createBully, tag: 'BULLY', dance: null, role: 'bully', temper: 'aggressive' },
   cop: { create: createCop, tag: 'OFFICER DOUGH', dance: null, role: 'cop', temper: 'timid' },
@@ -1429,13 +1430,13 @@ export const CUSTOM = {
   height: [0.85, 1.15],
   skins: [PALETTE.npcSkin, COMIC.warm[4], COMIC.warm[3], COMIC.warm[2], COMIC.warm[1], COMIC.warm[0], COMIC.neutrals[3], COMIC.blues[3]],
   hairs: HAIRSTYLES,
-  hats: ['none', 'cap', 'beanie'],
-  tops: ['tee', 'shirt', 'hoodie', 'sweater', 'tank', 'blazer', 'cardigan', 'coat', 'blouse', 'none'],
+  hats: ['none', 'cap', 'beanie', 'backcap'],
+  tops: ['tee', 'shirt', 'hoodie', 'sweater', 'tank', 'blazer', 'cardigan', 'coat', 'blouse', 'stripetee', 'none'],
   bottoms: ['pants', 'shorts', 'skirt', 'dress'],
   shoes: ['sneakers', 'boots', 'flats', 'barefoot'],
   accs: ['glasses', 'sunglasses', 'moustache', 'beard', 'earrings', 'bag'],
-  helds: ['none', 'football', 'guitar', 'skateboard', 'umbrella', 'phone', 'coffee', 'icecream', 'balloon', 'briefcase', 'shopping', 'boombox', 'flowers', 'baguette', 'dog'],
-  dances: ['robot', 'chicken', 'disco', 'sprinkler', 'flail', 'hula', 'flex'],
+  helds: ['none', 'football', 'guitar', 'skateboard', 'umbrella', 'phone', 'coffee', 'icecream', 'balloon', 'briefcase', 'shopping', 'boombox', 'flowers', 'baguette', 'dog', 'ring'],
+  dances: ['robot', 'chicken', 'disco', 'sprinkler', 'flail', 'hula', 'flex', 'mbappe'],   // 'mbappe' is labelled "Bad" in the creator
   colors: Object.values(COMIC).flat(),
 };
 const SHAPES = {
@@ -1461,6 +1462,12 @@ export function customDefaults(gender = 'man') {
     lines: w ? ['hey there!', 'nice day, huh?', 'love your vibe.'] : ['yo!', 'sup?', 'nice weather.'], bubble: '',
     dance: 'disco', home: 'fountain' };
 }
+/** Kimata's look as a creator preset (keeps name / lines / home). */
+export const KIMATA_STYLE = { gender: 'man', body: 'average', height: 1.0, skin: COMIC.warm[3], hair: 'buzz', hairColor: PALETTE.black,
+  hat: 'backcap', hatColor: PALETTE.white, top: 'stripetee', topColor: PALETTE.white, innerColor: COMIC.pinks[1],
+  bottom: 'shorts', bottomColor: COMIC.blues[0], shoes: 'barefoot', shoeColor: PALETTE.white,
+  acc: { glasses: false, sunglasses: false, moustache: false, beard: false, earrings: false, bag: false },
+  held: 'ring', heldColor: COMIC.pinks[1], dance: 'hula' };
 /** Fill gaps / clamp a saved definition (old or hand-edited JSON). */
 export function normalizeCustom(d = {}) {
   const base = customDefaults(d.gender === 'woman' ? 'woman' : 'man');
@@ -1488,7 +1495,7 @@ export function randomCustom(seed) {
   const C = CUSTOM.colors;
   Object.assign(d, {
     body: pick(CUSTOM.bodies), height: +(CUSTOM.height[0] + r() * (CUSTOM.height[1] - CUSTOM.height[0])).toFixed(2), skin: pick(CUSTOM.skins),
-    hair: pick(CUSTOM.hairs), hairColor: pick(C), hat: r() < 0.3 ? pick(['cap', 'beanie']) : 'none', hatColor: pick(C),
+    hair: pick(CUSTOM.hairs), hairColor: pick(C), hat: r() < 0.35 ? pick(['cap', 'beanie', 'backcap']) : 'none', hatColor: pick(C),
     top: pick(CUSTOM.tops), topColor: pick(C), innerColor: pick(C), bottom: pick(CUSTOM.bottoms), bottomColor: pick(C),
     shoes: pick(CUSTOM.shoes), shoeColor: pick(C), accColor: pick(C), held: pick(CUSTOM.helds), heldColor: pick(C), dance: pick(CUSTOM.dances),
   });
@@ -1708,7 +1715,11 @@ export function createCustom(input = {}) {
     for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.08, 0.05, 0.14), d.top === 'none' || d.top === 'tank' ? d.skin : fill, T, { pos: [sx * 0.1, 1.66, -0.01], rot: [0, 0, sx * -0.45] });   // traps
   }
   buildHair(P.headCenter, d.hair, d.hairColor, PALETTE.npcLine, mulberry32(String(cfg.seed) + d.hair));
-  if (d.hat !== 'none') buildHat(P.headCenter, d.hat, d.hatColor, d.hatColor === PALETTE.slate ? PALETTE.black : PALETTE.slate);
+  if (d.hat === 'backcap') {   // Kimata's cap, worn backward, hair showing through the strap opening
+    const capG = group(P.headCenter); capG.rotation.y = Math.PI;
+    buildHat(capG, 'cap', d.hatColor, d.hatColor);
+    mesh(new THREE.BoxGeometry(0.06, 0.035, 0.012), d.hairColor, capG, { pos: [0, 0.075, -0.112], rot: [0.35, 0, 0] });
+  } else if (d.hat !== 'none') buildHat(P.headCenter, d.hat, d.hatColor, d.hatColor === PALETTE.slate ? PALETTE.black : PALETTE.slate);
   customFace(P, d);
   if (d.acc.bag) {   // cross-body bag at the left hip
     const zf = 0.155 * shape.tz + (d.body === 'fat' ? 0.06 : 0);
@@ -1719,7 +1730,8 @@ export function createCustom(input = {}) {
   }
   // held item / guitar / dog
   const held = d.held, zF = 0.1 * (shape.tz - 1) + (d.body === 'fat' ? 0.07 : 0) + (d.body === 'muscle' ? 0.04 : 0);
-  let item = null, guitar = null, dog = null, leash = null;
+  let item = null, guitar = null, dog = null, leash = null, ring = null;
+  const ringS = Math.max(1, 0.35 + 0.65 * shape.tx), ringZ = zF * 0.6;   // the hoop grows with the waist
   if (held === 'guitar') {
     const gr = group(P.body); gr.name = 'guitarRoot';
     guitar = guitarModel(d.heldColor); gr.add(guitar);
@@ -1727,9 +1739,13 @@ export function createCustom(input = {}) {
   } else if (held === 'dog') {
     dog = dogModel(d.heldColor); P.root.add(dog); dog.position.set(0.55, 0, 0.5);
     leash = mesh(new THREE.BoxGeometry(0.008, 0.008, 1), PALETTE.black, P.root);
+  } else if (held === 'ring') {   // Kimata's watermelon pool ring (its two greens are the ONLY off-palette colours, see pixel.js)
+    ring = watermelonRing(); P.root.add(ring); ring.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   } else if (held !== 'none') { item = heldModel(held, d.heldColor); P.body.add(item); }
   const ch = new Character(P, cfg);
-  ch.def = d; ch.heldItem = item; ch.guitar = guitar; ch.dog = dog;
+  ch.def = d; ch.heldItem = item; ch.guitar = guitar; ch.dog = dog; ch.ring = ring;
+  // dances / poses written for a standard body: keep hands clear of wider shoulders and bigger bellies
+  ch.armOff = { x: 0.11 * (shape.sh - 1), z: zF };
   const pose = HELD_POSE[held];
   ch.hold = (c) => {
     if (c._kd || (c._dance && c._danceW >= 0.999)) return;
@@ -1746,6 +1762,21 @@ export function createCustom(input = {}) {
       return;
     }
     if (dog) return;
+    if (ring) {   // hand rests on the ring at the left hip; standing still a while -> hula-hoop it (Kimata's idle)
+      c._ringIdle = idle && !c.slapping && !c._dance ? (c._ringIdle || 0) + (c._lastD || 0.016) : 0;
+      const e = smooth(1.2, 2.0, c._ringIdle || 0);
+      c._ringE = e;
+      if (e > 0.001) {
+        const ph = c._ringPh = (c._ringPh || 0) + (c._lastD || 0.016) * SY_W;
+        const H = c.h, P2 = c.parts, cs = Math.cos(ph), sn = Math.sin(ph);
+        P2.body.position.x += 0.06 * cs * e * H; P2.body.position.z += 0.045 * sn * e * H;
+        P2.body.rotation.z += -0.08 * cs * e; P2.torso.rotation.y += -0.08 * sn * e;
+        const b = Math.sin(ph * 2) * 0.03;
+        c._armIK('L', [0.42 + ch.armOff.x, 1.62 + b, 0.06], [0.55, 1.4, -0.1], 0, 0.3, 0);
+        c._armIK('R', [-0.42 - ch.armOff.x, 1.62 + b, 0.06], [-0.55, 1.4, -0.1], 0, 0.3, 0);
+      } else if (!c._dance || c._danceW < 0.999) c._armIK('L', [0.37 + ch.armOff.x, 1.08, 0.08 + ringZ], [0.48, 1.32, -0.2], 0.3, 0, ty);
+      return;
+    }
     if (!pose || (pose.idleOnly && !idle)) return;
     let w = pose.w;
     if (held === 'football') { const k = Math.abs(Math.sin(t * 3.4)); w = [w[0], w[1] - 0.06 * (1 - k), w[2]]; }
@@ -1758,8 +1789,26 @@ export function createCustom(input = {}) {
     }
     if (held === 'phone') c.parts.head.rotation.x += 0.28;
   };
-  ch.prop = (c) => {
+  const rIdleQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.6, Math.PI / 2 - 0.12, 'YXZ'));
+  const rq = new THREE.Quaternion(), rs = new THREE.Quaternion(), rp = new THREE.Vector3(), re = new THREE.Euler();
+  ch.prop = (c, dp, dw) => {
     const P = c.parts, t = c.t;
+    if (ring) {
+      const H = c.h;
+      ring.scale.setScalar(ringS * H);
+      ring.position.set((0.43 + ch.armOff.x) * H, 0.62 * H, (0.07 + ringZ) * H); ring.quaternion.copy(rIdleQ);
+      // hula: the hula dance's own params, or the idle hoop
+      let p = null, w = 0;
+      if (dp && dp.ph !== undefined && dw > 0) { p = dp; w = dw; }
+      else if ((c._ringE || 0) > 0.001) { const ph = c._ringPh || 0; p = { ph, e: 1, hx: 0.06 * Math.cos(ph), hz: 0.045 * Math.sin(ph), dip: 0 }; w = c._ringE; }
+      if (p) {
+        const off = 0.105 * ringS;
+        rp.set((p.hx + off * Math.cos(p.ph - Math.PI / 2) * p.e) * H, (1.0 - p.dip + 0.04 * Math.sin(p.ph * 2) * p.e) * H, (p.hz + off * Math.sin(p.ph - Math.PI / 2) * p.e) * H);
+        re.set(0.28 * Math.cos(p.ph) * p.e, 0, 0.55 * Math.sin(p.ph) * p.e);
+        rq.setFromEuler(re); rs.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, -p.ph * 0.6); rq.multiply(rs);
+        ring.position.lerp(rp, w); ring.quaternion.slerp(rq, w);
+      }
+    }
     if (item) {
       P.wristL.updateWorldMatrix(true, false);
       P.wristL.localToWorld(_hp.set(0, -0.1, 0.02)); P.body.worldToLocal(_hp);

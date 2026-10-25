@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261025d';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261025d';
-import { Player, JUMP } from './player.js?v=20261025d';
-import { P } from './palette.js?v=20261025d';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025d';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025d';
-import { initExtras } from './extras.js?v=20261025d';
+import { generateCity } from './city.js?v=20261025e';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261025e';
+import { Player, JUMP } from './player.js?v=20261025e';
+import { P } from './palette.js?v=20261025e';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261025e';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261025e';
+import { initExtras } from './extras.js?v=20261025e';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -103,7 +103,7 @@ playerBtn?.addEventListener('click', (e) => {
   applyPlayerChar(); npcs?.syncCustom?.();
 });
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261025d')
+import('../characters/characters.js?v=20261025e')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
@@ -140,7 +140,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyI') { pixel.dither = !pixel.dither; showHud(); return; }
   if (e.code === 'KeyO') { pixel.outlines = !pixel.outlines; showHud(); return; }
   if (e.code === 'KeyC' && !e.repeat && !e.metaKey && !e.ctrlKey) { openCreator(); return; }
-  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !(extras?.combat.stun > 0)) player.jump(); return; }
+  if (e.code === 'Space') { e.preventDefault(); if (e.repeat) return; if (extras?.hiding?.hidden) { if (!extras.hiding.state.doomed) extras.hiding.popOut(); return; } if (!(extras?.combat.stun > 0)) player.jump(); return; }
   const k = KEYMAP[e.code];
   if (k) { keys.add(k); e.preventDefault(); if (k !== 'run') clickTarget = null; }
 });
@@ -249,6 +249,9 @@ function tick() {
   }
   // slap: walk into reach of the target NPC, then freeze input during the swing / when hit
   const ctl = extras ? extras.combat.control(dt, keys.has('up') || keys.has('down') || keys.has('left') || keys.has('right')) : null;
+  // hiding in a trash can: frozen in place; any move key pops you out (hiding.js)
+  const hid = extras?.hiding ? extras.hiding.control(keys.has('up') || keys.has('down') || keys.has('left') || keys.has('right')) : false;
+  if (hid) { move.set(0, 0, 0); clickTarget = null; player.vel.set(0, 0, 0); }
   if (ctl?.lock) { move.set(0, 0, 0); clickTarget = null; }
   else if (ctl?.dir) { move.set(ctl.dir.x, 0, ctl.dir.z); clickTarget = null; speed = ctl.speed; running = speed > 5; }
   if (!clickTarget) marker.visible = false;
@@ -274,9 +277,10 @@ function tick() {
       if (stuckTime > 0.35) clickTarget = null; // walked into a wall
     }
   }
-  const gy = Math.max(city.groundHeight(player.position.x, player.position.z) + 0.02, standHeight(player.position.x, player.position.z));
+  const gy = hid ? city.groundHeight(player.position.x, player.position.z) + 0.02   // inside the bin: feet on the ground, no push-out
+    : Math.max(city.groundHeight(player.position.x, player.position.z) + 0.02, standHeight(player.position.x, player.position.z));
   player.stepVertical(dt, gy); // gravity + jump; step-height smoothing on the ground
-  depenetrate();
+  if (!hid) depenetrate();
   player.animate(dt, actualSpeed > 0.2, running, targetHeading, actualSpeed);
 
   if (marker.visible) {
