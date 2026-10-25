@@ -1,4 +1,4 @@
-import { registerPools } from './french.js?v=20261025f';
+import { registerPools } from './french.js?v=20261025g';
 // OFFICER DOUGH: patrols the streets. Slap / push / fart on / trip someone where he can see it (or where a
 // witness yells for him) and he chases you, WEE-OO. Break line of sight or get far away for a few seconds
 // and he gives up. If he catches you: GAME OVER, "START AGAIN?" reloads the scene (saved missions are kept).
@@ -20,6 +20,7 @@ registerPools({ witness: L.witness });
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 export function initPolice({ scene, city, player, getNPCs, dialogue, combat, actions }) {
+  const hooks = { onOver: null, onRestart: null };   // story.js: reword the overlay / skip to the next morning
   const state = { mode: 'idle', offences: 0, reports: 0, chases: 0, escapes: 0, caught: 0, lostT: 0, last: null };
   let cop = null, wired = null, last = performance.now(), pendT = -1, lastSeen = null, searchT = 0, hidFn = () => false;
   const tall = () => city.colliders.filter((c) => c.top == null);
@@ -50,6 +51,11 @@ export function initPolice({ scene, city, player, getNPCs, dialogue, combat, act
   window.addEventListener('keydown', (e) => { if (state.mode === 'over' && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); restart(); } }, true);
 
   function restart() {   // fresh scene: player at spawn, everyone reset; saved mission progress stays (localStorage)
+    if (state.mode === 'over' && hooks.onRestart?.()) {   // story mode: a night in the cell, then the next morning (no reload)
+      state.mode = 'idle'; over.classList.remove('on'); combat.hold(0);
+      if (cop) { const n = getNPCs(); n?.calm?.(cop, 0.3); n?.goHome?.(cop); }
+      return;
+    }
     state.restarting = true;
     const u = new URL(location.href); u.searchParams.delete('reset');
     location.replace(u.toString());
@@ -103,6 +109,7 @@ export function initPolice({ scene, city, player, getNPCs, dialogue, combat, act
     actions?.closeMenu?.();
     combat.hold(1e6, cop.root.position);
     combat.audio?.thud?.(); combat.shakeIt?.(0.3);
+    hooks.onOver?.(over);
     setTimeout(() => { over.classList.add('on'); btn.focus(); }, 700);
   }
 
@@ -152,5 +159,5 @@ export function initPolice({ scene, city, player, getNPCs, dialogue, combat, act
   };
   // can the cop see the player right now (close and in line of sight)? hiding.js asks this when you hop in a bin
   const watching = (r = TUNE.watchR) => !!cop && !cop.down && state.mode === 'chase' && dist(cop.root.position, player.position) < r && los(cop.root.position, player.position);
-  return { state, offence, startChase, giveUp, callOff, gameOver, restart, los, watching, setHiddenFn(f) { hidFn = f; }, get cop() { return cop; }, TUNE, el: { wanted, over } };
+  return { state, hooks, offence, startChase, giveUp, callOff, gameOver, restart, los, watching, setHiddenFn(f) { hidFn = f; }, get cop() { return cop; }, TUNE, el: { wanted, over } };
 }

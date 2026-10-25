@@ -6,7 +6,7 @@
 // Units: ~2.0 tall, feet at y=0, facing +Z. Rotate `root` to steer.
 import * as THREE from 'three';
 
-import { PALETTE, COMIC } from './palette.js?v=20261025f';
+import { PALETTE, COMIC } from './palette.js?v=20261025g';
 export { PALETTE, COMIC };
 
 export const OUTFITS = ['shirt', 'tee', 'coat', 'blouse', 'apron',

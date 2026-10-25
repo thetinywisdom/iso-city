@@ -346,6 +346,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     combat.audio?.unlock?.();
     if (n.mode) { dialogue.shout(n, 'not NOW!', 1200); return; }
     if (active) { dialogue.show(n, GIVER_LINES.busy, 2000); return; }
+    const no = hooks.canOffer?.(n);   // story mode: a refusal line (e.g. two jobs a day) instead of an offer
+    if (typeof no === 'string') { dialogue.clear(n); dialogue.show(n, no, 2600); getNPCs()?.talk(n, 2.6, player.position); return; }
     let line;
     if (save.turnIn.length) {
       save.turnIn = [];
@@ -369,6 +371,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     g.toast('GO!');
     return true;
   }
+  const hooks = { canOffer: null, onComplete: null };   // story.js
   function finish(result, line = '') {
     if (!active) return;
     const { def, S } = active; active = null;
@@ -379,6 +382,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
       save.unlocked = Math.max(save.unlocked, Math.min(MISSIONS.length - 1, i + 1));
       persist();
       showBanner(true, line); jingle(true);
+      hooks.onComplete?.(def, banner);
     } else if (result === 'fail') {
       lastFailed = def; showBanner(false, line); jingle(false);
     }
@@ -518,7 +522,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   };
 
   const api = {
-    list: MISSIONS, TUNING, toast: (t) => g.toast(t),
+    hooks, list: MISSIONS, TUNING, toast: (t) => g.toast(t),
     get active() { return active && { id: active.def.id, S: active.S }; },
     get save() { return save; },
     get offer() { return offer; },

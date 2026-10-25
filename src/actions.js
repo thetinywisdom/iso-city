@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261025f';
+import { registerPools } from './french.js?v=20261025g';
 
 // Right-click an NPC -> small pixel context menu: DANCE-OFF / PUSH / SLAP / FART (+ MISSION on the giver).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
@@ -196,7 +196,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
       P.crew.add(o); o.party = true; o.talkT = 0; o.danceTo = P.center; o.c.dance(danceFor(o));
       if (Math.random() < 0.4) dialogue.shout(o, pick(L.party), 1500); else dialogue.showIcon(o, 'note', Math.max(500, (P.t - 0.3) * 1000));
     }));
-    for (const o of gathering) if (!o.mode && !o.down && o.c.dancing) { o.spectator = true; P.spect.add(o); }
+    for (const o of gathering) if (!o.mode && !o.down && o.c.dancing) { if (o.danceStyle) { P.crew.add(o); o.party = true; o.c.dance(danceFor(o)); } else { o.spectator = true; P.spect.add(o); } }
     state.lastParty = crew.length + 1; state.parties++;
   }
   function release(o) { o.party = false; o.spectator = false; if (!o.down && !o.mode && o.c.dancing) o.c.stopDance(0.3); o.talkT = 0; }
@@ -223,6 +223,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
       if (P.spect.has(o) || P.watch.has(o)) { if (busy) { P.spect.delete(o); P.watch.delete(o); o.spectator = false; } continue; }
       if (busy || (missions.active && o.special) || o.special === 'cop' || o.special === 'giver' || !inR(o)) continue;
       o.talkT = 0; o.danceTo = P.center; o.spectator = true;
+      if (o.danceStyle) { P.crew.add(o); o.party = true; o.spectator = false; o.c.dance(danceFor(o)); continue; }   // has their own dance (custom "Bad" etc.): joins the crew, never just claps
       if (o.special === 'bully') { P.watch.add(o); o.c.dance('crossed'); if (Math.random() < 0.5) dialogue.shout(o, pick(L.bullyWatch), 1600); }
       else { P.spect.add(o); o.c.dance('clap'); state.claps++; }
     }
@@ -391,7 +392,9 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     npcs.on('domino', () => { state.dominoes++; });
     npcs.on('gathered', (o) => {                   // a spectator reached the ring: face the dancers and clap
       if (!gathering.has(o)) return;
-      o.talkT = 0; o.danceTo = P ? P.center : gatherCenter; o.c.dance('clap'); state.claps++;
+      o.talkT = 0; o.danceTo = P ? P.center : gatherCenter;
+      if (P && o.danceStyle) { P.crew.add(o); o.party = true; o.c.dance(danceFor(o)); return; }   // a dancer with their own move joins in
+      o.c.dance('clap'); state.claps++;
       if (P) { o.spectator = true; P.spect.add(o); }   // early birds clap for the dance-off itself until the party starts
     });
     npcs.on('bonk', (o, flier) => {                  // someone got thrown into the bully: they bounce off

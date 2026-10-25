@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025f';
+import { COMIC } from './palette.js?v=20261025g';
 
 // Contact ("blob") shadows that stay visible through occluders.
 // When a character walks behind a building its real (shadow-mapped) shadow is
