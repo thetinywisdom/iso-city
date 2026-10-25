@@ -77,7 +77,7 @@ scene.add(player.root);
 import('../characters/characters.js')
   .then((mod) => {
     if (mod?.createMainCharacter) player.setModel(mod.createMainCharacter());
-    if (mod?.createNPC) npcs = new NPCs(scene, mod, city);
+    if (mod?.createNPC) { npcs = new NPCs(scene, mod, city); npcs.toonify = (r) => pixel.toonify(r); }
     pixel.toonify(scene);
   })
   .catch((e) => console.info('Character module not loaded, using placeholder:', e.message));
@@ -100,12 +100,16 @@ function showHud() {
   hud.textContent = pixel.enabled ? `Pixel ×${pixel.scale}${pixel.dither ? ' · dither' : ''}${pixel.outlines ? '' : ' · no outlines'}` : 'Pixel off';
   hud.style.opacity = 1; clearTimeout(hudTimer); hudTimer = setTimeout(() => (hud.style.opacity = 0), 1400);
 }
+// Character creator: opens in a new tab; saved characters spawn here live (storage event in npcs.js)
+function openCreator() { window.open('creator.html', 'isoCityCreator'); }
+document.getElementById('creatorBtn')?.addEventListener('click', (e) => { e.preventDefault(); openCreator(); });
 window.addEventListener('keydown', (e) => {
   if (e.code === 'BracketLeft') { pixel.setScale(pixel.scale - 1); showHud(); return; }
   if (e.code === 'BracketRight') { pixel.setScale(pixel.scale + 1); showHud(); return; }
   if (e.code === 'KeyP') { pixel.setEnabled(!pixel.enabled); showHud(); return; }
   if (e.code === 'KeyI') { pixel.dither = !pixel.dither; showHud(); return; }
   if (e.code === 'KeyO') { pixel.outlines = !pixel.outlines; showHud(); return; }
+  if (e.code === 'KeyC' && !e.repeat && !e.metaKey && !e.ctrlKey) { openCreator(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !(extras?.combat.stun > 0)) player.jump(); return; }
   const k = KEYMAP[e.code];
   if (k) { keys.add(k); e.preventDefault(); if (k !== 'run') clickTarget = null; }

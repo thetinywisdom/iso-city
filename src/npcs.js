@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { addGhosts } from './player.js';
+import { loadCustom, HOMES, VARIETY, STORE_KEY } from './customchars.js';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -153,7 +154,62 @@ export class NPCs {
       Object.assign(n, { path: W.path, idx: (W.start + W.dir + 4) % 4, dir: W.dir, speed: W.speed, walker: true });
       this.list.push(n);
     }
+    // variety pedestrians made from the creator's options (held items, body types...)
+    this.charMod = charMod; this.toonify = null; this.customs = [];
+    if (charMod.createCustom && charMod.randomCustom) for (const v of VARIETY) {
+      const def = { ...charMod.randomCustom(v.seed), ...v.over, id: 'variety' + v.seed };
+      const n = this._wrap(charMod.createCustom(def), v.seed);
+      n.variety = true;
+      if (v.walk) this._walkLoop(n, v.walk); else this._idleAt(n, v.pos, v.face);
+      this.list.push(n);
+    }
+    if (charMod.createCustom) {
+      this.syncCustom();
+      addEventListener('storage', (e) => { if (e.key === STORE_KEY || e.key === null) this.syncCustom(); });
+    }
     for (const n of this.list) n.root.position.y = city.groundHeight(n.root.position.x, n.root.position.z);
+  }
+  _walkLoop(n, W) {
+    const path = loop(W.c[0], W.c[1], W.L || 6.65), a = path[W.start || 0], b = path[((W.start || 0) + (W.dir || 1) + 4) % 4], t = W.along ?? 0.5;
+    n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
+    Object.assign(n, { path, idx: ((W.start || 0) + (W.dir || 1) + 4) % 4, dir: W.dir || 1, speed: W.speed || 1.3, walker: true });
+  }
+  _free(x, z, r = 0.4) {
+    for (const c of this.city.colliders) if (x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r) return false;
+    for (const o of this.list) if (Math.hypot(o.root.position.x - x, o.root.position.z - z) < 0.85) return false;
+    return true;
+  }
+  _idleAt(n, pos, face) {
+    let [x, z] = pos;
+    for (let k = 0; k < 60 && !this._free(x, z); k++) { const a = k * 2.4, d = 0.6 + k * 0.12; x = pos[0] + Math.cos(a) * d; z = pos[1] + Math.sin(a) * d; }
+    n.root.position.set(x, this.city.groundHeight(x, z), z);
+    n.heading = n.root.rotation.y = Math.atan2(face[0] - x, face[1] - z);
+    n.home = { x, z, heading: n.heading };
+    n.walker = false; n.idleT = Math.random() * 3;
+  }
+  /** (Re)spawn the creator's saved characters from localStorage. Returns the number spawned. */
+  syncCustom() {
+    const C = this.charMod;
+    for (const n of this.customs) { n.root.removeFromParent(); const i = this.list.indexOf(n); if (i >= 0) this.list.splice(i, 1); n.removed = true; }
+    this.customs = []; this.customGen = (this.customGen || 0) + 1;
+    const defs = loadCustom();
+    defs.forEach((raw, i) => {
+      let n;
+      try {
+        const d = C.normalizeCustom(raw);
+        n = this._wrap(C.createCustom(d), 7000 + i);
+        const lines = d.lines.length ? d.lines : null;
+        Object.assign(n, { tag: d.name.toUpperCase(), custom: true, customId: raw.id, important: true, lines,
+          chatLines: d.bubble ? [d.bubble] : lines, danceStyle: d.dance });
+        const H = HOMES[d.home] || HOMES.fountain;
+        if (H.walk) this._walkLoop(n, { c: [[0, 0], [33, 0], [0, 33], [33, 33]][i % 4], L: i % 2 ? 7.15 : 6.65, start: i % 4, dir: i % 2 ? -1 : 1, speed: 1.3 });
+        else this._idleAt(n, H.pos, H.face);
+        n.root.position.y = this.city.groundHeight(n.root.position.x, n.root.position.z);
+      } catch (e) { console.warn('custom character skipped:', e.message); if (n) n.root.removeFromParent(); return; }
+      this.list.push(n); this.customs.push(n);
+      this.toonify?.(n.root);
+    });
+    return this.customs.length;
   }
   _wrap(c, seed) {
     const root = new THREE.Group(); root.add(c.root); addGhosts(c.root); this.group.add(root);

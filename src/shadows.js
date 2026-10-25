@@ -37,6 +37,9 @@ export class ContactShadows {
     const mesh = blobMesh(r); this.group.add(mesh); this.items.push({ obj, mesh });
   }
   update() {
+    for (let i = this.items.length - 1; i >= 0; i--) {   // drop shadows of removed characters
+      const it = this.items[i]; if (it.obj.isObject3D && !it.obj.parent) { it.mesh.removeFromParent(); this.items.splice(i, 1); }
+    }
     for (const { obj, mesh } of this.items) {
       const p = obj.getWorldPosition ? obj.getWorldPosition(_v) : obj;
       mesh.position.set(p.x, this.city.groundHeight(p.x, p.z) + 0.04, p.z);

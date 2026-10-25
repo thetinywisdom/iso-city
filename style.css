@@ -186,3 +186,9 @@ canvas { image-rendering: pixelated; }
   box-shadow: 0 6px 0 0 #FF5491; white-space: nowrap; }
 #cat-hud canvas { width: 27px; height: 21px; image-rendering: pixelated; margin: -3px 6px 0 0; }
 .cat-heart { position: fixed; left: -10px; top: -9px; width: 21px; height: 18px; image-rendering: pixelated; pointer-events: none; z-index: 6; }
+
+/* ---- character creator button ---- */
+#creatorBtn { position: fixed; bottom: 48px; right: 18px; z-index: 8; text-decoration: none;
+  font: 10px/10px 'PressStart2P', ui-monospace, monospace; -webkit-font-smoothing: none; color: #292C2E; background: #FFCC3F;
+  padding: 8px 10px; box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E, 0 6px 0 0 #5B6A7B; }
+#creatorBtn:hover { background: #F0F2F4; }

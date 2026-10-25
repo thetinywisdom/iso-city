@@ -17,7 +17,7 @@ export function initExtras({ scene, camera, renderer, pixel, city, player, getNP
   const prev = scene.onBeforeRender;
   scene.onBeforeRender = (...a) => {   // pick up NPCs once the character module has loaded
     const npcs = getNPCs();
-    if (npcs && npcs.list.length !== tracked) { for (const r of npcs.roots) shadows.track(r, 0.4); tracked = npcs.list.length; }
+    if (npcs && npcs.list.length + (npcs.customGen || 0) * 1000 !== tracked) { for (const r of npcs.roots) shadows.track(r, 0.4); tracked = npcs.list.length + (npcs.customGen || 0) * 1000; }
     prev.apply(scene, a);
   };
   const dialogue = initDialogue({ scene, camera, renderer, pixel, player, getNPCs });

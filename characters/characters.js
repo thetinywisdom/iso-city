@@ -596,12 +596,14 @@ class Character {
     this.strideMul = clamp(P.legSwing / 0.34, 0.6, 1);   // skirts: shorter strides, no clipping
     // body variation: height scales the whole rig (stride scales with it, so no sliding); build widens it
     this.h = cfg.height || 1; const b = this.b = cfg.build || 1;
-    this.shX = SHOULDER_X * (1 + (b - 1) * 0.8); this.hipX = HIP_X * (1 + (b - 1) * 0.6);
-    P.torso.scale.set(b, 1, 1 + (b - 1) * 0.7);
+    // cfg.shape (creator body types) overrides the single build factor: { sh, hip, tx, tz, leg, arm }
+    const S = cfg.shape || { sh: 1 + (b - 1) * 0.8, hip: 1 + (b - 1) * 0.6, tx: b, tz: 1 + (b - 1) * 0.7, leg: 1 + (b - 1) * 0.8, arm: 1 + (b - 1) * 0.6 };
+    this.shX = SHOULDER_X * S.sh; this.hipX = HIP_X * S.hip;
+    P.torso.scale.set(S.tx, 1, S.tz);
     for (const s of ['L', 'R']) {
       P['leg' + s].position.x = (s === 'L' ? 1 : -1) * this.hipX;
-      P['leg' + s].scale.set(1 + (b - 1) * 0.8, 1, 1 + (b - 1) * 0.8);
-      P['arm' + s].scale.set(1 + (b - 1) * 0.6, 1, 1 + (b - 1) * 0.6);
+      P['leg' + s].scale.set(S.leg, 1, S.leg);
+      P['arm' + s].scale.set(S.arm, 1, S.arm);
     }
     P.body.rotation.order = 'YXZ';
     for (const s of ['L', 'R']) P['arm' + s].rotation.order = 'YXZ';
@@ -1414,3 +1416,378 @@ Object.assign(DANCES, {
   },
 });
 export const SILLY_DANCES = ['robot', 'chicken', 'disco', 'sprinkler'];
+
+// =====================================================================================
+// Custom characters (creator.html): a fully modular, mix-anything definition -> Character.
+// def = { name, gender, body, height, skin, hair, hairColor, hat, hatColor, top, topColor, innerColor,
+//         bottom, bottomColor, shoes, shoeColor, acc: {glasses, sunglasses, moustache, beard, earrings, bag},
+//         accColor, held, heldColor, lines[], bubble, dance, home }
+// =====================================================================================
+export const CUSTOM = {
+  genders: ['man', 'woman'],
+  bodies: ['skinny', 'average', 'fat', 'muscle'],
+  height: [0.85, 1.15],
+  skins: [PALETTE.npcSkin, COMIC.warm[4], COMIC.warm[3], COMIC.warm[2], COMIC.warm[1], COMIC.warm[0], COMIC.neutrals[3], COMIC.blues[3]],
+  hairs: HAIRSTYLES,
+  hats: ['none', 'cap', 'beanie'],
+  tops: ['tee', 'shirt', 'hoodie', 'sweater', 'tank', 'blazer', 'cardigan', 'coat', 'blouse', 'none'],
+  bottoms: ['pants', 'shorts', 'skirt', 'dress'],
+  shoes: ['sneakers', 'boots', 'flats', 'barefoot'],
+  accs: ['glasses', 'sunglasses', 'moustache', 'beard', 'earrings', 'bag'],
+  helds: ['none', 'football', 'guitar', 'skateboard', 'umbrella', 'phone', 'coffee', 'icecream', 'balloon', 'briefcase', 'shopping', 'boombox', 'flowers', 'baguette', 'dog'],
+  dances: ['robot', 'chicken', 'disco', 'sprinkler', 'flail', 'hula', 'flex'],
+  colors: Object.values(COMIC).flat(),
+};
+const SHAPES = {
+  skinny: { sh: 0.9, hip: 0.86, tx: 0.8, tz: 0.78, leg: 0.74, arm: 0.72 },
+  average: { sh: 1, hip: 1, tx: 1, tz: 1, leg: 1, arm: 1 },
+  fat: { sh: 1.2, hip: 1.38, tx: 1.4, tz: 1.42, leg: 1.36, arm: 1.32 },
+  muscle: { sh: 1.36, hip: 1.06, tx: 1.26, tz: 1.12, leg: 1.22, arm: 1.6 },
+};
+const LAYER_TOPS = ['blazer', 'cardigan', 'coat', 'hoodie'];
+const SKIN_LINE = (skin) => skin === PALETTE.npcSkin ? PALETTE.npcLine
+  : [COMIC.warm[4], COMIC.warm[3]].includes(skin) ? COMIC.warm[1] : skin === COMIC.warm[2] ? COMIC.warm[1] : COMIC.neutrals[0];
+
+/** Defaults for a gender; every part stays mixable afterwards. */
+export function customDefaults(gender = 'man') {
+  const w = gender === 'woman';
+  return { v: 1, name: w ? 'NEW GAL' : 'NEW GUY', gender, body: 'average', height: w ? 0.96 : 1.0, skin: PALETTE.npcSkin,
+    hair: w ? 'longStraight' : 'curtains', hairColor: PALETTE.black, hat: 'none', hatColor: COMIC.blues[1],
+    top: w ? 'blouse' : 'tee', topColor: w ? COMIC.pinks[2] : COMIC.blues[1], innerColor: PALETTE.white,
+    bottom: w ? 'skirt' : 'pants', bottomColor: w ? PALETTE.black : COMIC.blues[0],
+    shoes: w ? 'flats' : 'sneakers', shoeColor: w ? PALETTE.black : PALETTE.white,
+    acc: { glasses: false, sunglasses: false, moustache: false, beard: false, earrings: w, bag: false }, accColor: COMIC.yellows[1],
+    held: 'none', heldColor: COMIC.pinks[1],
+    lines: w ? ['hey there!', 'nice day, huh?', 'love your vibe.'] : ['yo!', 'sup?', 'nice weather.'], bubble: '',
+    dance: 'disco', home: 'fountain' };
+}
+/** Fill gaps / clamp a saved definition (old or hand-edited JSON). */
+export function normalizeCustom(d = {}) {
+  const base = customDefaults(d.gender === 'woman' ? 'woman' : 'man');
+  const o = { ...base, ...d, acc: { ...base.acc, ...(d.acc || {}) } };
+  const inL = (v, L, dflt) => (L.includes(v) ? v : dflt);
+  const col = (v, dflt) => (CUSTOM.colors.includes(v) || CUSTOM.skins.includes(v) || Object.values(PALETTE).includes(v) ? v : dflt);
+  o.body = inL(o.body, CUSTOM.bodies, 'average'); o.hair = inL(o.hair, CUSTOM.hairs, base.hair); o.hat = inL(o.hat, CUSTOM.hats, 'none');
+  o.top = inL(o.top, CUSTOM.tops, base.top); o.bottom = inL(o.bottom, CUSTOM.bottoms, base.bottom); o.shoes = inL(o.shoes, CUSTOM.shoes, base.shoes);
+  o.held = inL(o.held, CUSTOM.helds, 'none'); o.dance = inL(o.dance, CUSTOM.dances, 'disco');
+  o.skin = inL(o.skin, CUSTOM.skins, base.skin);
+  for (const k of ['hairColor', 'hatColor', 'topColor', 'innerColor', 'bottomColor', 'shoeColor', 'accColor', 'heldColor']) o[k] = col(o[k], base[k]);
+  o.height = clamp(+o.height || 1, CUSTOM.height[0], CUSTOM.height[1]);
+  o.name = String(o.name || base.name).slice(0, 18);
+  o.lines = (Array.isArray(o.lines) ? o.lines : []).map((s) => String(s).slice(0, 60)).filter(Boolean).slice(0, 5);
+  if (!o.lines.length) o.lines = base.lines.slice();
+  o.bubble = String(o.bubble || '').slice(0, 60);
+  for (const k of CUSTOM.accs) o.acc[k] = !!o.acc[k];
+  return o;
+}
+/** Random definition drawing from EVERY option (seeded when a seed is given). */
+export function randomCustom(seed) {
+  const r = seed === undefined ? Math.random : mulberry32(seed);
+  const pick = (a) => a[Math.floor(r() * a.length)];
+  const gender = pick(CUSTOM.genders), d = customDefaults(gender);
+  const C = CUSTOM.colors;
+  Object.assign(d, {
+    body: pick(CUSTOM.bodies), height: +(CUSTOM.height[0] + r() * (CUSTOM.height[1] - CUSTOM.height[0])).toFixed(2), skin: pick(CUSTOM.skins),
+    hair: pick(CUSTOM.hairs), hairColor: pick(C), hat: r() < 0.3 ? pick(['cap', 'beanie']) : 'none', hatColor: pick(C),
+    top: pick(CUSTOM.tops), topColor: pick(C), innerColor: pick(C), bottom: pick(CUSTOM.bottoms), bottomColor: pick(C),
+    shoes: pick(CUSTOM.shoes), shoeColor: pick(C), accColor: pick(C), held: pick(CUSTOM.helds), heldColor: pick(C), dance: pick(CUSTOM.dances),
+  });
+  d.acc = {}; for (const k of CUSTOM.accs) d.acc[k] = r() < 0.25;
+  if (d.acc.sunglasses && d.acc.glasses) d.acc.glasses = false;
+  const FIRST = ['ZED', 'MOMO', 'RIKU', 'PEPPER', 'JUNO', 'TAKO', 'NOVA', 'BIGGS', 'LULU', 'KAI', 'DOTTIE', 'SPUD', 'YUKI', 'REX', 'MAPLE'];
+  d.name = pick(FIRST);
+  const POOL = ['yo!', 'nice day, huh?', 'have we met?', 'i like your face.', 'got any snacks?', 'ugh, mondays.', 'this city is wild.', 'call me maybe.', 'living my best life.', 'what a vibe.', 'not now, busy.', 'rent is due soon...'];
+  d.lines = []; while (d.lines.length < 3 + Math.floor(r() * 3)) { const l = pick(POOL); if (!d.lines.includes(l)) d.lines.push(l); }
+  d.bubble = r() < 0.5 ? pick(POOL) : '';
+  d.home = pick(['fountain', 'lawn', 'busstop', 'crossing', 'tower', 'fruit', 'stroll']);
+  return d;
+}
+
+function customTop(P, d, T) {
+  const c = d.topColor, inner = d.innerColor, top = d.top;
+  if (top === 'none') return;
+  if (top === 'tee') { mesh(lathe(shell(0.87, 1.07), 8, TORSO_Z), c, T); sleeves(P, c, 0.25, 0, [0.07, 0.066]); }
+  else if (top === 'shirt') {
+    const prof = shell(0.87, 1.07); mesh(lathe(prof, 8, TORSO_Z), c, T);
+    frontLine(T, prof, 0.87, 1.64, TORSO_Z, PALETTE.npcLine);
+    for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.05, 0.035, 0.01), c, T, { pos: [sx * 0.03, 1.69, 0.062], rot: [-0.9, 0, sx * -0.6] });
+    mesh(limb(0.06, 0.06, 0.035, 6, 1.715), c, T); sleeves(P, c, UPPER, 0.09);
+  } else if (top === 'hoodie') {
+    mesh(lathe(shell(0.84, 1.1, 0.0), 8, TORSO_Z), c, T);
+    mesh(lathe(clip(TORSO, 0.84, 0.92, 1.12), 8, TORSO_Z), c, T);
+    mesh(lathe([[0.1, 1.6], [0.165, 1.66], [0.15, 1.76], [0.08, 1.8]], 8, 0.95, Math.PI * 0.55, Math.PI * 0.9), c, T, { double: true });
+    mesh(new THREE.BoxGeometry(0.2, 0.12, 0.02), c, T, { pos: [0, 1.06, 0.13], rot: [0.08, 0, 0] });
+    for (const sx of [-1, 1]) mesh(limb(0.006, 0.006, 0.13, 3), inner, T, { pos: [sx * 0.035, 1.66, 0.14], rot: [0.12, 0, 0] });
+    sleeves(P, c, UPPER, FORE - 0.015, [0.072, 0.068]);
+  } else if (top === 'sweater') {
+    mesh(lathe(shell(0.86, 1.11, 0.0), 8, TORSO_Z), c, T);
+    mesh(lathe(clip(TORSO, 0.86, 0.93, 1.13), 8, TORSO_Z), c, T);
+    mesh(limb(0.064, 0.064, 0.03, 7, 1.71), c, T); sleeves(P, c, UPPER, FORE - 0.01, [0.075, 0.072]);
+  } else if (top === 'tank') mesh(lathe(shell(0.87, 1.06), 8, TORSO_Z), c, T);
+  else if (top === 'blazer' || top === 'coat' || top === 'cardigan') {
+    if (d.bottom !== 'dress') mesh(lathe(shell(0.9, 1.04), 8, TORSO_Z), inner, T);
+    const [y0, grow, gap] = top === 'coat' ? [0.62, 1.15, 0.3] : top === 'blazer' ? [0.86, 1.12, 0.33] : [0.83, 1.11, 0.36];
+    const prof = shell(y0, grow, top === 'coat' ? 0.03 : 0.005, false);
+    mesh(lathe(prof, 10, TORSO_Z, gap, Math.PI * 2 - gap * 2), c, T, { double: true });
+    if (top === 'cardigan') for (const sx of [-1, 1]) frontLine(T, prof, 0.85, 1.55, TORSO_Z, c, sx * 0.055, 0.016, 0.004);
+    else for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.045, 0.15, 0.012), c, T, { pos: [sx * 0.06, 1.53, 0.145], rot: [0.12, 0, sx * 0.3] });
+    sleeves(P, c, UPPER, FORE - 0.02, [0.072, 0.068]);
+  } else if (top === 'blouse') {
+    const prof = shell(0.9, 1.07); mesh(lathe(prof, 8, TORSO_Z), c, T);
+    frontLine(T, prof, 1.45, 1.65, TORSO_Z, inner, 0, 0.012);
+    sleeves(P, c, 0.36, 0, [0.07, 0.07], true);
+  }
+}
+function customBottom(P, d, T) {
+  const c = d.bottomColor, bare = d.bottom !== 'pants';
+  const sh = d.shoes, shoeC = d.shoeColor;
+  const legs = bare ? { thigh: d.skin, shin: d.skin, thighR: [0.078, 0.066], shinR: [0.064, 0.047] } : { thigh: c, shin: c };
+  if (sh === 'sneakers') Object.assign(legs, { shoe: shoeC, sole: shoeC === PALETTE.white ? PALETTE.slate : PALETTE.white, socks: bare ? PALETTE.white : null });
+  else if (sh === 'boots') Object.assign(legs, { shoe: shoeC, sole: PALETTE.black });
+  else if (sh === 'flats') Object.assign(legs, { flats: shoeC, cuffSkin: bare });
+  P.legSwing = 0.34;
+  if (d.bottom === 'pants') mesh(lathe(clip(TORSO, 0.84, 0.95, 1.09), 8, TORSO_Z), c, T);
+  else if (d.bottom === 'shorts') { mesh(lathe(clip(TORSO, 0.84, 0.95, 1.09), 8, TORSO_Z), c, T); Object.assign(legs, { shorts: 0.27, shortsColor: c }); }
+  else if (d.bottom === 'skirt') {
+    mesh(lathe([[0, 1.0], [0.176, 1.0], [0.182, 0.92], [0.206, 0.76], [0.236, 0.57], [0, 0.57]], 10, 0.86), c, T, { double: true });
+    P.legSwing = 0.27;
+  } else {   // dress: bodice + skirt in the dress colour (jackets / hoodies layer over)
+    mesh(lathe(shell(0.98, 1.06), 8, TORSO_Z), c, T);
+    if (!LAYER_TOPS.includes(d.top)) sleeves(P, c, 0.16, 0, [0.068, 0.066]);
+    mesh(lathe([[0, 0.99], [0.174, 0.99], [0.182, 0.92], [0.206, 0.76], [0.236, 0.57], [0, 0.57]], 10, 0.86), c, T, { double: true });
+    mesh(lathe(clip(TORSO, 0.98, 1.02, 1.08), 8, TORSO_Z), d.accColor, T);
+    P.legSwing = 0.27;
+  }
+  dressLegs(P, { skin: d.skin }, legs);
+  if (sh === 'boots') for (const side of ['L', 'R']) mesh(limb(legs.shinR ? 0.07 : 0.088, legs.shinR ? 0.06 : 0.088, 0.17, 6, -SHIN + 0.13), shoeC, P['knee' + side]);
+}
+function customFace(P, d) {
+  const hc = P.headCenter, A = d.acc, hcol = d.hairColor;
+  if (A.glasses) buildGlasses(hc, PALETTE.slate);
+  if (A.sunglasses) {
+    for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.072, 0.042, 0.014), PALETTE.black, hc, { pos: [sx * 0.045, 0.02, 0.126] });
+    mesh(new THREE.BoxGeometry(0.2, 0.012, 0.012), PALETTE.black, hc, { pos: [0, 0.035, 0.128] });
+    for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.006, 0.008, 0.12), PALETTE.black, hc, { pos: [sx * 0.1, 0.03, 0.065], rot: [0, sx * -0.25, 0] });
+  }
+  if (A.beard) {
+    mesh(new THREE.BoxGeometry(0.15, 0.075, 0.05), hcol, hc, { pos: [0, -0.1, 0.085], rot: [-0.25, 0, 0] });
+    for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.03, 0.11, 0.1), hcol, hc, { pos: [sx * 0.095, -0.05, 0.035] });
+    mesh(new THREE.BoxGeometry(0.1, 0.05, 0.04), hcol, hc, { pos: [0, -0.135, 0.06] });
+  }
+  if (A.moustache || A.beard) {
+    mesh(new THREE.BoxGeometry(0.1, 0.026, 0.02), hcol, hc, { pos: [0, -0.042, 0.13] });
+    for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.028, 0.03, 0.018), hcol, hc, { pos: [sx * 0.055, -0.055, 0.124] });
+  }
+  if (A.earrings) for (const sx of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(0.014, 5, 4), COMIC.yellows[1], hc, { pos: [sx * 0.113, -0.045, 0.0] });
+    mesh(new THREE.BoxGeometry(0.006, 0.02, 0.006), COMIC.yellows[1], hc, { pos: [sx * 0.113, -0.03, 0.0] });
+  }
+}
+// held items: modelled upright in "hand space" (origin = grip point), anchored to the left hand every frame
+function heldModel(kind, col) {
+  const g = new THREE.Group(); g.name = 'held:' + kind;
+  const W = PALETTE.white, K = PALETTE.black;
+  if (kind === 'football') {
+    const b = group(g, 0, 0, 0); b.name = 'ball';
+    mesh(new THREE.IcosahedronGeometry(0.1, 1), W, b);
+    for (const [x, y, z] of [[0, 0.09, 0.04], [0.08, -0.02, 0.05], [-0.07, -0.03, 0.06], [0.02, -0.05, -0.08], [-0.05, 0.05, -0.07]])
+      mesh(new THREE.BoxGeometry(0.04, 0.04, 0.012), K, b, { pos: [x, y, z], rot: [Math.atan2(y, z), Math.atan2(x, z), 0] });
+  } else if (kind === 'skateboard') {
+    mesh(new THREE.BoxGeometry(0.035, 0.74, 0.19), col, g, { pos: [0.06, -0.3, 0] });
+    mesh(new THREE.BoxGeometry(0.008, 0.72, 0.17), K, g, { pos: [0.08, -0.3, 0] });
+    for (const y of [-0.06, -0.54]) for (const z of [-0.07, 0.07]) mesh(new THREE.BoxGeometry(0.04, 0.04, 0.03), COMIC.yellows[1], g, { pos: [0.02, y, z] });
+  } else if (kind === 'umbrella') {
+    mesh(limb(0.01, 0.01, 0.95, 4, 0.85), K, g);
+    mesh(new THREE.ConeGeometry(0.62, 0.24, 8), col, g, { pos: [0, 0.95, 0] });
+    mesh(new THREE.TorusGeometry(0.035, 0.01, 3, 6, Math.PI), K, g, { pos: [0.035, -0.1, 0], rot: [0, 0, Math.PI] });
+  } else if (kind === 'phone') {
+    mesh(new THREE.BoxGeometry(0.065, 0.12, 0.012), K, g, { pos: [0, 0.05, 0.03], rot: [-0.5, 0, 0] });
+    mesh(new THREE.BoxGeometry(0.052, 0.1, 0.004), COMIC.teals[3], g, { pos: [0, 0.052, 0.024], rot: [-0.5, 0, 0] });
+  } else if (kind === 'coffee') {
+    mesh(new THREE.CylinderGeometry(0.042, 0.034, 0.12, 7), W, g, { pos: [0, 0.05, 0.04] });
+    mesh(new THREE.CylinderGeometry(0.043, 0.04, 0.045, 7), COMIC.warm[1], g, { pos: [0, 0.04, 0.04] });
+    mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.016, 7), K, g, { pos: [0, 0.115, 0.04] });
+  } else if (kind === 'icecream') {
+    const cone = new THREE.ConeGeometry(0.042, 0.13, 6); cone.rotateX(Math.PI);
+    mesh(cone, COMIC.warm[2], g, { pos: [0, 0.04, 0.04] });
+    mesh(new THREE.SphereGeometry(0.05, 6, 5), col, g, { pos: [0, 0.12, 0.04] });
+    mesh(new THREE.SphereGeometry(0.04, 6, 5), COMIC.warm[4], g, { pos: [0, 0.18, 0.04] });
+  } else if (kind === 'balloon') {
+    mesh(new THREE.BoxGeometry(0.006, 0.9, 0.006), K, g, { pos: [0, 0.45, 0] });
+    const b = group(g, 0, 1.06, 0); b.name = 'balloon';
+    mesh(new THREE.SphereGeometry(0.17, 8, 6), col, b, { scale: [1, 1.2, 1] });
+    mesh(new THREE.ConeGeometry(0.03, 0.04, 4), col, b, { pos: [0, -0.21, 0], rot: [Math.PI, 0, 0] });
+  } else if (kind === 'briefcase') {
+    mesh(new THREE.BoxGeometry(0.09, 0.27, 0.36), col, g, { pos: [0, -0.18, 0] });
+    mesh(new THREE.BoxGeometry(0.095, 0.02, 0.37), K, g, { pos: [0, -0.1, 0] });
+    mesh(new THREE.TorusGeometry(0.04, 0.008, 3, 6, Math.PI), K, g, { pos: [0, -0.045, 0], rot: [0, Math.PI / 2, 0] });
+  } else if (kind === 'shopping') {
+    mesh(new THREE.BoxGeometry(0.12, 0.28, 0.25), col, g, { pos: [0, -0.22, 0] });
+    mesh(new THREE.BoxGeometry(0.125, 0.06, 0.255), W, g, { pos: [0, -0.14, 0] });
+    for (const z of [-0.05, 0.05]) mesh(new THREE.TorusGeometry(0.05, 0.006, 3, 6, Math.PI), K, g, { pos: [0, -0.08, z], rot: [0, Math.PI / 2, 0] });
+    mesh(new THREE.BoxGeometry(0.04, 0.12, 0.04), COMIC.teals[2], g, { pos: [0, -0.05, -0.06] });   // a baguette-ish leek poking out
+  } else if (kind === 'boombox') {
+    const b = group(g, -0.02, 0.1, 0); b.name = 'box';
+    mesh(new THREE.BoxGeometry(0.12, 0.2, 0.38), col, b);
+    for (const z of [-0.1, 0.1]) {
+      mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.02, 8), K, b, { pos: [0.06, 0, z], rot: [0, 0, Math.PI / 2] });
+      mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.024, 6), PALETTE.slate, b, { pos: [0.065, 0, z], rot: [0, 0, Math.PI / 2] });
+    }
+    mesh(new THREE.BoxGeometry(0.02, 0.02, 0.3), K, b, { pos: [0, 0.12, 0] });
+  } else if (kind === 'flowers') {
+    const paper = new THREE.ConeGeometry(0.07, 0.24, 6); paper.rotateX(Math.PI);
+    mesh(paper, W, g, { pos: [0, 0.06, 0.04] });
+    const B = [COMIC.pinks[1], COMIC.yellows[1], col, COMIC.pinks[3], COMIC.blues[2]];
+    B.forEach((c, i) => { const a = i / B.length * Math.PI * 2; mesh(new THREE.IcosahedronGeometry(0.04, 0), c, g, { pos: [Math.cos(a) * 0.05, 0.22 + (i % 2) * 0.03, 0.04 + Math.sin(a) * 0.05] }); });
+    mesh(new THREE.IcosahedronGeometry(0.02, 0), COMIC.teals[1], g, { pos: [0, 0.19, 0.11] });
+  } else if (kind === 'baguette') {
+    mesh(limb(0.035, 0.03, 0.62, 6, 0.31), COMIC.yellows[0], g, { pos: [0, -0.02, 0.03], rot: [1.25, 0, 0] });
+    for (const t of [-0.15, 0, 0.15]) mesh(new THREE.BoxGeometry(0.02, 0.004, 0.06), COMIC.yellows[3], g, { pos: [0, 0.012 + t * 0.32, 0.03 + t * 0.95], rot: [1.25, 0, 0.5] });
+  }
+  return g;
+}
+function guitarModel(col) {
+  const g = new THREE.Group(); g.name = 'guitar';
+  const disc = (r, y, c, z = 0, h = 0.07) => mesh(new THREE.CylinderGeometry(r, r, h, 9), c, g, { pos: [0, y, z], rot: [Math.PI / 2, 0, 0] });
+  disc(0.15, 0, col); disc(0.115, 0.15, col);
+  disc(0.045, 0.1, PALETTE.black, 0.036, 0.004);
+  mesh(new THREE.BoxGeometry(0.05, 0.44, 0.03), COMIC.warm[0], g, { pos: [0, 0.4, 0.01] });
+  mesh(new THREE.BoxGeometry(0.07, 0.1, 0.03), PALETTE.black, g, { pos: [0, 0.66, 0.01] });
+  mesh(new THREE.BoxGeometry(0.08, 0.02, 0.02), PALETTE.black, g, { pos: [0, -0.06, 0.04] });   // bridge
+  return g;
+}
+function dogModel(col) {
+  const g = new THREE.Group(); g.name = 'dog';
+  const K = PALETTE.black, dark = col === PALETTE.black ? PALETTE.slate : COMIC.warm[0];
+  const body = group(g, 0, 0.2, 0); body.name = 'dogBody';
+  mesh(new THREE.BoxGeometry(0.16, 0.13, 0.32), col, body);
+  const head = group(body, 0, 0.09, 0.19); head.name = 'dogHead';
+  mesh(new THREE.BoxGeometry(0.14, 0.12, 0.13), col, head);
+  mesh(new THREE.BoxGeometry(0.08, 0.06, 0.08), col, head, { pos: [0, -0.02, 0.09] });
+  mesh(new THREE.BoxGeometry(0.03, 0.025, 0.02), K, head, { pos: [0, 0, 0.135] });
+  for (const sx of [-1, 1]) {
+    mesh(new THREE.BoxGeometry(0.04, 0.08, 0.03), dark, head, { pos: [sx * 0.07, 0.06, -0.02], rot: [0, 0, sx * 0.3] });
+    mesh(new THREE.BoxGeometry(0.018, 0.018, 0.01), K, head, { pos: [sx * 0.035, 0.025, 0.066] });
+  }
+  mesh(new THREE.BoxGeometry(0.17, 0.03, 0.04), COMIC.pinks[1], body, { pos: [0, 0.05, 0.13] });   // collar
+  const tail = group(body, 0, 0.05, -0.16); tail.name = 'dogTail';
+  mesh(new THREE.BoxGeometry(0.03, 0.03, 0.12), dark, tail, { pos: [0, 0.03, -0.05], rot: [0.6, 0, 0] });
+  g.userData.legs = [];
+  for (const [x, z] of [[-0.05, 0.11], [0.05, 0.11], [-0.05, -0.11], [0.05, -0.11]]) {
+    const L = group(g, x, 0.16, z); mesh(new THREE.BoxGeometry(0.04, 0.16, 0.04), col, L, { pos: [0, -0.08, 0] }); g.userData.legs.push(L);
+  }
+  g.userData.body = body; g.userData.tail = tail; g.userData.head = head;
+  return g;
+}
+// left-arm poses per held item (body space; x+ = left side, z+ = forward)
+const HELD_POSE = {
+  umbrella: { w: [0.21, 1.4, 0.24], e: [0.44, 1.28, -0.05] },
+  phone: { w: [0.09, 1.56, 0.3], e: [0.36, 1.3, 0.02], f: -0.4 },
+  coffee: { w: [0.16, 1.24, 0.28], e: [0.38, 1.2, -0.05] },
+  icecream: { w: [0.15, 1.3, 0.28], e: [0.38, 1.2, -0.05] },
+  balloon: { w: [0.27, 1.22, 0.16], e: [0.45, 1.3, -0.1] },
+  flowers: { w: [0.14, 1.22, 0.3], e: [0.38, 1.2, -0.05] },
+  boombox: { w: [0.27, 1.86, 0.03], e: [0.46, 1.58, -0.1] },
+  football: { w: [0.16, 1.1, 0.3], e: [0.4, 1.16, -0.1], idleOnly: true },
+};
+const _hp = new THREE.Vector3(), _hq = new THREE.Vector3();
+
+export function createCustom(input = {}) {
+  const d = normalizeCustom(input);
+  const shape = SHAPES[d.body];
+  const cfg = { name: 'custom', custom: true, skin: d.skin, line: SKIN_LINE(d.skin), outfit: 'custom', hair: d.hair, hairColor: d.hairColor,
+    height: d.height, build: { skinny: 0.82, average: 1, fat: 1.35, muscle: 1.25 }[d.body], shape, seed: d.id || d.name, def: d,
+    accessories: d.acc.bag ? ['bag'] : [] };
+  const P = buildBody(cfg), T = P.torso;
+  customBottom(P, d, T);
+  customTop(P, d, T);
+  const fill = d.bottom === 'dress' && !LAYER_TOPS.includes(d.top) ? d.bottomColor : d.top === 'none' ? d.skin : d.top === 'coat' || d.top === 'blazer' || d.top === 'cardigan' ? d.innerColor : d.topColor;
+  if (d.body === 'fat') mesh(new THREE.SphereGeometry(0.17, 8, 6), fill, T, { pos: [0, 1.1, 0.045], scale: [1.02, 0.95, 1.05] });   // belly
+  if (d.body === 'muscle') {
+    for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.13, 0.11, 0.05), fill, T, { pos: [sx * 0.072, 1.46, 0.105], rot: [0.12, 0, sx * -0.1] });   // pecs
+    for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.08, 0.05, 0.14), d.top === 'none' || d.top === 'tank' ? d.skin : fill, T, { pos: [sx * 0.1, 1.66, -0.01], rot: [0, 0, sx * -0.45] });   // traps
+  }
+  buildHair(P.headCenter, d.hair, d.hairColor, PALETTE.npcLine, mulberry32(String(cfg.seed) + d.hair));
+  if (d.hat !== 'none') buildHat(P.headCenter, d.hat, d.hatColor, d.hatColor === PALETTE.slate ? PALETTE.black : PALETTE.slate);
+  customFace(P, d);
+  if (d.acc.bag) {   // cross-body bag at the left hip
+    const zf = 0.155 * shape.tz + (d.body === 'fat' ? 0.06 : 0);
+    mesh(new THREE.BoxGeometry(0.03, 0.66, 0.014), PALETTE.slate, T, { pos: [0.01, 1.3, zf], rot: [0.05, 0, 0.62] });
+    mesh(new THREE.BoxGeometry(0.03, 0.62, 0.014), PALETTE.slate, T, { pos: [0.01, 1.3, -0.15 * shape.tz], rot: [-0.05, 0, 0.62] });
+    mesh(new THREE.BoxGeometry(0.07, 0.17, 0.2), d.accColor, T, { pos: [0.205, 1.0, 0.04] });
+    mesh(new THREE.BoxGeometry(0.075, 0.06, 0.205), PALETTE.slate, T, { pos: [0.206, 1.06, 0.04] });
+  }
+  // held item / guitar / dog
+  const held = d.held, zF = 0.1 * (shape.tz - 1) + (d.body === 'fat' ? 0.07 : 0) + (d.body === 'muscle' ? 0.04 : 0);
+  let item = null, guitar = null, dog = null, leash = null;
+  if (held === 'guitar') {
+    const gr = group(P.body); gr.name = 'guitarRoot';
+    guitar = guitarModel(d.heldColor); gr.add(guitar);
+    guitar.position.set(-0.06, 1.12, 0.21 + zF); guitar.rotation.z = -0.9;
+  } else if (held === 'dog') {
+    dog = dogModel(d.heldColor); P.root.add(dog); dog.position.set(0.55, 0, 0.5);
+    leash = mesh(new THREE.BoxGeometry(0.008, 0.008, 1), PALETTE.black, P.root);
+  } else if (held !== 'none') { item = heldModel(held, d.heldColor); P.body.add(item); }
+  const ch = new Character(P, cfg);
+  ch.def = d; ch.heldItem = item; ch.guitar = guitar; ch.dog = dog;
+  const pose = HELD_POSE[held];
+  ch.hold = (c) => {
+    if (c._kd || (c._dance && c._danceW >= 0.999)) return;
+    const ty = c.parts.torso.rotation.y, idle = c.walk < 0.25 && c.air < 0.5, t = c.t;
+    c._idleProp = idle;
+    if (guitar) {
+      guitar.parent.rotation.y = ty;
+      c._armIK('L', [0.33, 1.43, 0.25 + zF], [0.5, 1.2, -0.05], 0.3, 0, ty);
+      if (idle && !c.slapping) {   // strum
+        const s = Math.sin(t * 13);
+        c._armIK('R', [-0.04, 1.15 + 0.055 * s, 0.28 + zF], [-0.42, 1.2, -0.05], -0.3, -0.3 * s, ty);
+        c.parts.head.rotation.x += 0.08 * Math.max(0, Math.sin(t * 6.5));
+      }
+      return;
+    }
+    if (dog) return;
+    if (!pose || (pose.idleOnly && !idle)) return;
+    let w = pose.w;
+    if (held === 'football') { const k = Math.abs(Math.sin(t * 3.4)); w = [w[0], w[1] - 0.06 * (1 - k), w[2]]; }
+    if (held === 'coffee' && t % 6 > 4.8) w = [0.06, 1.62, 0.22];   // a sip
+    if (held === 'icecream' && t % 5 > 3.9) w = [0.05, 1.6, 0.22];   // a lick
+    c._armIK('L', [w[0], w[1], w[2] + zF], pose.e, 0, pose.f || 0, ty);
+    if (held === 'boombox' && idle) {   // bob to the beat
+      const b = Math.abs(Math.sin(t * 7));
+      c.parts.head.rotation.x += 0.16 * b - 0.05; c.parts.body.position.y -= 0.025 * b * c.h;
+    }
+    if (held === 'phone') c.parts.head.rotation.x += 0.28;
+  };
+  ch.prop = (c) => {
+    const P = c.parts, t = c.t;
+    if (item) {
+      P.wristL.updateWorldMatrix(true, false);
+      P.wristL.localToWorld(_hp.set(0, -0.1, 0.02)); P.body.worldToLocal(_hp);
+      item.position.copy(_hp); item.rotation.set(0, P.torso.rotation.y, 0);
+      if (held === 'football') {
+        const ball = item.getObjectByName('ball');
+        const up = c._idleProp && !c._dance ? 0.08 + 0.42 * Math.abs(Math.sin(t * 3.4)) : -0.02;
+        ball.position.set(c._idleProp ? 0 : 0.06, up, 0); ball.rotation.x = t * (c._idleProp ? 7 : 2);
+      } else if (held === 'balloon') {
+        const b = item.getObjectByName('balloon'); b.position.x = 0.05 * Math.sin(t * 1.3); b.position.y = 1.06 + 0.03 * Math.sin(t * 2.1);
+      } else if (held === 'baguette' || held === 'skateboard' || held === 'briefcase' || held === 'shopping') {
+        item.rotation.x = 0.15 * Math.sin(t * 2) * c.walk;
+      }
+    }
+    if (dog) {
+      const sp = c.walk, ph = c.phase * Math.PI * 4;
+      dog.userData.legs.forEach((L, i) => { L.rotation.x = sp > 0.05 ? 0.7 * Math.sin(ph + (i % 3 ? Math.PI : 0)) * sp : 0; });
+      dog.userData.body.position.y = 0.2 + (sp > 0.05 ? 0.02 * Math.abs(Math.sin(ph)) : 0);
+      dog.userData.tail.rotation.y = 0.6 * Math.sin(t * (sp > 0.05 ? 9 : 14));
+      dog.userData.head.rotation.x = sp > 0.05 ? 0 : 0.12 * Math.sin(t * 1.7);
+      dog.position.x = 0.55 + (sp > 0.05 ? 0 : 0.06 * Math.sin(t * 0.7)); dog.position.z = 0.5 + 0.12 * sp;
+      P.wristL.updateWorldMatrix(true, false);
+      P.wristL.localToWorld(_hp.set(0, -0.12, 0.02)); c.root.worldToLocal(_hp);
+      _hq.set(dog.position.x, 0.29, dog.position.z + 0.14);
+      leash.position.copy(_hp).add(_hq).multiplyScalar(0.5);
+      leash.scale.set(1, 1, _hp.distanceTo(_hq)); leash.lookAt(c.root.localToWorld(_hq.clone()));
+    }
+  };
+  ch.update(0, 0);
+  return ch;
+}

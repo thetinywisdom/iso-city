@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Iso City — Character Creator</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="creator.css" />
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <header>
+    <h1>CHARACTER CREATOR</h1>
+    <a class="pbtn" href="index.html" target="isoCityGame" id="toCity">◀ CITY</a>
+  </header>
+  <main>
+    <section id="stage">
+      <div id="preview"></div>
+      <div class="row center" id="previewBtns">
+        <button class="pbtn sm" id="pvSpin" aria-pressed="true">SPIN</button>
+        <button class="pbtn sm" id="pvWalk" aria-pressed="false">WALK</button>
+        <button class="pbtn sm" id="pvDance">DANCE</button>
+      </div>
+      <div class="row center">
+        <button class="pbtn yellow" id="btnSave">SAVE</button>
+        <button class="pbtn" id="btnCopy">SAVE AS COPY</button>
+        <button class="pbtn pink" id="btnRandom">RANDOMIZE</button>
+        <button class="pbtn" id="btnNew">NEW</button>
+      </div>
+      <p id="status" role="status"></p>
+      <h2>SAVED <span id="count"></span></h2>
+      <ul id="saved"></ul>
+      <div class="row center">
+        <button class="pbtn sm" id="btnExport">EXPORT JSON</button>
+        <label class="pbtn sm" for="importFile">IMPORT JSON</label>
+        <input type="file" id="importFile" accept="application/json,.json" hidden />
+      </div>
+      <p class="note">Saved in this browser (localStorage). Saved characters walk around the city right away — talk to them, slap them, dance with them.</p>
+    </section>
+    <section id="form"></section>
+  </main>
+  <script type="module" src="src/creator.js"></script>
+</body>
+</html>

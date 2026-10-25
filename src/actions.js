@@ -114,7 +114,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (n.c.dancing) n.c.stopDance(0.1);
     if (n.mode) n.mode = null;                       // even someone fleeing stops for a dance battle
     n.talkT = 1.4; n.talkTo = player.position;        // stop and size up the challenger
-    const theirs = SIGNATURE[n.special] || pick(SILLY.filter((d) => d !== myDance));
+    const theirs = n.danceStyle || SIGNATURE[n.special] || pick(SILLY.filter((d) => d !== myDance));
     const center = new THREE.Vector3().copy(player.position).lerp(n.root.position, 0.5);
     const crowd = crowdAt(center, n);
     const big = crowd.length >= CROWD_MIN;           // enough people around: the street ALWAYS joins in
@@ -181,7 +181,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   const ring = new THREE.Mesh(new THREE.RingGeometry(PARTY_R - 0.18, PARTY_R, 72, 1),
     new THREE.MeshBasicMaterial({ color: '#FFCC3F', transparent: true, opacity: 0, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2; ring.renderOrder = 1; ring.visible = false; scene.add(ring);
-  const danceFor = (o) => SIGNATURE[o.special] || pick(SILLY);
+  const danceFor = (o) => o.danceStyle || SIGNATURE[o.special] || pick(SILLY);
   function startParty(n, crew, center, dur) {
     if (P) endParty(true);
     P = { n, center: center.clone(), t: dur, T: dur, crew: new Set([n]), spect: new Set(), watch: new Set(), clapT: 0, wooT: 1.2 };
