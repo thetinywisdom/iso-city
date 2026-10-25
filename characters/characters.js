@@ -1199,7 +1199,7 @@ export function createSyoya(opts = {}) {
   const capG = group(P.headCenter); capG.rotation.y = Math.PI;                                  // cap worn backward
   buildHat(capG, 'cap', WHITE, WHITE);
   mesh(new THREE.BoxGeometry(0.06, 0.035, 0.012), C.black, capG, { pos: [0, 0.075, -0.112], rot: [0.35, 0, 0] });   // strap opening: hair showing at the forehead
-  const ch = new Character(P, cfg);
+  const ch = new Character(P, cfg); ch.cap = capG;
   // the ring: rests at the left hip under the hand; spins round the waist while dancing
   const ring = watermelonRing(); P.root.add(ring); ch.ring = ring;
   ring.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -1221,8 +1221,37 @@ export function createSyoya(opts = {}) {
   ch.triangles += 0; let t2 = 0; ring.traverse((o) => { if (o.isMesh) t2 += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; }); ch.ringTriangles = t2;
   return ch;
 }
+// Mission giver: shady guy in a trench coat, beanie and sunglasses (blue-grey NPC base)
+export function createGiver(opts = {}) {
+  const C = PALETTE;
+  const ch = createNPC({ seed: 4711, outfit: 'coat', hair: 'buzz', hairColor: C.black, glasses: false, hat: 'beanie', hatColor: C.black,
+    colors: { top: COMIC.warm[1], inner: C.black, bottom: C.black, shoe: C.black, accent: C.slate, shorts: false },
+    accessories: [], height: 1.0, build: 1.04, ...opts, name: 'giver', special: 'giver' });
+  const hc = ch.parts.headCenter;
+  for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.072, 0.042, 0.014), C.black, hc, { pos: [sx * 0.045, 0.02, 0.124] });   // shades
+  mesh(new THREE.BoxGeometry(0.2, 0.012, 0.012), C.black, hc, { pos: [0, 0.035, 0.126] });
+  for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.006, 0.008, 0.12), C.black, hc, { pos: [sx * 0.1, 0.03, 0.065], rot: [0, sx * -0.25, 0] });
+  // popped collar
+  for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.09, 0.1, 0.02), COMIC.warm[1], ch.parts.torso, { pos: [sx * 0.07, 1.72, 0.03], rot: [0.2, sx * 0.5, 0] });
+  ch.update(0, 0);
+  return ch;
+}
+// The bully: big, angry brows, hot-pink tank top
+export function createBully(opts = {}) {
+  const C = PALETTE;
+  const ch = createNPC({ seed: 666, outfit: 'tank', hair: 'buzz', hairColor: C.black, glasses: false, hat: 'none',
+    colors: { top: COMIC.pinks[1], inner: COMIC.pinks[1], bottom: C.black, shoe: C.white, accent: C.black, shorts: true },
+    accessories: [], height: 1.1, build: 1.42, ...opts, name: 'bully', special: 'bully' });
+  const hc = ch.parts.headCenter;
+  for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(0.07, 0.022, 0.016), C.black, hc, { pos: [sx * 0.047, 0.058, 0.124], rot: [0, 0, sx * 0.5] });   // angry brows
+  ch.update(0, 0);
+  return ch;
+}
+
 export const SPECIALS = {
   mbappe: { create: createMbappe, tag: 'MBAPPÉ', dance: 'mbappe', icon: 'note' },
   syoya: { create: createSyoya, tag: 'SYOYA', dance: 'hula', icon: 'heart' },
+  giver: { create: createGiver, tag: '???', dance: null, role: 'giver' },
+  bully: { create: createBully, tag: 'BULLY', dance: null, role: 'bully', temper: 'aggressive' },
 };
 export function createSpecial(key, opts) { return SPECIALS[key].create(opts); }

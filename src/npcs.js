@@ -28,6 +28,8 @@ const IDLERS = [
 const SPECIAL_SPOTS = [
   { key: 'mbappe', pos: [-8.5, 2.2], face: [-5.5, 5.0], ball: [0.14, 0.42] },    // quiet west arm of the spawn crossing: clear sightline, kit reads on dark asphalt
   { key: 'syoya', pos: [-14.3, 23.5], face: [-11.3, 26.3] },                       // park lawn left of the front path, out of the blossom tree's shade
+  { key: 'giver', pos: [5.6, -9.7], face: [2.0, -6.0] },                            // mission giver: lurking by the peach building
+  { key: 'bully', pos: [-5.5, -9.8], face: [-2.0, -6.0] },                          // the bully: west sidewalk, in plain view of spawn
 ];
 export const NPC_RADIUS = 0.35;
 // ---- slap reactions (tuning) ----
@@ -78,15 +80,15 @@ export class NPCs {
     if (charMod.createSpecial) for (const s of SPECIAL_SPOTS) {
       const n = this._wrap(charMod.createSpecial(s.key), 0);
       const sp = charMod.SPECIALS[s.key];
-      Object.assign(n, { special: s.key, tag: sp.tag, danceName: sp.dance, icon: sp.icon, temper: 'timid', walker: false, idleT: 0 });
+      Object.assign(n, { special: s.key, tag: sp.tag, danceName: sp.dance, icon: sp.icon, role: sp.role || null, temper: sp.temper || 'timid', walker: false, idleT: 0 });
       n.root.position.set(s.pos[0], 0, s.pos[1]);
       n.heading = n.root.rotation.y = Math.atan2(s.face[0] - s.pos[0], s.face[1] - s.pos[1]);
       n.home = { x: s.pos[0], z: s.pos[1], heading: n.heading };
       if (s.ball) {   // a football resting at his feet (stays put in the world)
-        const b = football(), h = n.heading;
+        const b = football(), h = n.heading; b.name = 'football';
         b.position.set(s.pos[0] + Math.sin(h) * s.ball[1] + Math.cos(h) * s.ball[0], 0, s.pos[1] + Math.cos(h) * s.ball[1] - Math.sin(h) * s.ball[0]);
         b.position.y = city.groundHeight(b.position.x, b.position.z) + 0.11;
-        this.group.add(b); n.ball = b;
+        this.group.add(b); n.ball = b; n.ballHome = b.position.clone();
       }
       this.list.push(n);
     }
@@ -125,7 +127,22 @@ export class NPCs {
   // Ignored while an NPC is angry / scared (they keep chasing / fleeing).
   talk(n, secs, playerPos) { if (n.mode) return; n.talkT = secs; n.talkTo = playerPos; }
   endTalk(n) { n.talkT = 0; }
-  _shout(n, key) { this.onShout?.(n, SHOUTS[key]); }
+  _shout(n, key) { const c = n.chaseCfg; this.onShout?.(n, (c && c[key]) || SHOUTS[key]); }
+  // ---- mission hooks: tiny event bus (slap, hitPlayer, caught) ----
+  on(evt, fn) { (this._ev ||= {})[evt] = ((this._ev[evt]) || []).concat(fn); return () => { this._ev[evt] = this._ev[evt].filter((f) => f !== fn); }; }
+  emit(evt, ...a) { for (const f of (this._ev?.[evt] || [])) f(...a); }
+  /** Make an NPC chase the player right now. cfg: {speed, accel, react, noGiveUp, catch, chase, giveUp} (shout overrides). */
+  forceChase(n, cfg = {}) {
+    if (n.c.dancing) n.c.stopDance(0.12);
+    n.chaseCfg = cfg; n.talkT = 0;
+    n.mode = 'react'; n.modeT = cfg.react ?? TUNE.reactDelay; n.chaseT = 0; n.chaseV = 0;
+  }
+  /** Calm an NPC down: stop chasing/fleeing and walk back to their route/spot. */
+  calm(n, standFor = 0.6) {
+    n.chaseCfg = null; n.pendingHit = -1;
+    if (!n.mode && !n.stagger) return;
+    n.stagger = null; n.mode = 'return'; n.modeT = standFor; n.target = this._nearestWaypoint(n);
+  }
 
   /** The player's hand connected. `from` = player position. */
   slapped(n, from) {
@@ -143,6 +160,7 @@ export class NPCs {
       n.mode = 'flee'; n.modeT = TUNE.fleeTime[0] + Math.random() * (TUNE.fleeTime[1] - TUNE.fleeTime[0]);
       this._shout(n, 'help');
     }
+    this.emit('slap', n);
   }
 
   // ---- collision for NPCs that leave their lane (reuses the city colliders) ----
@@ -191,7 +209,7 @@ export class NPCs {
     // the hand of an NPC slap connects a moment after the swing starts
     if (n.pendingHit >= 0) {
       n.pendingHit -= dt;
-      if (n.pendingHit < 0 && dist < TUNE.reach + 0.45) this.onSlapPlayer?.(n);
+      if (n.pendingHit < 0 && dist < TUNE.reach + 0.45) { this.onSlapPlayer?.(n); this.emit('hitPlayer', n); }
     }
     if (n.stagger) {                         // knocked back a step
       n.chaseV = 0;
@@ -201,7 +219,12 @@ export class NPCs {
       return 0;
     }
     const faceP = () => { n.targetHeading = Math.atan2(dx, dz); };
+    const cc = n.chaseCfg || {};
     const trySlap = () => {
+      if (cc.catch) {                        // grabs instead of slapping (e.g. Mbappé taking his ball back)
+        if (dist < TUNE.reach * 0.9) { this.emit('caught', n); return true; }
+        return false;
+      }
       if (dist < TUNE.reach && n.cooldown <= 0 && !n.c.slapping) {
         n.c.slap(); n.pendingHit = this.slapHit; n.cooldown = TUNE.chaseCooldown;
         return true;
@@ -220,9 +243,9 @@ export class NPCs {
       n.chaseT += dt; n.shoutT -= dt;
       faceP();
       if (n.shoutT <= 0) { this._shout(n, 'chase'); n.shoutT = TUNE.shoutEvery; }
-      if (dist > TUNE.giveUpDist || n.chaseT > TUNE.giveUpTime) {
+      if (!cc.noGiveUp && (dist > TUNE.giveUpDist || n.chaseT > TUNE.giveUpTime)) {
         this._shout(n, 'giveUp');
-        n.mode = 'return'; n.modeT = 1.4;   // stand and yell first
+        n.mode = 'return'; n.modeT = 1.4; n.chaseCfg = null;   // stand and yell first
         n.target = this._nearestWaypoint(n);
         return 0;
       }
@@ -233,7 +256,7 @@ export class NPCs {
       const [sx, sz] = this._steer(n, dx / dist, dz / dist);
       n.targetHeading = Math.atan2(sx, sz);
       // ramp up (gives a slapped player a head start to break away)
-      n.chaseV = Math.min(TUNE.chaseSpeed, (n.chaseV || 0) + TUNE.chaseAccel * dt);
+      n.chaseV = Math.min(cc.speed ?? TUNE.chaseSpeed, (n.chaseV || 0) + (cc.accel ?? TUNE.chaseAccel) * dt);
       const step = Math.min(n.chaseV * dt, dist - stopAt);
       this._move(p, sx * step, sz * step);
       return n.chaseV;

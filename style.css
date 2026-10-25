@@ -86,3 +86,46 @@ canvas { image-rendering: pixelated; }
   -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
   box-shadow: 0 3px 0 0 #5B6A7B;
 }
+
+/* ---- missions: HUD, banner, offer panel, giver marker, off-screen arrow ---------- */
+#missions { position: fixed; inset: 0; pointer-events: none; z-index: 7; font-family: 'PressStart2P', ui-monospace, monospace;
+  -webkit-font-smoothing: none; font-smooth: never; }
+#missions canvas { image-rendering: pixelated; vertical-align: top; }
+#mission-hud { position: absolute; left: 15px; top: 15px; color: #F0F2F4; background: #292C2E; padding: 9px 12px 6px;
+  box-shadow: 0 6px 0 0 #5B6A7B; max-width: 60vw; }
+#mission-hud > div { font-size: 16px; line-height: 16px; margin-bottom: 6px; white-space: nowrap; }
+#mission-hud .mh-stars { color: #FFCC3F; }
+#mission-hud .mh-stars canvas { margin-top: -2px; }
+#mission-hud .mh-title { color: #FF5491; }
+#mission-hud .mh-timer { color: #FFCC3F; }
+#mission-hud .mh-timer.low { color: #FF5491; }
+#mission-hud .mh-line { font-size: 16px; line-height: 16px; color: #F0F2F4; }
+#mission-hud .mh-line.off { color: #5B6A7B; }
+#mission-toast { position: absolute; left: 50%; top: 18%; translate: -50% 0; display: none; font-size: 16px; line-height: 16px;
+  color: #292C2E; background: #FFCC3F; padding: 6px 9px; box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E;
+  animation: bubble-pop .22s steps(4, end) backwards; white-space: nowrap; }
+#mission-banner { position: absolute; left: 50%; top: 30%; translate: -50% 0; display: none; text-align: center; pointer-events: auto;
+  background: #292C2E; color: #F0F2F4; padding: 15px 18px 12px; box-shadow: 0 -3px 0 0 #F0F2F4, 0 3px 0 0 #F0F2F4, -3px 0 0 0 #F0F2F4, 3px 0 0 0 #F0F2F4, 0 9px 0 0 #5B6A7B;
+  animation: bubble-pop .22s steps(4, end) backwards; }
+#mission-banner .mb-head { font-size: 24px; line-height: 30px; color: #FFCC3F; white-space: nowrap; }
+#mission-banner.bad .mb-head { color: #FF5491; animation: shout-shake .2s steps(2, end) 4; }
+#mission-banner .mb-line { font-size: 16px; line-height: 16px; margin-top: 12px; white-space: nowrap; }
+#mission-banner .mb-sub { font-size: 16px; line-height: 16px; margin-top: 12px; color: #B6C2CA; }
+#mission-offer { position: absolute; left: 50%; bottom: 36px; translate: -50% 0; display: none; pointer-events: auto; max-width: 92vw; width: max-content;
+  color: #292C2E; background: #F0F2F4; padding: 12px 15px 9px;
+  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E, 0 9px 0 0 #5B6A7B;
+  animation: bubble-pop .22s steps(4, end) backwards; }
+#mission-offer > div { margin-bottom: 12px; white-space: normal; }
+#mission-offer .mo-line { font-size: 16px; line-height: 24px; color: #A92D59; }
+#mission-offer .mo-title { font-size: 16px; line-height: 16px; color: #292C2E; background: #FFCC3F; display: inline-block; padding: 3px 6px; }
+#mission-offer .mo-title canvas { margin-left: 6px; }
+#mission-offer .mo-goal { font-size: 16px; line-height: 24px; }
+#mission-offer .mo-row { display: flex; gap: 9px; margin: 12px 0 3px; }
+.mo-btn { font: 16px/16px 'PressStart2P', monospace; color: #F0F2F4; background: #5B6A7B; border: 0; padding: 6px 9px; cursor: pointer; white-space: nowrap;
+  box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E; -webkit-font-smoothing: none; }
+.mo-btn.mo-yes { background: #FF5491; }
+.mo-btn:hover { background: #292C2E; color: #FFCC3F; }
+.mission-mark { position: absolute; left: -9px; top: -48px; display: none; will-change: transform; }
+.mission-mark canvas { display: block; animation: mark-bob .8s steps(2, end) infinite; }
+@keyframes mark-bob { 0% { translate: 0 0; } 50% { translate: 0 -6px; } }
+#mission-arrow { position: absolute; left: 0; top: 0; width: 33px; height: 33px; display: none; image-rendering: pixelated; animation: mark-bob .6s steps(2, end) infinite; }

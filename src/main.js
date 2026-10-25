@@ -231,3 +231,4 @@ requestAnimationFrame(tick);
 // Expose a little debug handle (used by the headless smoke test).
 window.__game = { player, city, camera, renderer, keys, pixel, get npcs() { return npcs; }, setZoom: (z) => (zoom = z) };
 const extras = window.__game.extras = initExtras({ scene, camera, renderer, pixel, city, player, keys, getNPCs: () => npcs });
+window.__game.missions = extras.missions;

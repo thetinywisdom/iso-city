@@ -29,18 +29,20 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   }
 
   function say(npc) {
-    if (npc.special) {                      // easter-egg NPCs dance instead of talking
+    if (api.onClick?.(npc)) return;          // missions can take over a click (giver, quest NPCs)
+    if (npc.special && npc.danceName) {                      // easter-egg NPCs dance instead of talking
       if (npc.c.dancing || npc.mode) return;   // clicks mid-dance (or while scared) do nothing
       const secs = getNPCs().dance(npc, player.position);
       if (secs > 0) { showIcon(npc, npc.icon, secs * 1000 - 300); place(); }
       return;
     }
-    let line;
-    do line = LINES[Math.floor(Math.random() * LINES.length)]; while (line === npc.lastLine && LINES.length > 1);
+    let line = api.pickLine?.(npc) || null;   // missions may bias the line
+    if (!line) do line = LINES[Math.floor(Math.random() * LINES.length)]; while (line === npc.lastLine && LINES.length > 1);
     npc.lastLine = line;
     show(npc, line, SHOW_MS, false);
     getNPCs().talk(npc, SHOW_MS / 1000, player.position);
     place();
+    api.onLine?.(npc, line);
   }
   // Shout: bigger, red-bordered, shaking bubble. Does not stop the NPC.
   function shout(npc, text, ms = 1900) { show(npc, text, ms, true); place(); }
@@ -187,6 +189,6 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   const prev = scene.onBeforeRender;
   scene.onBeforeRender = (...a) => { prev.apply(scene, a); place(); };
   function clear(npc) { const b = bubbles.get(npc); if (b) { b.el.remove(); bubbles.delete(npc); } }
-  const api = { say, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n) { hoverNPC = n; tagEl.textContent = n ? n.tag : ''; tagEl.style.display = n ? 'block' : 'none'; if (n) tagEl.style.marginLeft = -Math.round(tagEl.offsetWidth / 2 / 3) * 3 + 'px'; }, onLongPress: null, get pressing() { return press; } };
+  const api = { say, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n) { hoverNPC = n; tagEl.textContent = n ? n.tag : ''; tagEl.style.display = n ? 'block' : 'none'; if (n) tagEl.style.marginLeft = -Math.round(tagEl.offsetWidth / 2 / 3) * 3 + 'px'; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false) => { show(n, t, ms, sh); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
   return api;
 }
