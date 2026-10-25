@@ -3,8 +3,8 @@
 // and dodges, a time machine (a black hole floating in the middle of the room), a bowl of bananas and (soon enough) Officer Dough.
 // Slap her (F) to stun her, push her (E) into the black hole. GIVE UP any time: ACCEPT FATE.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025m';
-import { box, sign } from './growth.js?v=20261025m';
+import { COMIC } from './palette.js?v=20261025n';
+import { box, sign } from './growth.js?v=20261025n';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 export const HOUSE = { x0: -28, x1: -21, z0: 8.5, z1: 14, door: { x: -24.5, z: 14.9, r: 1.1 } };
@@ -125,7 +125,7 @@ export function initFinale(ctx) {
     const points = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.13, vertexColors: true, transparent: true, depthWrite: false }));
     points.name = 'bh-points'; points.rotation.x = 0.42; g.add(points); noInk.add(points);
     // its shadow on the rug
-    const shadow = new THREE.Mesh(new THREE.CircleGeometry(BH.core * 1.3, 28), new THREE.MeshBasicMaterial({ color: K[0], transparent: true, opacity: 0.55, depthWrite: false }));
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(BH.core * 1.3, 28), new THREE.MeshBasicMaterial({ color: K[0], transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
     shadow.rotation.x = -Math.PI / 2; shadow.position.set(PAD.x, 0.035, PAD.z); room.add(shadow); noInk.add(shadow);
     bh = { g, core, disk, halo, lens, points, pts, diskMat, lensMat, shadow, pulse: 0 };
   }

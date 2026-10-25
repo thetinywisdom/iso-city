@@ -1,33 +1,35 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261025m';
+import { COMIC } from './palette.js?v=20261025n';
 
-// Contact ("blob") shadows that stay visible through occluders.
-// When a character walks behind a building its real (shadow-mapped) shadow is
-// hidden by the roof, so every tracked character also gets a flat pixel-ish
-// ellipse at its feet that is drawn AFTER the opaque world (renderOrder 0.5)
-// with depthTest off, but BEFORE the character's ghost (1) and body (2), so the
-// character always covers its own blob. Colours are exact palette entries, so
-// the pixel quantiser keeps them as-is: a #292C2E core with a #5B6A7B rim, which
-// reads on both the roofs (#363E47) and the road (#5B6A7B).
+// Contact ("blob") shadows: a flat ellipse at each tracked character's feet.
+// They live on the ground only: depth-tested against the world (so a character,
+// bin or prop standing in front of / on top of a blob fully hides it), never
+// write depth, sit just above the ground with a polygonOffset (no z-fighting),
+// and draw early in the transparent pass (renderOrder -1) at 50% opacity.
+// Core disc + non-overlapping rim ring, so the blob is one even 50% tone.
+// The group is in scene.userData.noInk, so it never touches the building ink.
 const CORE = COMIC.neutrals[0], RIM = COMIC.neutrals[2];
+export const SHADOW_OPACITY = 0.5;
 
 function blobMesh(r) {
   const g = new THREE.Group();
-  const mk = (rad, color, order) => {
-    const m = new THREE.Mesh(new THREE.CircleGeometry(rad, 10),
-      new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false, fog: false }));
-    m.rotation.x = -Math.PI / 2; m.renderOrder = order; m.castShadow = false; m.receiveShadow = false;
-    m.frustumCulled = false; m.userData.noToon = true;
+  const mat = (color) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: SHADOW_OPACITY,
+    depthTest: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+  const mk = (geo, color) => {
+    const m = new THREE.Mesh(geo, mat(color));
+    m.rotation.x = -Math.PI / 2; m.renderOrder = -1; m.castShadow = false; m.receiveShadow = false;
+    m.frustumCulled = false; m.userData.noToon = true; m.userData.blobShadow = true;
     return m;
   };
-  g.add(mk(r * 1.25, RIM, 0.5), mk(r, CORE, 0.6));
-
+  g.add(mk(new THREE.RingGeometry(r, r * 1.25, 10), RIM), mk(new THREE.CircleGeometry(r, 10), CORE));
   return g;
 }
 
 export class ContactShadows {
   constructor(scene, city) {
     this.city = city; this.items = []; this.group = new THREE.Group(); scene.add(this.group);
+    this.group.name = 'contact-shadows';
+    (scene.userData.noInk || (scene.userData.noInk = new Set())).add(this.group);
     // Re-position just before every render pass (after main.js has moved characters).
     const prev = scene.onBeforeRender;
     scene.onBeforeRender = (...args) => { prev.apply(scene, args); this.update(); };
@@ -42,7 +44,7 @@ export class ContactShadows {
     }
     for (const { obj, mesh } of this.items) {
       const p = obj.getWorldPosition ? obj.getWorldPosition(_v) : obj;
-      mesh.position.set(p.x, this.city.groundHeight(p.x, p.z) + 0.04, p.z);
+      mesh.position.set(p.x, this.city.groundHeight(p.x, p.z) + 0.03, p.z);
       mesh.visible = obj.visible !== false;
       mesh.updateMatrixWorld(true);
     }
