@@ -104,7 +104,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'BracketLeft') { pixel.setScale(pixel.scale - 1); showHud(); return; }
   if (e.code === 'BracketRight') { pixel.setScale(pixel.scale + 1); showHud(); return; }
   if (e.code === 'KeyP') { pixel.setEnabled(!pixel.enabled); showHud(); return; }
-  if (e.code === 'KeyB') { pixel.dither = !pixel.dither; showHud(); return; }
+  if (e.code === 'KeyI') { pixel.dither = !pixel.dither; showHud(); return; }
   if (e.code === 'KeyO') { pixel.outlines = !pixel.outlines; showHud(); return; }
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat && !(extras?.combat.stun > 0)) player.jump(); return; }
   const k = KEYMAP[e.code];

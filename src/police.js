@@ -59,7 +59,7 @@ export function initPolice({ scene, city, player, getNPCs, dialogue, combat, act
   }
   function giveUp() {
     state.mode = 'idle'; state.escapes++; state.lostT = 0; wanted.classList.remove('on');
-    if (cop && !cop.down) { dialogue.shout(cop, pick(L.giveUp), 2000); getNPCs().calm(cop, 1.2); }
+    if (cop) { dialogue.shout(cop, pick(L.giveUp), 2000); getNPCs().calm(cop, 1.2); }
   }
   function offence(victim, kind) {
     if (!cop || state.mode === 'over' || state.restarting) return;
@@ -108,11 +108,10 @@ export function initPolice({ scene, city, player, getNPCs, dialogue, combat, act
     wire(npcs); if (!cop) return;
     if (pendT > 0 && (pendT -= dt) <= 0) { pendT = -1; if (state.mode === 'idle') startChase(pick(L.coming)); }
     if (state.mode !== 'chase') return;
-    if (cop.down || cop.stagger) return;
-    if (cop.mode !== 'chase' && cop.mode !== 'react') { startChase(null); return; }   // knocked out of it: back at it
+    if (!cop.down && !cop.stagger && cop.mode !== 'chase' && cop.mode !== 'react') { startChase(null); return; }   // knocked out of it: back at it
     const cp = cop.root.position, pp = player.position, d = dist(cp, pp);
     const sees = d < TUNE.keepR && los(cp, pp);
-    state.lostT = sees ? 0 : state.lostT + dt;
+    state.lostT = cop.down ? state.lostT + dt * 0.6 : sees ? 0 : state.lostT + dt;   // flat on his back (banana!) you get a head start
     wanted.classList.toggle('losing', state.lostT > 0);
     if (state.lostT >= TUNE.loseAfter) giveUp();
   };

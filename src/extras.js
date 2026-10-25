@@ -7,6 +7,8 @@ import { initMissions } from './missions.js';
 import { initActions } from './actions.js';
 import { initChatter } from './chatter.js';
 import { initPolice } from './police.js';
+import { initBananas } from './bananas.js';
+import { initCats } from './cats.js';
 
 export function initExtras({ scene, camera, renderer, pixel, city, player, getNPCs, keys }) {
   const shadows = new ContactShadows(scene, city);
@@ -24,5 +26,7 @@ export function initExtras({ scene, camera, renderer, pixel, city, player, getNP
   const actions = initActions({ scene, camera, renderer, pixel, player, getNPCs, dialogue, combat, missions });
   const chatter = initChatter({ scene, player, getNPCs, dialogue });
   const police = initPolice({ scene, city, player, getNPCs, dialogue, combat, actions });
-  return { shadows, dialogue, combat, missions, actions, chatter, police };
+  const bananas = initBananas({ scene, city, player, getNPCs, dialogue, combat, missions, pixel });
+  const cats = initCats({ scene, city, player, getNPCs, dialogue, combat, actions, police, pixel });
+  return { shadows, dialogue, combat, missions, actions, chatter, police, bananas, cats };
 }

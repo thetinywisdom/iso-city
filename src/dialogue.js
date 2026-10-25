@@ -82,7 +82,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     bubbles.set(npc, b);
   }
   function hideAll() {   // closes chat bubbles; shouts keep going
-    for (const [n, b] of bubbles) { if (b.shout || b.icon) continue; b.el.remove(); getNPCs()?.endTalk(n); bubbles.delete(n); }
+    for (const [n, b] of bubbles) { if (b.shout || b.icon) continue; b.el.remove(); if (!n.cat) getNPCs()?.endTalk(n); bubbles.delete(n); }
   }
 
   // Short click/tap on an NPC = talk. Hold >= LONG_PRESS_MS = slap (api.onLongPress).
@@ -174,7 +174,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     const g = pixel && pixel.enabled ? pixel.scale : 1;
     for (const [npc, b] of bubbles) {
       if (now > b.until) { b.el.remove(); bubbles.delete(npc); continue; }
-      npc.root.getWorldPosition(head); head.y += 2.35;
+      npc.root.getWorldPosition(head); head.y += npc.bubbleY ?? 2.35;
       head.project(camera);
       const x = Math.round(((head.x + 1) / 2 * w) / g) * g;
       const y = Math.round(((1 - head.y) / 2 * h) / g) * g;

@@ -518,7 +518,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   };
 
   const api = {
-    list: MISSIONS, TUNING,
+    list: MISSIONS, TUNING, toast: (t) => g.toast(t),
     get active() { return active && { id: active.def.id, S: active.S }; },
     get save() { return save; },
     get offer() { return offer; },

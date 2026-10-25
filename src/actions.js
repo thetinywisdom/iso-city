@@ -39,11 +39,12 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   // ---- the menu ----
   const menu = document.createElement('div'); menu.id = 'npc-menu'; document.body.appendChild(menu);
   let open = null;
+  const hooks = {};                       // hooks.pickExtra(x, y) -> a non-NPC thing with its own menu (cats)
   const ITEMS = [['dance', 'DANCE-OFF'], ['push', 'PUSH'], ['slap', 'SLAP'], ['fart', 'FART']];
   function openMenu(npc) {
     menu.innerHTML = '';
     if (npc.tag) { const h = document.createElement('div'); h.className = 'nm-head'; h.textContent = npc.tag; menu.appendChild(h); }
-    const items = (npc.special === 'giver' ? [['mission', 'MISSION']] : []).concat(ITEMS);
+    const items = npc.menuItems || (npc.special === 'giver' ? [['mission', 'MISSION']] : []).concat(ITEMS);   // cats: just PET
     for (const [k, label] of items) {
       const b = document.createElement('button'); b.className = 'nm-item'; b.dataset.act = k; b.textContent = label;
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); });
@@ -69,7 +70,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   window.addEventListener('pointerdown', (e) => {
     if (open && !menu.contains(e.target)) closeMenu();        // a click anywhere else closes it (and still does its thing)
     if (e.target !== canvas || e.button !== 2) return;
-    const npc = dialogue.pick(e.clientX, e.clientY);
+    const npc = hooks.pickExtra?.(e.clientX, e.clientY) || dialogue.pick(e.clientX, e.clientY);   // cats first (pickExtra)
     if (!npc) return;                                          // right click on the ground: nothing
     e.stopImmediatePropagation(); e.preventDefault();
     dialogue.hideAll();
@@ -87,6 +88,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (!open) return;
     const n = open.npc; closeMenu();
     combat.audio.unlock();
+    if (n.onChoose) { n.onChoose(kind); return; }
     if (kind === 'mission') { missions.clickGiver(); return; }
     if (kind === 'slap') { combat.slap(n); return; }
     if (n.down && kind !== 'fart') { dialogue.show(n, '...', 1200); return; }
@@ -416,5 +418,5 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     }
   };
 
-  return { openMenu, closeMenu, choose, get open() { return open; }, menu, force, state, clouds, cloud, danceOff, push, fart, get party() { return P; }, get gathering() { return gathering; }, endParty, PARTY_R };
+  return { hooks, openMenu, closeMenu, choose, get open() { return open; }, menu, force, state, clouds, cloud, danceOff, push, fart, get party() { return P; }, get gathering() { return gathering; }, endParty, PARTY_R };
 }

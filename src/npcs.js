@@ -28,31 +28,31 @@ const IDLERS = [
 const WOMEN = [
   { seed: 1201, name: 'BRENDA', walk: { path: loop(33, 33, 7.15), start: 0, dir: -1, speed: 1.3, along: 0.5 },
     look: { outfit: 'dress', hair: 'ponytail', hairColor: '#292C2E', colors: { top: '#FF5491', accent: '#292C2E', shoe: '#292C2E' }, accessories: ['tote'], accColor: '#FFCC3F' },
-    lines: ['ew.', 'my husband is a cop. sort of.', 'not today, sweaty.', 'do i KNOW you?', 'move it, b*tch.'] },
+    role: 'spy', chatLines: ['i see EVERYTHING.', 'the landlady pays me in cookies.', 'writing that down...'], lines: ['ew.', 'my husband is a cop. sort of.', 'not today, sweaty.', 'do i KNOW you?', 'move it, b*tch.'] },
   { seed: 1202, name: 'TIFF', walk: { path: loop(33, 0), start: 1, dir: 1, speed: 1.25, along: 0.5 },
     look: { outfit: 'blouse', hair: 'longStraight', hairColor: '#93616B', glasses: false, hat: 'none', accessories: ['headphones'] },
-    lines: ['literally who are you', 'ugh. peasants.', "i'm on a call.", 'this is SO random', 'babe, no.'] },
+    plain: true },
   { seed: 1203, name: 'MRS. ITO', walk: { path: loop(0, 0), start: 1, dir: 1, speed: 1.1, along: 0.2 },
     look: { outfit: 'cardigan', hair: 'bob', hairColor: '#363E47', glasses: true, colors: { top: '#A7BFA4', inner: '#F0F2F4', bottom: '#363E47', shoe: '#292C2E' }, height: 0.94 },
-    lines: ['kids these days...', 'pull your pants up.', 'i knew your mother. sadly.', 'shoo. SHOO.'] },
+    plain: true },
   { seed: 1204, name: 'LINDA', pos: [15.2, -6.2], face: [13.4, -6.1],
     look: { outfit: 'apron', hair: 'bun', hairColor: '#363E47', glasses: false },
-    lines: ['i will speak to your MANAGER.', 'who raised you?', 'the bus is LATE again', 'step back, sweetie.'] },
+    plain: true },
   { seed: 1205, name: 'GRANDMA FUMIKO', pos: [-23.6, 23.5], face: [-24.4, 22.7],
     look: { outfit: 'cardigan', hair: 'bun', hairColor: '#F0F2F4', glasses: true, colors: { top: '#F8C0C5', inner: '#F0F2F4', bottom: '#292C2E', shoe: '#292C2E' }, height: 0.88, build: 0.95 },
-    lines: ["i'll hit you with my purse.", 'back in my day we slapped HARDER', 'eat something, you look like a noodle', 'speak up, dummy!'] },
+    role: 'oracle', chatLines: ['this week feels... familiar.', 'my hip says rain. again.', 'eat something, you noodle!', 'back in my day...'], lines: ["i'll hit you with my purse.", 'back in my day we slapped HARDER', 'eat something, you look like a noodle', 'speak up, dummy!'] },
   { seed: 1206, name: 'KIKO', pos: [-18.6, 27.5], face: [-19.2, 26.6],
     look: { outfit: 'dress', hair: 'bob', hairColor: '#292C2E', colors: { top: '#00B4BC', accent: '#FFCC3F', shoe: '#F0F2F4' }, height: 0.95 },
-    lines: ['is that your face or a dare?', 'lol no.', 'ok boomer', 'blocked.'] },
+    plain: true },
   { seed: 1207, name: 'ROSA', pos: [-6.4, -14.9], face: [-8, -14.9],
     look: { outfit: 'blazer', hair: 'curlyLong', hairColor: '#4C3F42', colors: { top: '#FF7DAF', inner: '#F0F2F4', bottom: '#292C2E' } },
-    lines: ['i bite.', 'call me never.', 'nice shoes. NOT.', "don't make me take my earrings off"] },
+    plain: true },
   { seed: 1208, name: 'DORIS', pos: [-13.4, 19.6], face: [-12.6, 20.2],
     look: { outfit: 'coat', hair: 'braids', hairColor: '#4C3F42', glasses: false },
-    lines: ["i've buried two husbands.", 'move, pumpkin.', 'what are YOU looking at?', 'h*ll no.'] },
+    plain: true },
   { seed: 1209, name: 'BIG DEB', pos: [-12.6, 20.2], face: [-13.4, 19.6],
     look: { outfit: 'sweater', hair: 'ponytail', hairColor: '#292C2E', colors: { top: '#FFE166', bottom: '#2A5B94', shoe: '#F0F2F4' }, build: 1.3, height: 1.03 },
-    lines: ['wanna arm wrestle? no? coward.', 'i eat guys like you for brunch', 'beat it, shrimp.', 'oh h*ll naw.'] },
+    role: 'deb', chatLines: ['who wants to arm wrestle?', 'i bench-pressed a bus once.', 'protein is a personality.'], lines: ['wanna arm wrestle? no? coward.', 'i eat guys like you for brunch', 'beat it, shrimp.', 'oh h*ll naw.'] },
 ];
 // The cop walks a big beat around four blocks (outer sidewalk lane).
 const COP_BEAT = { path: [[-7.15, -7.15], [10.4, -7.15], [10.9, -5.0], [17.0, -5.0], [17.3, -7.15], [40.15, -7.15], [40.15, 40.15], [-7.15, 40.15], [-7.15, 17.2], [-4.6, 16.7], [-4.6, 12.6], [-7.15, 12.1]], start: 0, dir: 1, speed: 1.2, along: 0.15 };   // detours round the bus shelter and the bench
@@ -78,6 +78,7 @@ export const TUNE = {
   staggerDist: 0.7, staggerTime: 0.28,
 };
 export const TRIP_LINES = ['ow!!', 'watch it!', 'what the h*ll', 'my back...'];
+export const SLIP_LINES = ['who left a BANANA?!', 'my tailbone...', 'not funny!!', 'ow ow ow'];
 export const PUSH_CRY = ['MOMMY!!', 'WAAAAH!', "i'm telling!!", 'my spine!!'];
 export const PUSH_MAD = ["you're DEAD!", 'oh it is ON!', 'big mistake, pal!'];
 export const FAINT_LINES = ['wha... what happened', '*cough* *cough*', 'i saw the light...', 'never again...'];
@@ -115,7 +116,7 @@ export class NPCs {
     }
     for (const w of WOMEN) {
       const n = this._wrap(charMod.createNPC({ seed: w.seed, ...w.look }), w.seed);
-      Object.assign(n, { tag: w.name, lines: w.lines, woman: true });
+      Object.assign(n, { tag: w.name, woman: true }, w.plain ? {} : { lines: w.lines, chatLines: w.chatLines, role: w.role, important: true });
       if (w.walk) {
         const W = w.walk, a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4], t = W.along || 0;
         n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
@@ -131,7 +132,7 @@ export class NPCs {
     if (charMod.createSpecial) for (const s of SPECIAL_SPOTS) {
       const n = this._wrap(charMod.createSpecial(s.key), 0);
       const sp = charMod.SPECIALS[s.key];
-      Object.assign(n, { special: s.key, tag: sp.tag, danceName: sp.dance, icon: sp.icon, role: sp.role || null, temper: sp.temper || 'timid', walker: false, idleT: 0 });
+      Object.assign(n, { important: true, special: s.key, tag: sp.tag, danceName: sp.dance, icon: sp.icon, role: sp.role || null, temper: sp.temper || 'timid', walker: false, idleT: 0 });
       n.root.position.set(s.pos[0], 0, s.pos[1]);
       n.heading = n.root.rotation.y = Math.atan2(s.face[0] - s.pos[0], s.face[1] - s.pos[1]);
       n.home = { x: s.pos[0], z: s.pos[1], heading: n.heading };
@@ -145,7 +146,7 @@ export class NPCs {
     }
     if (charMod.SPECIALS?.cop) {
       const n = this._wrap(charMod.createSpecial('cop'), 0), sp = charMod.SPECIALS.cop, W = COP_BEAT;
-      Object.assign(n, { special: 'cop', tag: sp.tag, role: 'cop', temper: 'timid', idleT: 0,
+      Object.assign(n, { important: true, special: 'cop', tag: sp.tag, role: 'cop', temper: 'timid', idleT: 0,
         lines: ['move along.', "i've got my eye on you, punk.", '*munch munch*', 'nothing to see here.', 'is that a donut? no? then beat it.'] });
       const a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4];
       n.root.position.set(a[0] + (b[0] - a[0]) * W.along, 0, a[1] + (b[1] - a[1]) * W.along);
@@ -249,6 +250,19 @@ export class NPCs {
     this.emit('trip', n);
     return t;
   }
+  /** Banana peel: feet fly up, flat on the back for a couple of seconds. Works on anyone (cop, bully, landlady);
+   *  a chaser picks the chase back up after getting up. Returns the down time. */
+  slip(n, lie = 2.0) {
+    if (n.down || !n.c.knockdown) return 0;
+    if (n.c.dancing) n.c.stopDance(0.05);
+    const p = n.root.position, h = n.root.rotation.y;
+    const t = n.c.knockdown(-1, lie);          // falls backwards (heels toward where they were running)
+    n.root.rotation.y = h;
+    n.down = { t, wasChasing: n.mode === 'chase' || n.mode === 'react', cfg: n.chaseCfg, post: 'slip' };
+    n.talkT = 0; n.stagger = null; n.pendingHit = -1; n.chaseV = 0; n.curSpeed = 0;
+    this.emit('slip', n);
+    return t;
+  }
   /** Cartoon shove: knocked off their feet, short airborne arc, flailing; lands with a thud (emits 'land').
    *  Anyone they sail into goes down too (domino, emits 'domino'). */
   shove(n, from, power = 7.5, depth = 0) {
@@ -290,7 +304,8 @@ export class NPCs {
       this.emit('getUp', n, d.post);
       return;
     }
-    this.onShout?.(n, TRIP_LINES[Math.floor(Math.random() * TRIP_LINES.length)]);
+    const TL = d.post === 'slip' ? SLIP_LINES : TRIP_LINES;
+    this.onShout?.(n, TL[Math.floor(Math.random() * TL.length)]);
     if (d.wasChasing && n.chaseCfg === d.cfg && n.mode) { n.mode = 'react'; n.modeT = 0.25; n.chaseT = n.chaseT || 0; n.shoutT = 1.2; }
     else if (n.temper === 'aggressive' && !n.mode) { n.mode = 'react'; n.modeT = 0.6; n.chaseT = 0; n.shoutT = 1.2; }
   }

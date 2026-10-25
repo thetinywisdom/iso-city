@@ -174,3 +174,15 @@ canvas { image-rendering: pixelated; }
 #game-over .go-title { font-size: 48px; line-height: 48px; color: #FFCC3F; text-shadow: 6px 6px 0 #A92D59; margin-bottom: 18px; }
 #game-over .go-sub { font-size: 16px; line-height: 16px; color: #B0E9FF; margin-bottom: 24px; }
 #game-over .go-btn { font-size: 16px; padding: 9px 12px 6px; }
+
+/* ---- bananas (bananas.js): carried peels + key hint ---- */
+#banana-hud { position: fixed; left: 15px; bottom: 60px; z-index: 7; pointer-events: none; display: flex; align-items: center;
+  font: 16px/16px 'PressStart2P', monospace; -webkit-font-smoothing: none; color: #FFE166; background: #292C2E; padding: 9px 12px 6px;
+  box-shadow: 0 6px 0 0 #ED8F02; white-space: nowrap; }
+#banana-hud canvas { width: 36px; height: 30px; image-rendering: pixelated; margin: -6px 3px -3px 0; }
+#banana-hud.empty { color: #FF7DAF; box-shadow: 0 6px 0 0 #A92D59; }
+#cat-hud { position: fixed; left: 15px; bottom: 114px; z-index: 7; pointer-events: none; display: none; align-items: center;
+  font: 16px/16px 'PressStart2P', monospace; -webkit-font-smoothing: none; color: #F0F2F4; background: #292C2E; padding: 9px 12px 6px;
+  box-shadow: 0 6px 0 0 #FF5491; white-space: nowrap; }
+#cat-hud canvas { width: 27px; height: 21px; image-rendering: pixelated; margin: -3px 6px 0 0; }
+.cat-heart { position: fixed; left: -10px; top: -9px; width: 21px; height: 18px; image-rendering: pixelated; pointer-events: none; z-index: 6; }

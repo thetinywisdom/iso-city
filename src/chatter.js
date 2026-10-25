@@ -1,12 +1,11 @@
 // Idle small talk: NPCs standing close together take turns with little chat bubbles.
 // Groups are found every half second; each group has its own turn clock. Paused while the player
 // is talking to someone nearby so real dialogue is never covered.
-const OPEN = ['did you SEE what brenda wore?', 'my cat has a lawyer now', 'i only eat beige food', 'that bald guy slaps people',
-  'rent is HOW much?!', 'i farted in the elevator. twice.', 'my ex is a magician. poof.', "don't look now... baldy.",
-  'is it lunch yet?', 'my therapist quit on me', 'i licked a bus pole once', 'the cop eats 12 donuts a day',
-  'the bully cried at a movie', 'my hips do NOT lie', 'i googled myself. 0 results.', 'my mom says i am cool'];
-const REPLY = ['shut UP.', 'no WAY.', 'lol', 'sameee', 'wait what?', 'i KNOW right?!', 'ew.', 'bless your heart.',
-  'ugh, men.', "that's illegal", 'mood.', 'tell me more...', 'GIRL.', 'b*tch, same.', 'i hate it here', 'huh.'];
+// Plain background people share one small, generic pool. Only important characters (story / supporting cast,
+// custom characters from the creator) get their own bubble lines: n.chatLines.
+const OPEN = ['nice day, huh?', 'did you hear?', 'is it lunch yet?', 'ugh, mondays.', 'so anyway...', 'traffic was crazy.',
+  'rent is HOW much?!', 'i need a coffee.'];
+const REPLY = ['mm-hm.', 'no way.', 'lol', 'same.', 'right?', 'huh.', 'totally.', 'wait what?'];
 const R = 2.3, SHOW_MS = 2300;
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
@@ -54,7 +53,8 @@ export function initChatter({ scene, player, getNPCs, dialogue }) {
       if ((g.t -= dt) > 0) continue;
       if (busyNear(g)) { g.t = 1; state.paused++; continue; }
       const n = g.members[g.turn % g.members.length];
-      if (idle(n) && dialogue.chat(n, pick(g.open ? OPEN : REPLY), SHOW_MS)) { state.lines++; g.open = !g.open || g.members.length > 2 && Math.random() < 0.3; }
+      const own = n.important && n.chatLines?.length && Math.random() < 0.75 ? n.chatLines : null;
+      if (idle(n) && dialogue.chat(n, pick(own || (g.open ? OPEN : REPLY)), SHOW_MS)) { state.lines++; g.open = !g.open || g.members.length > 2 && Math.random() < 0.3; }
       g.turn++; g.t = 2.6 + Math.random() * 1.2;
     }
   };
