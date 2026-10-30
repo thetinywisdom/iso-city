@@ -1,5 +1,5 @@
 // One in-game menu (Esc or the MENU button): CONTROLS · CHARACTERS · CREATOR. The game pauses while it is open.
-import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031e';
+import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031f';
 
 const CONTROLS = [
   ['MOUSE', '— the main controls —'],

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261031e';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031e';
-import { registerPools } from './french.js?v=20261031e';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031e';
+import { addGhosts } from './player.js?v=20261031f';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031f';
+import { registerPools } from './french.js?v=20261031f';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031f';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -291,10 +291,11 @@ export class NPCs {
     n.c.hold = (c) => {
       prev?.(c);
       if (c._kd || (c._dance && c._danceW >= 0.999)) return;
-      const k = n.sneakCrouch ? 1 : 0.4;
+      // gait never writes torso.x — MUST assign (not +=) or pitch accumulates into a tumble/spin
+      const k = n.sneakCrouch ? 1 : 0.35;
       c.parts.body.position.y -= 0.16 * k * c.h;
-      c.parts.torso.rotation.x += 0.18 * k;
-      c.parts.head.rotation.x += 0.2 * k;
+      c.parts.torso.rotation.x = 0.18 * k;
+      c.parts.head.rotation.x += 0.2 * k; // head.x is reset by gait each frame, += is safe
       // tip-toe / peek: hands a little forward when ducked
       if (n.sneakCrouch && !c.slapping) {
         const ty = c.parts.torso.rotation.y;
@@ -326,30 +327,29 @@ export class NPCs {
     const L = n.pairLead; if (!L || L.removed) return 0;
     const lp = L.root.position, p = n.root.position;
     const h = L.root.rotation.y;
-    const fx = Math.sin(h), fz = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h);
-    n.sneakPh = (n.sneakPh || 0) + dt;
-    // soft path weave only — never use it for facing (chasing the weave yaw spun him)
-    const weave = Math.sin(n.sneakPh * 0.5) * 0.22;
+    const fx = Math.sin(h), fz = Math.cos(h);
     const back = 2.6;
-    const tx = lp.x - fx * back + rx * weave, tz = lp.z - fz * back + rz * weave;
+    // straight trail slot — no lateral weave (strafe+peek looked like a spin)
+    const tx = lp.x - fx * back, tz = lp.z - fz * back;
     const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz) || 1e-6;
     const leadStill = (L.wait > 0) || L.talkT > 0 || (L.curSpeed || 0) < 0.18 || !!L.down || !!L.mode;
-    n.sneakCrouch = leadStill || dist < 1.1;
+    // crouch/peek only when the couple has stopped — not while chasing the slot
+    n.sneakCrouch = leadStill;
     if (n.talkT > 0) { n.sneakCrouch = true; return 0; }
-    // face walk direction (= lead heading); tiny capped peek toward the couple when ducked
-    let face = h;
-    if (n.sneakCrouch || leadStill) {
+    if (leadStill && dist < 1.6) {
+      // duck in place; soft capped peek toward the couple
       const peek = Math.atan2(lp.x - p.x, lp.z - p.z);
       let d = peek - h; d = Math.atan2(Math.sin(d), Math.cos(d));
-      face = h + Math.max(-0.4, Math.min(0.4, d * 0.35));
+      n.targetHeading = h + Math.max(-0.35, Math.min(0.35, d * 0.3));
+      return 0;
     }
-    n.targetHeading = face;
-    if (leadStill && dist < 1.6) return 0; // duck & peek in place
-    if (dist < 0.12) return 0;
+    if (dist < 0.12) { n.targetHeading = h; return 0; }
     const spd = leadStill ? 1.6 : Math.min(1.35, (L.speed || 1.2) * 0.95);
     const step = Math.min(dist, spd * dt);
     const [sx, sz] = this._steer(n, dx / dist, dz / dist, 0.9);
     this._move(p, sx * step, sz * step);
+    // face the way we actually step (matches motion; no strafe-twist)
+    n.targetHeading = Math.atan2(sx, sz);
     return spd;
   }
   _wrap(c, seed) {

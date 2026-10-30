@@ -3,8 +3,8 @@
 // and dodges, a time machine (a black hole floating in the middle of the room), a bowl of bananas and (soon enough) Officer Dough.
 // Slap her (F) to stun her, push her (E) into the black hole. GIVE UP any time: ACCEPT FATE.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031e';
-import { box, sign } from './growth.js?v=20261031e';
+import { COMIC } from './palette.js?v=20261031f';
+import { box, sign } from './growth.js?v=20261031f';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 export const HOUSE = { x0: -28, x1: -21, z0: 8.5, z1: 14, door: { x: -24.5, z: 14.9, r: 1.1 } };
