@@ -42,6 +42,16 @@ export const BUILTIN_CHARS = [
     lines: ['Asaka Kotaro イムニダ', 'Hi', 'ハローマイネームイスコウタロウ'],
     bubble: 'ハトめっちゃ好き', dance: 'chicken', home: 'fountain', id: 'cmvnktp6giaph',
   },
+  {
+    v: 1, name: 'BRIAN', gender: 'man', body: 'average', height: 1.02, skin: '#F1CDC3',
+    hair: 'buzz', hairColor: '#363E47', hat: 'backcap', hatColor: '#198085',
+    top: 'tee', topColor: '#EFFAFA', innerColor: '#F0F2F4', bottom: 'pants', bottomColor: '#203A57',
+    shoes: 'sneakers', shoeColor: '#A7BFA4',
+    acc: { glasses: true, sunglasses: false, moustache: false, beard: false, earrings: false, bag: false },
+    accColor: '#292C2E', held: 'skateboard', heldColor: '#4C3F42',
+    lines: ['I made this game', 'You dumb', 'Tanga yawa', 'Bapak lo jelek', 'Muka lu berminyak'],
+    bubble: 'I miss my wife', dance: 'mbappe', home: 'fountain', id: 'cmvv5u4oo8ga7',
+  },
 ];
 const builtinIds = () => new Set(BUILTIN_CHARS.map((c) => c.id));
 const builtinNames = () => new Set(BUILTIN_CHARS.map((c) => String(c.name || '').toUpperCase()));
