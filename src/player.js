@@ -1,12 +1,32 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031l';
+import { P } from './palette.js?v=20261031m';
 
 // Silhouette shown only where the player is hidden behind buildings.
 // Thin light rim so the dark fill stays readable on dark roofs; fine on light walls too.
+// Rim expands along normals by a fixed view-space width (not mesh scale) so heads /
+// umbrellas don't get a fat halo. ~0.055wu ≈ 1.8px at default zoom 1.6 (VIEW=30).
+const RIM_W = 0.055;
 const ghostMat = new THREE.MeshBasicMaterial({ color: P.ghost, depthWrite: false });
 ghostMat.depthFunc = THREE.GreaterDepth;
 const ghostRimMat = new THREE.MeshBasicMaterial({ color: 0xf0f2f4, depthWrite: false });
 ghostRimMat.depthFunc = THREE.GreaterDepth;
+// MeshBasic skips lighting normals — inject objectNormal so we can extrude.
+ghostRimMat.onBeforeCompile = (shader) => {
+  shader.vertexShader = shader.vertexShader
+    .replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+	vec3 objectNormal = vec3( normal );`
+    )
+    .replace(
+      '#include <project_vertex>',
+      `vec4 mvPosition = modelViewMatrix * vec4( transformed, 1.0 );
+	vec3 vN = normalize( normalMatrix * objectNormal );
+	mvPosition.xyz += vN * float(${RIM_W});
+	gl_Position = projectionMatrix * mvPosition;`
+    );
+};
+ghostRimMat.customProgramCacheKey = () => 'ghostRimN2_' + RIM_W;
 
 export function addGhosts(obj) {
   const meshes = [];
@@ -14,11 +34,10 @@ export function addGhosts(obj) {
   for (const m of meshes) {
     m.castShadow = true;
     m.renderOrder = 3;
-    // Slightly larger light shell (MeshBasic keeps skinning); dark fill covers the middle → white outline.
+    // Light extruded shell; dark fill covers the middle → white outline of uniform width.
     const rim = new THREE.Mesh(m.geometry, ghostRimMat);
     rim.userData.isGhost = true;
     rim.userData.isGhostRim = true;
-    rim.scale.setScalar(1.40);
     rim.renderOrder = 1;  // after buildings (0) so GreaterDepth sees roofs
     rim.castShadow = false;
     rim.receiveShadow = false;

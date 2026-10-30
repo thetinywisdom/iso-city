@@ -2,8 +2,8 @@
 // Empty lots fill up with fenced building sites, scaffolding and finally new buildings + a rent billboard.
 // Free roam never calls this, so the sandbox city stays exactly as it was.
 import * as THREE from 'three';
-import { COMIC, SCHEMES, P } from './palette.js?v=20261031l';
-import { frontFor, faceFrame } from './facing.js?v=20261031l';
+import { COMIC, SCHEMES, P } from './palette.js?v=20261031m';
+import { frontFor, faceFrame } from './facing.js?v=20261031m';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 const CURB = 0.2;

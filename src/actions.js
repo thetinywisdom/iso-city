@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261031l';
+import { registerPools } from './french.js?v=20261031m';
 
 // Right-click an NPC -> small pixel context menu: DANCE-OFF / PUSH / SLAP / FART (+ MISSION on the giver).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
