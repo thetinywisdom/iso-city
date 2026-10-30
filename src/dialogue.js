@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { isFrench, frLine } from './french.js?v=20261031j';
+import { isFrench, frLine } from './french.js?v=20261031k';
 
 // Click an NPC -> pixel-art chat bubble with a random line above their head.
 // The listener runs in the capture phase on window, so a click that hits an NPC
@@ -20,9 +20,6 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const bubbles = new Map(); // npc -> { el, until }
-  const hints = new Map();   // npc -> { el, bb, fill, line, kind }  comic ! / ? above talkable heads
-  const HINT_R = 11;         // world units: only near the player (avoids crowd clutter)
-  const HINT_MAX = 6;        // cap on simultaneous icons
   const head = new THREE.Vector3();
 
   function pick(clientX, clientY) {
@@ -86,9 +83,8 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     if (opt.cap) { const c = document.createElement('div'); c.className = 'cap'; c.textContent = opt.cap; B.bb.appendChild(c); }
     if (opt.hint) { const h = document.createElement('div'); h.className = 'hint'; h.textContent = opt.hint; B.bb.appendChild(h); }
     if (opt.story) B.el.classList.add('story');
-    b = { ...B, until: performance.now() + ms, shout: isShout, story: !!opt.story, chat: !!opt.chat, prio: opt.story ? 4 : isShout ? 3 : 2 };
+    b = { ...B, until: performance.now() + ms, shout: isShout, story: !!opt.story, prio: opt.story ? 4 : isShout ? 3 : 2 };
     bubbles.set(npc, b);
-    if (!isShout && !opt.chat) npc.talked = true;   // real talk / story advances → optional ? next time
     return b;
   }
   // floating pixel icon bubble (♪ / ♥), drawn per-pixel on a tiny canvas
@@ -249,49 +245,6 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     return { x: (head.x + 1) / 2 * w, y: (1 - head.y) / 2 * h, vis: head.z < 1 && n.root?.visible !== false && !n.removed };
   }
 
-
-  // ---- talk hints: comic ! / ? above people you can talk to (near the player only) ----
-  function hintKind(n) {
-    const o = api.hintFor?.(n);
-    if (o === null) return null;
-    if (o === '!' || o === '?') return o;
-    if (!n || n.removed || n.down || n.cat) return null;
-    if (n.special === 'giver') return '!';                         // job board
-    if ((n.important || n.story) && !n.talked) return '!';         // story beat / something new
-    return '?';                                                   // optional chat, or already talked
-  }
-  function ensureHint(n, kind) {
-    let h = hints.get(n);
-    if (h && h.kind === kind) return h;
-    if (h) h.el.remove();
-    const B = makeBubble('talk-hint ' + (kind === '!' ? 'bang' : 'ask'));
-    B.bb.textContent = kind;
-    // no tail on these — they sit as a floating mark just above the head
-    B.fill.setAttribute('points', ''); B.line.setAttribute('points', '');
-    h = { ...B, kind, prio: 0.4 };
-    hints.set(n, h);
-    return h;
-  }
-  function clearHint(n) { const h = hints.get(n); if (h) { h.el.remove(); hints.delete(n); } }
-  function refreshHints() {
-    const npcs = getNPCs()?.list; if (!npcs) { for (const n of [...hints.keys()]) clearHint(n); return; }
-    const px = player.position.x, pz = player.position.z;
-    const cand = [];
-    for (const n of npcs) {
-      if (n.removed || n.down || !n.root?.visible) continue;
-      const kind = hintKind(n); if (!kind) continue;
-      if (bubbles.has(n)) continue;                 // hide while their chat / shout / icon / story bubble is up
-      if (n === markNPC) continue;                  // landlady mark already tags her
-      const d = Math.hypot(n.root.position.x - px, n.root.position.z - pz);
-      if (d > HINT_R) continue;
-      cand.push({ n, kind, d });
-    }
-    cand.sort((a, b) => a.d - b.d);
-    const keep = new Set();
-    for (const c of cand.slice(0, HINT_MAX)) { ensureHint(c.n, c.kind); keep.add(c.n); }
-    for (const n of [...hints.keys()]) if (!keep.has(n)) clearHint(n);
-  }
-
   // Lay out every bubble: centred over the head, tail tip on the head, clamped to the screen, no overlaps.
   function place() {
     const now = performance.now();
@@ -301,12 +254,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
       if (now > b.until) { b.el.remove(); bubbles.delete(npc); continue; }
       items.push({ npc, b, prio: b.prio ?? 2 });
     }
-    refreshHints();
-    for (const [npc, h] of hints) {
-      if (bubbles.has(npc) || npc === markNPC) { h.el.style.visibility = 'hidden'; continue; }
-      items.push({ npc, b: h, prio: h.prio, hint: true });
-    }
-    const tagOn = hoverNPC && !bubbles.has(hoverNPC) && hoverNPC !== markNPC && !hints.has(hoverNPC);
+    const tagOn = hoverNPC && !bubbles.has(hoverNPC) && hoverNPC !== markNPC;
     tagB.el.style.display = tagOn ? '' : 'none';
     if (tagOn) items.push({ npc: hoverNPC, b: tagB, prio: 0 });
     const markOn = markNPC && !bubbles.has(markNPC);
@@ -319,7 +267,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     for (const it of items) {
       const { a, w, h } = it;
       if (!a.vis) { it.b.el.style.visibility = 'hidden'; it.b.tip = null; continue; }
-      let x = Math.round(a.x - w / 2), y = Math.round(a.y - (it.hint ? 8 : TAIL) - h);
+      let x = Math.round(a.x - w / 2), y = Math.round(a.y - TAIL - h);
       const clampX = () => { x = Math.max(EDGE, Math.min(W - EDGE - w, x)); };
       const clampY = () => { y = Math.max(EDGE, Math.min(H - EDGE - h, y)); };
       clampX(); clampY();
@@ -340,7 +288,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
       // tail: base on the body's bottom edge (as close under the head as the body allows), tip on the head
       const tx = Math.round(Math.max(EDGE, Math.min(W - EDGE, a.x))) - x, ty = Math.round(Math.max(EDGE, Math.min(H - EDGE, a.y))) - y;
       const bx = Math.max(12, Math.min(w - 12, tx)), by = h - 3, half = it.prio < 1 ? 5 : 8;
-      const on = !it.hint && ty > by + 4;
+      const on = ty > by + 4;
       it.b.fill.setAttribute('points', on ? `${bx - half},${by} ${tx},${ty} ${bx + half},${by}` : '');
       it.b.line.setAttribute('points', on ? `${bx - half},${by + 1} ${tx},${ty} ${bx + half},${by + 1}` : '');
       it.b.tip = on ? { x: x + tx, y: y + ty } : null;
@@ -359,6 +307,6 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     const nb = bubbles.get(npc); nb.chat = true; nb.prio = 0.8; nb.el.classList.add('chat'); nb.bb.querySelector('.who')?.remove();
     place(); return true;
   }
-  const api = { say, chat, shout, clear, pick, hideAll, bubbles, hints, get hover() { return hoverNPC; }, setHover(n, label) { setTag(n, label); }, hoverables: [], onDoubleClick: null, approach: null, talkTo, get pending() { return pend; }, DBL_MS, setMark, anchor, headNode, place, modal: null, story: (n, line, opt = {}) => { const b = show(n, line, 1e9, false, { ...opt, story: true }); place(); return b; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, hintFor: null, show: (n, t, ms = SHOW_MS, sh = false, opt) => { show(n, t, ms, sh, opt); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
+  const api = { say, chat, shout, clear, pick, hideAll, bubbles, get hover() { return hoverNPC; }, setHover(n, label) { setTag(n, label); }, hoverables: [], onDoubleClick: null, approach: null, talkTo, get pending() { return pend; }, DBL_MS, setMark, anchor, headNode, place, modal: null, story: (n, line, opt = {}) => { const b = show(n, line, 1e9, false, { ...opt, story: true }); place(); return b; }, onLongPress: null, onClick: null, pickLine: null, onLine: null, show: (n, t, ms = SHOW_MS, sh = false, opt) => { show(n, t, ms, sh, opt); place(); }, showIcon: (n, k, ms) => { showIcon(n, k, ms); place(); }, get pressing() { return press; } };
   return api;
 }

@@ -1,9 +1,23 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031j';
+import { P } from './palette.js?v=20261031k';
 
-// Roof occlusion is handled by fading the covering building's roof (see updateRoofFade).
-// Unrestricted GreaterDepth ghosts X-rayed open-street characters through self/others/props.
-export function addGhosts(/* obj */) { /* no-op: call sites on player/npcs/cats kept */ }
+// Silhouette shown only where the player is hidden behind buildings.
+const ghostMat = new THREE.MeshBasicMaterial({ color: P.ghost, depthWrite: false });
+ghostMat.depthFunc = THREE.GreaterDepth;
+
+export function addGhosts(obj) {
+  const meshes = [];
+  obj.traverse((o) => { if (o.isMesh && !o.userData.isGhost) meshes.push(o); });
+  for (const m of meshes) {
+    m.castShadow = true;
+    m.renderOrder = 2;
+    const g = new THREE.Mesh(m.geometry, ghostMat);
+    g.userData.isGhost = true;
+    g.renderOrder = 1;
+    g.castShadow = false;
+    m.add(g); // inherits transforms + animation of the source mesh
+  }
+}
 
 // Placeholder: orange capsule with a peach "face" marker so facing is readable.
 function createPlaceholder() {

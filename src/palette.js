@@ -18,7 +18,7 @@ export const P = {
   paint: N[4],        // road markings
   black: N[0],        // #292C2E poles, details
   roof: N[1],         // #363E47 roof caps
-  ghost: N[4],        // occluded-character silhouette (light, readable on dark roofs)
+  ghost: N[1],        // occluded-player silhouette
   sage: N[3],         // #A7BFA4 tree crowns
   trunk: T[0],        // #194A4C tree trunks
   lampGlow: Y[2],     // #FFE166

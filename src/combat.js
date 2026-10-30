@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TUNE, NPC_RADIUS } from './npcs.js?v=20261031j';
+import { TUNE, NPC_RADIUS } from './npcs.js?v=20261031k';
 
 // SLAP: long-press an NPC (dialogue.js fires onLongPress) -> the player walks into
 // reach, winds up and slaps. Impact = pixel "SLAP!" burst, screen shake, a synthesized

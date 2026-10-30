@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { Bucket, mat } from './bucket.js?v=20261031j';
-import { P, SCHEMES, COMIC } from './palette.js?v=20261031j';
-import { makeProps } from './props.js?v=20261031j';
-import { resolveFace, faceFrame } from './facing.js?v=20261031j';
-import { addFill } from './fill.js?v=20261031j';
-import { markInk } from './pixel.js?v=20261031j';
+import { Bucket, mat } from './bucket.js?v=20261031k';
+import { P, SCHEMES, COMIC } from './palette.js?v=20261031k';
+import { makeProps } from './props.js?v=20261031k';
+import { resolveFace, faceFrame } from './facing.js?v=20261031k';
+import { addFill } from './fill.js?v=20261031k';
+import { markInk } from './pixel.js?v=20261031k';
 
 // Small art-direction test scene: a main intersection at (0,0) plus two
 // streets on the near (+x / +z) side, so the block nearest the camera has
@@ -25,8 +25,7 @@ const G = {
 
 export function generateCity(scene) {
   const solid = new Bucket();
-  const bsolid = new Bucket();   // building walls/windows/doors: cartoon ink
-  // Roofs are per-building meshes so we can fade the one covering the player (~35%).
+  const bsolid = new Bucket();   // buildings only: the one mesh that gets cartoon ink
   const colliders = [];
   const blocks = [];
   // top: world height of a LOW prop (fence, bush, bench...) the player can jump over; omitted = tall (always blocks)
@@ -78,7 +77,6 @@ export function generateCity(scene) {
   // Building: light wall, roof cap, windows on the camera-facing faces (+x, +z) and on the front;
   // door + shop window + optional awning/blade sign on the FRONT, which faces the nearest road (facing.js).
   const buildings = [];
-  const roofMatBase = new THREE.MeshLambertMaterial({ color: P.roof, flatShading: true });
   function building({ x0, z0, x1, z1, floors, scheme, door, awning = true, sign = false, name = scheme, kind = 'base' }) {
     const C = SCHEMES[scheme];
     const L = { x0, x1, z0, z1 };
@@ -86,12 +84,7 @@ export function generateCity(scene) {
     const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const h = floors * 3, base = CURB;
     bsolid.add(G.box, mat(cx, base + h / 2, cz, w, h, d), C.body);
-    const roof = new THREE.Mesh(G.box, roofMatBase.clone());
-    roof.position.set(cx, base + h + 0.18, cz);
-    roof.scale.set(w + 0.3, 0.36, d + 0.3);
-    roof.castShadow = true; roof.receiveShadow = true;
-    roof.name = 'roof-' + name;
-    scene.add(markInk(roof));
+    bsolid.add(G.box, mat(cx, base + h + 0.18, cz, w + 0.3, 0.36, d + 0.3), P.roof);
     const faces = new Set(['+x', '+z', face]);
     for (let f = 1; f < floors; f++) {
       const wy = base + f * 3 + 1.7;
@@ -114,7 +107,7 @@ export function generateCity(scene) {
       put(-F.len / 2 + 0.8, base + 4.6, 0.1, 0.2, 0.2, 0.2, P.black);
     }
     addCollider(cx, cz, w / 2, d / 2);
-    buildings.push({ x0, x1, z0, z1, face, name, kind, base, h, roof });
+    buildings.push({ x0, x1, z0, z1, face, name, kind, base, h });
     return { face, h };
   }
 
@@ -178,30 +171,4 @@ export function generateCity(scene) {
     return 0;
   }
   return { colliders, buildings, groundHeight, bounds: { min: -30, max: 46 }, spawn: new THREE.Vector3(0, 0, 0), trees: { mesh: treeMesh, log: props.treeLog, draw: props.treeDraw } };
-}
-
-// Fade the roof of any building currently covering the player (iso far side / under footprint).
-// ~35% opacity so the player stays readable without X-ray ghosts on open street.
-const ROOF_FADE = 0.35;
-const ROOF_MARGIN = 1.7;
-export function updateRoofFade(city, playerPos, camPos) {
-  if (!city?.buildings) return;
-  const px = playerPos.x, pz = playerPos.z;
-  const camx = camPos.x, camz = camPos.z;
-  for (const b of city.buildings) {
-    const roof = b.roof;
-    if (!roof?.material) continue;
-    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
-    const inXZ = px > b.x0 - ROOF_MARGIN && px < b.x1 + ROOF_MARGIN && pz > b.z0 - ROOF_MARGIN && pz < b.z1 + ROOF_MARGIN;
-    // Far side from camera (or inside footprint): roof is what hides the player in iso view.
-    const behind = (px - camx) * (px - camx) + (pz - camz) * (pz - camz) >= (cx - camx) * (cx - camx) + (cz - camz) * (cz - camz) - 6;
-    const cover = inXZ && behind;
-    const m = roof.material;
-    const op = cover ? ROOF_FADE : 1;
-    if (m.opacity !== op) {
-      m.opacity = op;
-      m.transparent = cover;
-      m.depthWrite = !cover;
-    }
-  }
 }

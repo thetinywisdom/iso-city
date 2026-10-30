@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261031j';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031j';
-import { registerPools } from './french.js?v=20261031j';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031j';
+import { addGhosts } from './player.js?v=20261031k';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031k';
+import { registerPools } from './french.js?v=20261031k';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031k';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.

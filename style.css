@@ -76,17 +76,6 @@ canvas { image-rendering: pixelated; }
 /* ---- special NPCs: floating pixel icon bubble + hover name tag ---------------- */
 @keyframes icon-bob { 0% { translate: 0 0; } 50% { translate: 0 -3px; } }
 
-/* talk hints: comic ! / ? above nearby talkable people (hidden while their bubble is up) */
-.bubble.talk-hint { z-index: 1; pointer-events: none; }
-.bubble.talk-hint .bb {
-  font-size: 14px; line-height: 14px; padding: 6px 8px 5px; border-radius: 11px;
-  font-weight: 700; letter-spacing: 0; min-width: 14px; text-align: center;
-  box-shadow: 0 -2px 0 0 #292C2E, 0 2px 0 0 #292C2E, -2px 0 0 0 #292C2E, 2px 0 0 0 #292C2E, 0 5px 0 0 #5B6A7B;
-  animation: bubble-pop .18s steps(3, end) backwards, mark-bob .8s steps(2, end) .18s infinite;
-}
-.bubble.talk-hint.bang .bb { color: #292C2E; background: #FFCC3F; }
-.bubble.talk-hint.ask .bb { color: #5B6A7B; background: #F0F2F4; }
-.bubble.talk-hint svg.tail { display: none; }
 
 /* ---- missions: HUD, banner, offer panel, giver marker, off-screen arrow ---------- */
 #missions { position: fixed; inset: 0; pointer-events: none; z-index: 7; font-family: 'PressStart2P', ui-monospace, monospace;
