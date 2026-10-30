@@ -1,8 +1,12 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031g';
+import { P } from './palette.js?v=20261031h';
 
-// Silhouette shown only where the player is hidden behind buildings.
-const ghostMat = new THREE.MeshBasicMaterial({ color: P.ghost, depthWrite: false });
+// See-through silhouette only on occluded fragments (GreaterDepth): light tint ~55% so
+// characters stay readable against dark roofs/walls. Solids draw after and cover visible bits.
+const ghostMat = new THREE.MeshBasicMaterial({
+  color: P.ghost, transparent: true, opacity: 0.55,
+  depthWrite: false, depthTest: true, fog: false, toneMapped: false,
+});
 ghostMat.depthFunc = THREE.GreaterDepth;
 
 export function addGhosts(obj) {
@@ -13,8 +17,10 @@ export function addGhosts(obj) {
     m.renderOrder = 2;
     const g = new THREE.Mesh(m.geometry, ghostMat);
     g.userData.isGhost = true;
-    g.renderOrder = 1;
+    g.renderOrder = 3; // after solids in the transparent queue; GreaterDepth still only fills holes
     g.castShadow = false;
+    g.receiveShadow = false;
+    g.frustumCulled = false;
     m.add(g); // inherits transforms + animation of the source mesh
   }
 }

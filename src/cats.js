@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addGhosts } from './player.js?v=20261031h';
 
 // STRAY CATS: a handful of pixel strays living around the city and the park. They wander, sit, groom,
 // stretch, loaf, get the zoomies, hop up on benches and low walls, flick their tails and meow now and then.
@@ -88,7 +89,7 @@ export function initCats({ scene, city, player, getNPCs, dialogue, combat, actio
     const [px, pz] = nearestFree(x, z);
     const M = buildCat(coat, i);
     M.root.position.set(px, city.groundHeight(px, pz), pz); M.root.rotation.y = Math.random() * 6.28;
-    M.root.scale.setScalar(1.2); scene.add(M.root); pixel?.toonify?.(M.root);
+    M.root.scale.setScalar(1.2); scene.add(M.root); pixel?.toonify?.(M.root); addGhosts(M.root);
     const cat = { id: i, cat: true, ...M, tag: null, bubbleY: 1.05, home: new THREE.Vector3(px, 0, pz), heading: M.root.rotation.y,
       mode: 'idle', pose: 'sit', t: 1 + Math.random() * 3, speed: 0, target: null, y: M.root.position.y, perch: null,
       follow: false, slot: 0, sniffT: 0, poof: 0, phase: Math.random() * 6, flick: 0, meowT: 8 + Math.random() * 25, startleT: 0,
