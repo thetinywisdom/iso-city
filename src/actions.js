@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261031m';
+import { registerPools } from './french.js?v=20261031n';
 
-// Right-click an NPC -> small pixel context menu: DANCE-OFF / PUSH / SLAP / FART (+ MISSION on the giver).
+// Right-click an NPC -> comic icon ring: DANCE-OFF / PUSH / SLAP / FART (+ MISSION on the giver).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
 // Cartoon mayhem: dance battles that can turn into street parties, shoves that domino, stink clouds.
 const MENU_FAR = 9, MENU_DRIFT = 3.5;
@@ -38,43 +38,103 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   function later(sec, fn, tag = null) { timers.push({ t: sec, fn, tag }); }
   function cancelTag(tag) { timers = timers.filter((x) => x.tag !== tag); }
 
-  // ---- the menu ----
+  // ---- the ring menu (round icons around the character) ----
   const menu = document.createElement('div'); menu.id = 'npc-menu'; document.body.appendChild(menu);
   let open = null;
   const hooks = {};                       // hooks.pickExtra(x, y) -> a non-NPC thing with its own menu (cats)
   const ITEMS = [['dance', 'DANCE-OFF'], ['push', 'PUSH'], ['slap', 'SLAP'], ['fart', 'FART']];
+  const RING_R = 70, BTN = 48;            // px radius + button size
+  // tiny comic-pixel icons (16x16, nearest) — Procreate Comic palette
+  function pxIcon(rows, colors) {
+    const N = rows.length, c = document.createElement('canvas'); c.width = c.height = N;
+    const x = c.getContext('2d');
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const ch = rows[j][i]; if (ch === '.' || !colors[ch]) continue;
+      x.fillStyle = colors[ch]; x.fillRect(i, j, 1, 1);
+    }
+    return c;
+  }
+  const C = { K: '#292C2E', W: '#F0F2F4', Y: '#FFCC3F', P: '#FF5491', B: '#B0E9FF', G: '#4DBA5A', D: '#1F6B35', O: '#ED8F02', R: '#A92D59' };
+  const ICO = {
+    dance: pxIcon([
+      '................', '......KKKK......', '.....KYYYYK.....', '....KYYKKYYK....',
+      '....KYK..KYK....', '....KYK..KYK....', '....KYYKKYYK....', '.....KYYYYK.....',
+      '......KKKK......', '.......KK.......', '......KKKK......', '.....KK..KK.....',
+      '....KK....KK....', '...KK......KK...', '..KK........KK..', '................'], C),
+    push: pxIcon([
+      '................', '................', '......KKKK......', '.....KWWWWK.....',
+      '.....KWWWWK.....', '.....KWWWWK.....', '...KKKWWWWKKK...', '..KWWWWWWWWWWK..',
+      '..KWWWWWWWWWWK..', '...KKKWWWWKKK...', '.....KWWWWK.....', '.....KWWWWK.....',
+      '.....KKKKKK.....', '................', '................', '................'], C),
+    slap: pxIcon([
+      '................', '.....KK.........', '....KWWK........', '...KWWWWK.......',
+      '..KWWWWWWK......', '..KWWWWWWWK.....', '.KWWWWWWWWK.....', '.KWWWWWWWWK.....',
+      '.KWWWWWWWWK.....', '.KWWKKKKWWK.....', '..KK....KK......', '................',
+      '....KKKKKK......', '...KYYYYYYK.....', '....KKKKKK......', '................'], C),
+    fart: pxIcon([
+      '................', '......DD........', '.....DGGD.......', '....DGGGGD......',
+      '...DGGDGGGD.....', '..DGGGGGGGGD....', '..DGGDGGDGGD....', '...DGGGGGGD.....',
+      '....DGGGGD......', '.....DDDD.......', '......KK........', '.....KWWK.......',
+      '....KWWWWK......', '.....KWWK.......', '......KK........', '................'], C),
+    mission: pxIcon([
+      '................', '.......K........', '......KYK.......', '.....KYYYK......',
+      '....KYYYYYK.....', '...KKYYYYYKK....', '..KYYYYYYYYYK...', '.KKKKYYYYYKKKK..',
+      '..KYYYYYYYYYK...', '...KKYYYYYKK....', '....KYYYYYK.....', '.....KYYYK......',
+      '......KYK.......', '.......K........', '................', '................'], C),
+    pet: pxIcon([
+      '................', '.KK.........KK..', 'KWWK.......KWWK.', 'KWWK.......KWWK.',
+      '.KK..KKKKK..KK..', '....KWWWWWK.....', '...KWWWWWWWK....', '..KWWOKWWOWWK...',
+      '..KWWWWWWWWWK...', '..KWWKPKKWWWK...', '...KWWWWWWWK....', '....KWWWWWK.....',
+      '.....KKKKK......', '................', '................', '................'], C),
+    weird: pxIcon([
+      '................', '.....KKKKK......', '....KYYYYYK.....', '...KYYKKKYYK....',
+      '...KYYK.KYYK....', '......K.KYYK....', '.......KYYK.....', '......KYYK......',
+      '......KYK.......', '......KK........', '................', '......KK........',
+      '.....KYYK.......', '......KK........', '................', '................'], C),
+  };
   function openMenu(npc) {
     menu.innerHTML = '';
-    if (npc.tag) { const h = document.createElement('div'); h.className = 'nm-head'; h.textContent = npc.tag; menu.appendChild(h); }
     const items = (npc.menuItems || (npc.special === 'giver' ? [['mission', 'MISSION']] : []).concat(ITEMS)).concat(hooks.extraItems?.(npc) || []);   // cats: just PET; story hunt: + THAT'S WEIRD!
-    for (const [k, label] of items) {
-      const b = document.createElement('button'); b.className = 'nm-item'; b.dataset.act = k; b.textContent = label;
+    items.forEach(([k, label], i) => {
+      const b = document.createElement('button'); b.className = 'nm-btn'; b.dataset.act = k; b.type = 'button';
+      b.style.animationDelay = (i * 0.03) + 's';
+      const tip = document.createElement('span'); tip.className = 'nm-tip'; tip.textContent = label; b.appendChild(tip);
+      const ico = ICO[k];
+      if (ico) { const img = document.createElement('canvas'); img.width = img.height = 16; img.getContext('2d').drawImage(ico, 0, 0); img.className = 'nm-ico'; b.appendChild(img); }
+      else { b.textContent = label[0]; }
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); });
       b.addEventListener('click', (e) => { e.stopPropagation(); choose(k); });
       menu.appendChild(b);
-    }
+    });
     open = { npc, at: npc.root.position.clone() };
     menu.style.display = 'block';
-    menu.style.animation = 'none'; void menu.offsetWidth; menu.style.animation = '';
     placeMenu();
   }
-  function closeMenu() { if (!open) return; open = null; menu.style.display = 'none'; }
+  function closeMenu() { if (!open) return; open = null; menu.style.display = 'none'; menu.innerHTML = ''; }
   function placeMenu() {
     if (!open) return;
     const g = pixel && pixel.enabled ? pixel.scale : 1, w = canvas.clientWidth, h = canvas.clientHeight;
-    open.npc.root.getWorldPosition(tmp); tmp.y += 1.5; tmp.project(camera);
-    let x = (tmp.x + 1) / 2 * w + 33, y = (1 - tmp.y) / 2 * h - 45;
-    const mw = menu.offsetWidth, mh = menu.offsetHeight;
-    if (x + mw > w - 6) x -= mw + 66;                       // flip to the left near the screen edge
-    x = Math.max(6, x); y = Math.max(6, Math.min(y, h - mh - 6));
-    menu.style.transform = `translate(${Math.round(x / g) * g}px, ${Math.round(y / g) * g}px)`;
+    open.npc.root.getWorldPosition(tmp); tmp.y += 1.15; tmp.project(camera);
+    let cx = (tmp.x + 1) / 2 * w, cy = (1 - tmp.y) / 2 * h;
+    // keep the whole ring on-screen
+    cx = Math.max(RING_R + BTN / 2 + 4, Math.min(cx, w - RING_R - BTN / 2 - 4));
+    cy = Math.max(RING_R + BTN / 2 + 4, Math.min(cy, h - RING_R - BTN / 2 - 4));
+    const btns = menu.querySelectorAll('.nm-btn'), n = btns.length || 1;
+    btns.forEach((b, i) => {
+      const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      const x = Math.round((cx + Math.cos(a) * RING_R - BTN / 2) / g) * g;
+      const y = Math.round((cy + Math.sin(a) * RING_R - BTN / 2) / g) * g;
+      b.style.transform = `translate(${x}px, ${y}px)`;
+    });
   }
   window.addEventListener('pointerdown', (e) => {
+    const was = open;
     if (open && !menu.contains(e.target)) closeMenu();        // a click anywhere else closes it (and still does its thing)
     if (e.target !== canvas || e.button !== 2) return;
     const npc = hooks.pickExtra?.(e.clientX, e.clientY) || dialogue.pick(e.clientX, e.clientY);   // cats first (pickExtra)
     if (!npc) { e.preventDefault(); hooks.groundRight?.(e); return; }   // right click on the ground: drop a banana
     e.stopImmediatePropagation(); e.preventDefault();
+    if (was && was.npc === npc) return;                       // right-click same character again = just closed
     dialogue.hideAll();
     openMenu(npc);
   }, true);
@@ -82,7 +142,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (!open) return;
     if (e.code === 'Escape') { closeMenu(); return; }
     const i = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].indexOf(e.code);   // number keys pick an item
-    const btns = menu.querySelectorAll('.nm-item');
+    const btns = menu.querySelectorAll('.nm-btn');
     if (i >= 0 && btns[i]) { e.preventDefault(); choose(btns[i].dataset.act); }
   });
 
