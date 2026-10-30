@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031h';
+import { P } from './palette.js?v=20261031i';
 
 // See-through silhouette only on occluded fragments (GreaterDepth): light tint ~55% so
 // characters stay readable against dark roofs/walls. Solids draw after and cover visible bits.

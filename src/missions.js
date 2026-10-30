@@ -489,7 +489,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   }
   function renderMarker() {
     const gv = g.special('giver');
-    const kind = !gv || active || !mode ? null : mode === 'story' ? null : save.turnIn.length ? 'star' : (save.unlocked < MISSIONS.length && MISSIONS.slice(0, save.unlocked + 1).some((d) => !save.stars.includes(d.id))) ? 'bang' : null;
+    // bang (!) is drawn by dialogue talk-hints; this mark only shows the turn-in star
+    const kind = !gv || active || !mode || mode === 'story' ? null : save.turnIn.length ? 'star' : null;
     if (kind !== markKind) { markKind = kind; mark.replaceChildren(...(kind ? [artCanvas(kind, 3)] : [])); if (kind) mark.style.left = -Math.round(ART[kind][0].length / 2) * 3 + 'px'; }
     mark.style.display = kind && !offer ? 'block' : 'none';
     if (!kind) return;
