@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031i';
+import { COMIC } from './palette.js?v=20261031j';
 
 // ---------------------------------------------------------------------------
 // Full-resolution cartoon pipeline (the old low-res pixel-art pass is gone)
@@ -173,6 +173,7 @@ void main() {`)
 // renders just that layer (depth-tested against everything), and the post pass only inks building pixels.
 export const INK_LAYER = 5;
 export function markInk(o) { o?.traverse?.((m) => m.layers.enable(INK_LAYER)); return o; }
+
 
 export class PixelPipeline {
   constructor(renderer, opts = {}) {

@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261031i';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031i';
-import { Player, JUMP } from './player.js?v=20261031i';
-import { P } from './palette.js?v=20261031i';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031i';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031i';
-import { initExtras } from './extras.js?v=20261031i';
-import { initGameMenu } from './gamemenu.js?v=20261031i';
+import { generateCity, updateRoofFade } from './city.js?v=20261031j';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031j';
+import { Player, JUMP } from './player.js?v=20261031j';
+import { P } from './palette.js?v=20261031j';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031j';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031j';
+import { initExtras } from './extras.js?v=20261031j';
+import { initGameMenu } from './gamemenu.js?v=20261031j';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -88,7 +88,7 @@ function applyPlayerChar(force = false) {
 }
 function updatePlayerBtn() {}
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261031i')
+import('../characters/characters.js?v=20261031j')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
@@ -274,6 +274,7 @@ function tick() {
   // Sun + shadow frustum follow the player (snapped to shadow texels: no crawling)
   placeSnappedSun(sun, camTarget, SUN_OFFSET);
 
+  updateRoofFade(city, player.position, camera.position);
   pixel.render(scene, camera);
   requestAnimationFrame(tick);
 }

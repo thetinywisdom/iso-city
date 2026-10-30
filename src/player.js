@@ -1,29 +1,9 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031i';
+import { P } from './palette.js?v=20261031j';
 
-// See-through silhouette only on occluded fragments (GreaterDepth): light tint ~55% so
-// characters stay readable against dark roofs/walls. Solids draw after and cover visible bits.
-const ghostMat = new THREE.MeshBasicMaterial({
-  color: P.ghost, transparent: true, opacity: 0.55,
-  depthWrite: false, depthTest: true, fog: false, toneMapped: false,
-});
-ghostMat.depthFunc = THREE.GreaterDepth;
-
-export function addGhosts(obj) {
-  const meshes = [];
-  obj.traverse((o) => { if (o.isMesh && !o.userData.isGhost) meshes.push(o); });
-  for (const m of meshes) {
-    m.castShadow = true;
-    m.renderOrder = 2;
-    const g = new THREE.Mesh(m.geometry, ghostMat);
-    g.userData.isGhost = true;
-    g.renderOrder = 3; // after solids in the transparent queue; GreaterDepth still only fills holes
-    g.castShadow = false;
-    g.receiveShadow = false;
-    g.frustumCulled = false;
-    m.add(g); // inherits transforms + animation of the source mesh
-  }
-}
+// Roof occlusion is handled by fading the covering building's roof (see updateRoofFade).
+// Unrestricted GreaterDepth ghosts X-rayed open-street characters through self/others/props.
+export function addGhosts(/* obj */) { /* no-op: call sites on player/npcs/cats kept */ }
 
 // Placeholder: orange capsule with a peach "face" marker so facing is readable.
 function createPlaceholder() {

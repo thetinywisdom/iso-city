@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261031i';
+import { addGhosts } from './player.js?v=20261031j';
 
 // STRAY CATS: a handful of pixel strays living around the city and the park. They wander, sit, groom,
 // stretch, loaf, get the zoomies, hop up on benches and low walls, flick their tails and meow now and then.
