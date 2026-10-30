@@ -10,11 +10,57 @@ export const HOMES = {
   fruit: { label: 'Fruit stand', pos: [-10.6, 17.6], face: [-12.2, 19.2] },
   stroll: { label: 'Strolls the block', walk: true },
 };
-export function loadCustom() {
+// Built into the game: every player sees them. Kept exact from the user's export.
+export const BUILTIN_CHARS = [
+  {
+    v: 1, name: 'NAYEON', gender: 'man', body: 'skinny', height: 0.97, skin: '#F1CDC3',
+    hair: 'ponytail', hairColor: '#93616B', hat: 'none', hatColor: '#F9F0F1',
+    top: 'sweater', topColor: '#A92D59', innerColor: '#F1CDC3', bottom: 'skirt', bottomColor: '#A8ECF2',
+    shoes: 'boots', shoeColor: '#FFCC3F',
+    acc: { glasses: false, sunglasses: true, moustache: false, beard: false, earrings: true, bag: true },
+    accColor: '#FF5491', held: 'umbrella', heldColor: '#DBF5FE',
+    lines: ['Pop, pop!', 'One in a million!', 'Living my best life.'],
+    bubble: 'Once? or Twice?', dance: 'flail', home: 'stroll', id: 'cmvnkdzlxi20h',
+  },
+  {
+    v: 1, name: 'FELI', gender: 'woman', body: 'average', height: 0.9, skin: '#F1CDC3',
+    hair: 'longStraight', hairColor: '#292C2E', hat: 'cap', hatColor: '#3B7EE1',
+    top: 'none', topColor: '#203A57', innerColor: '#203A57', bottom: 'dress', bottomColor: '#203A57',
+    shoes: 'sneakers', shoeColor: '#ED8F02',
+    acc: { glasses: false, sunglasses: false, moustache: false, beard: false, earrings: false, bag: true },
+    accColor: '#ED8F02', held: 'shopping', heldColor: '#3B7EE1',
+    lines: ['Nyahaha', 'I have a theory', 'Mon?'],
+    bubble: 'イケメン大好き', dance: 'disco', home: 'fountain', id: 'cmvnkmzoqam8p',
+  },
+  {
+    v: 1, name: 'KOTARO', gender: 'man', body: 'average', height: 1.1, skin: '#FCF0ED',
+    hair: 'spiky', hairColor: '#FFF3C1', hat: 'none', hatColor: '#2A5B94',
+    top: 'tee', topColor: '#5B6A7B', innerColor: '#DBF5FE', bottom: 'pants', bottomColor: '#203A57',
+    shoes: 'sneakers', shoeColor: '#292C2E',
+    acc: { glasses: false, sunglasses: false, moustache: false, beard: false, earrings: false, bag: false },
+    accColor: '#FF5491', held: 'none', heldColor: '#FF5491',
+    lines: ['Asaka Kotaro イムニダ', 'Hi', 'ハローマイネームイスコウタロウ'],
+    bubble: 'ハトめっちゃ好き', dance: 'chicken', home: 'fountain', id: 'cmvnktp6giaph',
+  },
+];
+const builtinIds = () => new Set(BUILTIN_CHARS.map((c) => c.id));
+const builtinNames = () => new Set(BUILTIN_CHARS.map((c) => String(c.name || '').toUpperCase()));
+export function isBuiltinChar(d) {
+  if (!d) return false;
+  if (typeof d === 'string') return builtinIds().has(d);
+  return builtinIds().has(d.id) || builtinNames().has(String(d.name || '').toUpperCase());
+}
+function loadStored() {
   try {
     const a = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
     return Array.isArray(a) ? a.filter((d) => d && typeof d === 'object') : [];
   } catch { return []; }
+}
+/** Built-ins first, then the player's saved ones (skipping any that match a built-in id or name). */
+export function loadCustom() {
+  const ids = builtinIds(), names = builtinNames();
+  const extras = loadStored().filter((d) => d && !ids.has(d.id) && !names.has(String(d.name || '').toUpperCase()));
+  return [...BUILTIN_CHARS.map((c) => ({ ...c, acc: { ...c.acc } })), ...extras];
 }
 // Which saved character the player plays as (null = the default bald guy).
 export const PLAYER_KEY = 'isoCity.playerChar.v1';
@@ -26,7 +72,12 @@ export function setPlayerChar(id) {
 }
 /** The saved design the player is playing as, or null (default guy / deleted design). */
 export function playerCharDef() { const id = getPlayerChar(); return id ? loadCustom().find((d) => d.id === id) || null : null; }
-export function saveCustom(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
+/** Write only user-made characters; built-ins stay in the source. */
+export function saveCustom(list) {
+  const ids = builtinIds(), names = builtinNames();
+  const only = (Array.isArray(list) ? list : []).filter((d) => d && !ids.has(d.id) && !names.has(String(d.name || '').toUpperCase()));
+  localStorage.setItem(STORE_KEY, JSON.stringify(only));
+}
 export const newId = () => 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 // Seeded variety pedestrians built from the creator's options (plain, generic lines).
 export const VARIETY = [

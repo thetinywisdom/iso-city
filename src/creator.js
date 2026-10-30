@@ -1,11 +1,11 @@
 // Character creator page (creator.html). Builds custom characters with the same builder + pixel
 // pipeline as the game and saves them to localStorage; the city tab picks them up live.
 import * as THREE from 'three';
-import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261025p';
-import { PixelPipeline, rampUniforms } from './pixel.js?v=20261025p';
-import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY } from './customchars.js?v=20261025p';
-import * as CH from '../characters/characters.js?v=20261025p';
-import { CITY_ROSTER, OVERRIDE_KEY, cityBaseDef, loadOverrides, saveOverride, clearOverride } from './citychars.js?v=20261025p';
+import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261031a';
+import { PixelPipeline, rampUniforms } from './pixel.js?v=20261031a';
+import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY, isBuiltinChar } from './customchars.js?v=20261031a';
+import * as CH from '../characters/characters.js?v=20261031a';
+import { CITY_ROSTER, OVERRIDE_KEY, cityBaseDef, loadOverrides, saveOverride, clearOverride } from './citychars.js?v=20261031a';
 
 const MAX = 30;
 const $ = (s) => document.querySelector(s);
@@ -196,6 +196,7 @@ function save(asCopy) {
   const list = loadCustom();
   const def = { ...normalizeCustom(cur) };
   if (editingId && !asCopy) {
+    if (isBuiltinChar(editingId)) return status(`${def.name} is permanent — use DUP to make your own.`, true);
     const i = list.findIndex((d) => d.id === editingId);
     if (i >= 0) { list[i] = { ...def, id: editingId }; saveCustom(list); status(`${def.name} updated.`); return renderList(); }
   }
@@ -229,6 +230,7 @@ function renderList() {
     const btn = (t, fn, cls = '') => { const b = el('button', { className: 'pbtn sm ' + cls, type: 'button', textContent: t }); b.onclick = fn; return b; };
     let armed = false;
     const del = btn('DEL', () => {
+      if (isBuiltinChar(d)) return status(`${d.name} is permanent.`, true);
       if (!armed) { armed = true; del.textContent = 'SURE?'; del.classList.add('pink'); setTimeout(() => { armed = false; del.textContent = 'DEL'; del.classList.remove('pink'); }, 2500); return; }
       saveCustom(loadCustom().filter((o) => o.id !== d.id));
       if (editingId === d.id) editingId = null;
@@ -247,7 +249,7 @@ function renderList() {
       renderList();
     }, me ? 'yellow' : ''); play.dataset.act = 'play'; play.title = me ? 'Playing as them — click to go back to the bald guy' : 'Play as this character';
     if (me) li.classList.add('me');
-    li.append(dot, el('span', { className: 'nm', textContent: d.name }), play, edit, dup, del);
+    li.append(dot, el('span', { className: 'nm', textContent: d.name + (isBuiltinChar(d) ? ' ★' : '') }), play, edit, dup, del);
     ul.append(li);
   }
 }
