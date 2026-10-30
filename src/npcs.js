@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261031d';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031d';
-import { registerPools } from './french.js?v=20261031d';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031d';
+import { addGhosts } from './player.js?v=20261031e';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031e';
+import { registerPools } from './french.js?v=20261031e';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031e';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -310,10 +310,11 @@ export class NPCs {
     const h = L.root.rotation.y;
     const rx = Math.cos(h), rz = -Math.sin(h);
     const tx = lp.x + rx * 0.55, tz = lp.z + rz * 0.55;
-    const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz);
+    const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz) || 1e-6;
     n.pairHold = !busy && !n.mode && dist < 0.9 && !n.c.dancing && n.talkT <= 0 && L.talkT <= 0;
     if (n.talkT > 0) return 0; // talking: stand, face player (handled below)
-    n.targetHeading = busy && dist > 1.5 ? Math.atan2(dx, dz) : h;
+    // always share BRIAN's facing — never yaw toward the side-slot (that spun when catching up)
+    n.targetHeading = h;
     if (dist < 0.06) { p.x = tx; p.z = tz; return L.curSpeed || 0; }
     const spd = busy ? 2.6 : Math.max(L.speed || 1.2, 1.3) * (dist > 1.2 ? 1.5 : 1.15);
     const step = Math.min(dist, spd * dt);
@@ -327,15 +328,23 @@ export class NPCs {
     const h = L.root.rotation.y;
     const fx = Math.sin(h), fz = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h);
     n.sneakPh = (n.sneakPh || 0) + dt;
-    const weave = Math.sin(n.sneakPh * 0.85) * 0.4;
-    const back = 2.6 + 0.25 * Math.sin(n.sneakPh * 0.4);
+    // soft path weave only — never use it for facing (chasing the weave yaw spun him)
+    const weave = Math.sin(n.sneakPh * 0.5) * 0.22;
+    const back = 2.6;
     const tx = lp.x - fx * back + rx * weave, tz = lp.z - fz * back + rz * weave;
-    const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz);
+    const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz) || 1e-6;
     const leadStill = (L.wait > 0) || L.talkT > 0 || (L.curSpeed || 0) < 0.18 || !!L.down || !!L.mode;
     n.sneakCrouch = leadStill || dist < 1.1;
     if (n.talkT > 0) { n.sneakCrouch = true; return 0; }
-    if (leadStill && dist < 1.6) { n.targetHeading = Math.atan2(lp.x - p.x, lp.z - p.z); return 0; } // duck & peek
-    n.targetHeading = dist > 0.2 ? Math.atan2(dx, dz) : h;
+    // face walk direction (= lead heading); tiny capped peek toward the couple when ducked
+    let face = h;
+    if (n.sneakCrouch || leadStill) {
+      const peek = Math.atan2(lp.x - p.x, lp.z - p.z);
+      let d = peek - h; d = Math.atan2(Math.sin(d), Math.cos(d));
+      face = h + Math.max(-0.4, Math.min(0.4, d * 0.35));
+    }
+    n.targetHeading = face;
+    if (leadStill && dist < 1.6) return 0; // duck & peek in place
     if (dist < 0.12) return 0;
     const spd = leadStill ? 1.6 : Math.min(1.35, (L.speed || 1.2) * 0.95);
     const step = Math.min(dist, spd * dt);
