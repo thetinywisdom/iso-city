@@ -3,11 +3,11 @@
 // oddity hunt ("THAT'S WEIRD!" [Q], 7 of 10 per loop). Free roam is the untouched sandbox.
 // Saves to localStorage isoCity.story.v1. The hidden house + the 7:00 finale come in Phase C.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031k';
-import { initGrowth } from './growth.js?v=20261031k';
-import { initFinale } from './finale.js?v=20261031k';
-import { APARTMENT } from './fill.js?v=20261031k';
-import { initGlitch } from './glitch.js?v=20261031k';
+import { COMIC } from './palette.js?v=20261031l';
+import { initGrowth } from './growth.js?v=20261031l';
+import { initFinale } from './finale.js?v=20261031l';
+import { APARTMENT } from './fill.js?v=20261031l';
+import { initGlitch } from './glitch.js?v=20261031l';
 
 export const STORY_KEY = 'isoCity.story.v1';
 export const RENT = 77777;

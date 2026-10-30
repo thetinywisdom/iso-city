@@ -1,23 +1,39 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031k';
+import { P } from './palette.js?v=20261031l';
 
 // Silhouette shown only where the player is hidden behind buildings.
+// Thin light rim so the dark fill stays readable on dark roofs; fine on light walls too.
 const ghostMat = new THREE.MeshBasicMaterial({ color: P.ghost, depthWrite: false });
 ghostMat.depthFunc = THREE.GreaterDepth;
+const ghostRimMat = new THREE.MeshBasicMaterial({ color: 0xf0f2f4, depthWrite: false });
+ghostRimMat.depthFunc = THREE.GreaterDepth;
 
 export function addGhosts(obj) {
   const meshes = [];
   obj.traverse((o) => { if (o.isMesh && !o.userData.isGhost) meshes.push(o); });
   for (const m of meshes) {
     m.castShadow = true;
-    m.renderOrder = 2;
+    m.renderOrder = 3;
+    // Slightly larger light shell (MeshBasic keeps skinning); dark fill covers the middle → white outline.
+    const rim = new THREE.Mesh(m.geometry, ghostRimMat);
+    rim.userData.isGhost = true;
+    rim.userData.isGhostRim = true;
+    rim.scale.setScalar(1.40);
+    rim.renderOrder = 1;  // after buildings (0) so GreaterDepth sees roofs
+    rim.castShadow = false;
+    rim.receiveShadow = false;
+    rim.frustumCulled = false;
+    m.add(rim);
     const g = new THREE.Mesh(m.geometry, ghostMat);
     g.userData.isGhost = true;
-    g.renderOrder = 1;
+    g.renderOrder = 2;  // after rim so dark fill covers the middle
     g.castShadow = false;
+    g.receiveShadow = false;
+    g.frustumCulled = false;
     m.add(g); // inherits transforms + animation of the source mesh
   }
 }
+
 
 // Placeholder: orange capsule with a peach "face" marker so facing is readable.
 function createPlaceholder() {
