@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261031f';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031f';
-import { registerPools } from './french.js?v=20261031f';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031f';
+import { addGhosts } from './player.js?v=20261031g';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031g';
+import { registerPools } from './french.js?v=20261031g';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031g';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -287,21 +287,12 @@ export class NPCs {
     };
   }
   _pairSneakPose(n) {
+    // Scrub only. Crouch is driven via Character.update({ crouch }) so the whole rig
+    // (torso/head/arms are siblings under body) stays intact. Never bend torso.x / arm IK here.
     const prev = n.c.hold;
     n.c.hold = (c) => {
       prev?.(c);
-      if (c._kd || (c._dance && c._danceW >= 0.999)) return;
-      // gait never writes torso.x — MUST assign (not +=) or pitch accumulates into a tumble/spin
-      const k = n.sneakCrouch ? 1 : 0.35;
-      c.parts.body.position.y -= 0.16 * k * c.h;
-      c.parts.torso.rotation.x = 0.18 * k;
-      c.parts.head.rotation.x += 0.2 * k; // head.x is reset by gait each frame, += is safe
-      // tip-toe / peek: hands a little forward when ducked
-      if (n.sneakCrouch && !c.slapping) {
-        const ty = c.parts.torso.rotation.y;
-        c._armIK('L', [0.22, 1.15, 0.2], [0.4, 1.25, -0.05], 0.2, 0.4, ty);
-        c._armIK('R', [-0.22, 1.15, 0.2], [-0.4, 1.25, -0.05], -0.2, 0.4, ty);
-      }
+      c.parts.torso.rotation.x = 0; // kill any leftover broken bend from older builds
     };
   }
   _pairFollowMate(n, dt) {
@@ -329,26 +320,26 @@ export class NPCs {
     const h = L.root.rotation.y;
     const fx = Math.sin(h), fz = Math.cos(h);
     const back = 2.6;
-    // straight trail slot — no lateral weave (strafe+peek looked like a spin)
     const tx = lp.x - fx * back, tz = lp.z - fz * back;
     const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz) || 1e-6;
     const leadStill = (L.wait > 0) || L.talkT > 0 || (L.curSpeed || 0) < 0.18 || !!L.down || !!L.mode;
-    // crouch/peek only when the couple has stopped — not while chasing the slot
-    n.sneakCrouch = leadStill;
-    if (n.talkT > 0) { n.sneakCrouch = true; return 0; }
+    n.sneakCrouch = leadStill; // deeper dip only when the couple stops
+    if (n.talkT > 0) { n.sneakCrouch = true; n.sneakLean = 0; return 0; }
+    // whole-root lean: absolute set each frame (cleared when not peeking); never +=
     if (leadStill && dist < 1.6) {
-      // duck in place; soft capped peek toward the couple
       const peek = Math.atan2(lp.x - p.x, lp.z - p.z);
       let d = peek - h; d = Math.atan2(Math.sin(d), Math.cos(d));
       n.targetHeading = h + Math.max(-0.35, Math.min(0.35, d * 0.3));
+      n.sneakLean = Math.max(-0.08, Math.min(0.08, d * 0.04)); // tiny whole-root tip
       return 0;
     }
+    n.sneakLean = 0;
     if (dist < 0.12) { n.targetHeading = h; return 0; }
-    const spd = leadStill ? 1.6 : Math.min(1.35, (L.speed || 1.2) * 0.95);
+    // tiptoe: a bit slower than the lead
+    const spd = Math.min(1.15, (L.speed || 1.2) * 0.85);
     const step = Math.min(dist, spd * dt);
     const [sx, sz] = this._steer(n, dx / dist, dz / dist, 0.9);
     this._move(p, sx * step, sz * step);
-    // face the way we actually step (matches motion; no strafe-twist)
     n.targetHeading = Math.atan2(sx, sz);
     return spd;
   }
@@ -680,6 +671,7 @@ export class NPCs {
       let speed = 0;
       if (n.bonkT > 0) n.bonkT -= dt;
       if (n.sway > 0) { n.sway = Math.max(0, n.sway - dt); n.root.rotation.x = 0.07 * Math.sin(n.sway * 28) * n.sway / 0.35; }
+      else n.root.rotation.x = (n.pairRole === 'tail' ? (n.sneakLean || 0) : 0);
       if (n.down && n.fly) {                   // shoved: airborne arc, then a thud
         const f = n.fly; f.t += dt;
         this._move(p, f.vx * dt, f.vz * dt);
@@ -770,7 +762,10 @@ export class NPCs {
       n.curSpeed += (speed - n.curSpeed) * Math.min(1, dt * (n.mode || n.drive ? 14 : 10));
       const gy = this.city.groundHeight(p.x, p.z);
       p.y += (gy + 0.02 - p.y) * Math.min(1, dt * 15);
-      n.c.update(dt, n.curSpeed > 0.15 ? n.curSpeed : 0);
+      const spd = n.curSpeed > 0.15 ? n.curSpeed : 0;
+      // tail: proper gait crouch (whole-rig) — never raw torso bends
+      if (n.pairRole === 'tail') n.c.update(dt, { speed: spd, crouch: n.sneakCrouch ? 0.38 : 0.14 });
+      else n.c.update(dt, spd);
     }
   }
 }
