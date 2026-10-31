@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
 // BANANAS: press B to drop a peel behind you (carry up to 3, refill at the fruit stand in the park).
-// Anyone chasing you who steps on one slips comically and lies flat for a couple of seconds:
-// Officer Dough, the bully, Mbappé, (later) the landlady. Peels vanish when used or after a while.
+// ANY NPC who steps on a peel slips and lies flat for a couple of seconds. After they get up,
+// aggressive types chase you; timid ones grumble and carry on. Peels vanish when used or after a while.
 export const BANANA = { max: 3, life: 30, hitR: 0.55, maxOnGround: 4, lie: 2.1, stand: { x: -12.2, z: 19.4 }, refillR: 1.9 };
 // pixel peel (12x10 art pixels), Comic yellows + warm-brown tips, drawn once
 const PEEL = [
@@ -79,7 +79,6 @@ export function initBananas({ scene, city, player, getNPCs, dialogue, combat, mi
     return true;
   }
   function remove(pl) { const i = peels.indexOf(pl); if (i >= 0) peels.splice(i, 1); pl.mesh.removeFromParent(); pl.mesh.material.dispose(); }
-  const chasing = (n) => n.mode === 'chase' || n.mode === 'react' || n.landlady;
   function step(dt) {
     const npcs = getNPCs();
     for (const pl of peels.slice()) {
@@ -87,8 +86,10 @@ export function initBananas({ scene, city, player, getNPCs, dialogue, combat, mi
       if (pl.t > BANANA.life) { remove(pl); continue; }
       pl.mesh.visible = pl.t < BANANA.life - 3 || Math.floor(pl.t * 6) % 2 === 0;   // blink before vanishing
       if (!npcs) continue;
+      // Any NPC (walker, idle, special, chaser…) who steps on a peel slips.
+      // Aggression reaction after get-up lives in npcs.slip → _getUp.
       for (const n of npcs.list) {
-        if (n.down || !chasing(n)) continue;
+        if (n.down) continue;
         const q = n.root.position;
         if (Math.hypot(q.x - pl.x, q.z - pl.z) < BANANA.hitR) {
           if (npcs.slip(n, BANANA.lie)) {

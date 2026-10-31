@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031x';
+import { COMIC } from './palette.js?v=20261031y';
 
 // ---------------------------------------------------------------------------
 // Full-resolution cartoon pipeline (the old low-res pixel-art pass is gone)
