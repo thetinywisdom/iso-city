@@ -5,9 +5,9 @@
 // (spawn, the run-down apartment's door, the landlady's house lot west of the white building, the park).
 // Every building's front faces its nearest road (facing.js). All baked into the city's single draw call.
 import * as THREE from 'three';
-import { mat } from './bucket.js?v=20261031s';
-import { COMIC, P } from './palette.js?v=20261031s';
-import { faceFrame } from './facing.js?v=20261031s';
+import { mat } from './bucket.js?v=20261031t';
+import { COMIC, P } from './palette.js?v=20261031t';
+import { faceFrame } from './facing.js?v=20261031t';
 
 const { blues: B, pinks: K, teals: T, warm: W, neutrals: N, yellows: Y } = COMIC;
 const G = {

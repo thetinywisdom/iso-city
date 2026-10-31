@@ -116,8 +116,29 @@ canvas { image-rendering: pixelated; }
 .mo-btn.mo-yes { background: #FF5491; }
 .mo-btn:hover { background: #292C2E; color: #FFCC3F; }
 .mission-mark { position: absolute; left: 0; top: 0; display: none; will-change: transform; pointer-events: none; }
-.mission-mark canvas { display: block; animation: mark-bob .8s steps(2, end) infinite; }
+/* v=20261031i comic talk-hint look: rounded bubble, no tail, bob */
+.mission-mark.talk-hint-mark .bb {
+  display: block; font: 700 14px/14px 'PressStart2P', monospace; padding: 6px 8px 5px; border-radius: 11px;
+  letter-spacing: 0; min-width: 14px; text-align: center; border: 3px solid #292C2E;
+  box-shadow: 0 3px 0 0 #5B6A7B;
+  -webkit-font-smoothing: none; font-smooth: never;
+  animation: bubble-pop .18s steps(3, end) backwards, mark-bob .8s steps(2, end) .18s infinite;
+}
+.mission-mark.talk-hint-mark.bang .bb { color: #292C2E; background: #FFCC3F; }
+.mission-mark.talk-hint-mark.ask .bb { color: #5B6A7B; background: #F0F2F4; }
 @keyframes mark-bob { 0% { translate: 0 0; } 50% { translate: 0 -6px; } }
+
+/* Grandma Fumiko: persistent heart-in-comic-bubble (same chrome as .bubble.icon) */
+.grandma-heart { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; will-change: transform; }
+.grandma-heart .bb {
+  display: block; line-height: 0; padding: 5px 8px; border-radius: 12px;
+  background: #F0F2F4; border: 3px solid #292C2E; box-shadow: 0 3px 0 0 #5B6A7B;
+  animation: bubble-pop .22s steps(4, end) backwards, icon-bob 1s steps(2, end) .22s infinite;
+}
+.grandma-heart canvas { display: block; image-rendering: pixelated; }
+.grandma-heart svg.tail { position: absolute; left: 0; top: 0; overflow: visible; z-index: 2; pointer-events: none; }
+.grandma-heart .tf { fill: #F0F2F4; }
+.grandma-heart .tl { fill: none; stroke: #292C2E; stroke-width: 3; stroke-linejoin: miter; }
 #mission-arrow { position: absolute; left: 0; top: 0; width: 33px; height: 33px; display: none; image-rendering: pixelated; animation: mark-bob .6s steps(2, end) infinite; }
 /* trip: pixel dust puff */
 .impact.dust > div { left: -36px; top: -28px; width: 72px; height: 42px; animation: dust-puff .6s steps(6, end) forwards; }

@@ -239,17 +239,7 @@ const SAVE_KEY = 'isoCity.missions.v1';
 
 // tiny per-pixel art (crisp at any pixel scale)
 const ART = {
-  // Floating world marks (comic yellow + black outline). Star/starOff stay for the HUD tracker only.
-  q: [
-    '..XXXXX..', '.XXYYYXX.', 'XXY...YXX', 'XXY...YXX', 'XXY..YYXX',
-    '...XYYX..', '..XYYX...', '..XYY....', '..XYY....', '.........',
-    '..XYYX...', '.XXYYXX..', '..XYYX...',
-  ],
-  bang: [
-    '..XXX..', '.XYYYX.', '.XYYYX.', '.XYYYX.', '.XYYYX.',
-    '.XYYYX.', '..XYX..', '..XYX..', '.......', '..XXX..',
-    '.XYYYX.', '..XYX..',
-  ],
+  // HUD tracker stars only. Floating ? / ! marks use the v=20261031i comic talk-hint bubble look.
   star: ['....X....', '...XYX...', '...XYX...', 'XXXXYXXXX', 'XYYYYYYYX', '.XYYYYYX.', '..XYYYX..', '.XYYXYYX.', 'XYXX.XXYX', 'XX.....XX'],
   starOff: ['....X....', '...XWX...', '...XWX...', 'XXXXWXXXX', 'XWWWWWWWX', '.XWWWWWX.', '..XWWWX..', '.XWWXWWX.', 'XWXX.XXWX', 'XX.....XX'],
 };
@@ -305,13 +295,15 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     for (const m of markPool) { m.free = true; m.el.style.display = 'none'; }
   }
   function paintMark(m, kind) {
+    // kind 'q' → '?' (ask), 'bang' → '!' — same comic bubble look as v=20261031i talk-hints.
     if (m.kind === kind && m.el.firstChild) { m.el.style.display = 'block'; return; }
     m.kind = kind; m.el.replaceChildren();
-    if (!kind) { m.el.style.display = 'none'; return; }
-    const c = artCanvas(kind, 3);
-    m.el.appendChild(c);
-    m.el.style.left = -Math.round(ART[kind][0].length / 2) * 3 + 'px';
-    m.el.style.top = -(ART[kind].length * 3) + 'px';
+    if (!kind) { m.el.className = 'mission-mark'; m.el.style.display = 'none'; return; }
+    const glyph = kind === 'bang' ? '!' : '?';
+    m.el.className = 'mission-mark talk-hint-mark ' + (kind === 'bang' ? 'bang' : 'ask');
+    const bb = document.createElement('div'); bb.className = 'bb'; bb.textContent = glyph;
+    m.el.appendChild(bb);
+    m.el.style.left = '0'; m.el.style.top = '0';
     m.el.style.display = 'block';
   }
   const arrow = document.createElement('canvas'); arrow.id = 'mission-arrow'; arrow.width = arrow.height = 11; root.appendChild(arrow);
@@ -588,13 +580,13 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     const qList = bangN ? wantQ.filter((n) => n !== bangN) : wantQ;
     for (const n of qList) {
       const m = acquireMark(); paintMark(m, 'q');
-      const s = project(n.root.getWorldPosition(new THREE.Vector3()), 2.75);
-      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px)`;
+      const s = project(n.root.getWorldPosition(new THREE.Vector3()), 2.55);
+      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px) translate(-50%, -100%)`;
     }
     if (bangN) {
       const m = acquireMark(); paintMark(m, 'bang');
-      const s = project(bangN.root.getWorldPosition(new THREE.Vector3()), 2.75);
-      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px)`;
+      const s = project(bangN.root.getWorldPosition(new THREE.Vector3()), 2.55);
+      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px) translate(-50%, -100%)`;
     }
   }
   function idleArrowNpc() {

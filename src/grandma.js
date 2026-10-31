@@ -13,35 +13,34 @@ const L = {
 };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
-// Grandma's heart sits inside the game's standard comic speech bubble (white bg, black outline, tail).
-const BUBBLE = [
-  '..XXXXXXXXX..',
-  '.XFFFFFFFFFX.',
-  'XFFFFFFFFFFFX',
-  'XFF.11.11.FFX',
-  'XF1221111.FFX',
-  'XF1211111.FFX',
-  'XFF.11111.FFX',
-  'XFFF..111.FFX',
-  'XFFFF...0.FFX',
-  '.XFFFFFFFFFX.',
-  '..XXXXXXXXX..',
-  '......XX.....',
-  '.....XFX.....',
-  '......X......',
-];
-const BCOL = { X: '#292C2E', F: '#F0F2F4', '0': '#A92D59', '1': '#FF5491', '2': '#F9F0F1' };
-function heartSprite() {
-  const c = document.createElement('canvas'); c.width = BUBBLE[0].length; c.height = BUBBLE.length;
+// Heart pixel art (same glyph dialogue uses for ♥ icons).
+const HEART = ['.XX...XX.', 'XPPX.XPPX', 'XPPPXPPPX', 'XPPPPPPPX', 'XPPPPPPPX', '.XPPPPPX.', '..XPPPX..', '...XPX...', '....X....'];
+function heartCanvas() {
+  const c = document.createElement('canvas'); c.width = HEART[0].length; c.height = HEART.length;
   const x = c.getContext('2d');
-  BUBBLE.forEach((row, y) => [...row].forEach((ch, i) => { if (BCOL[ch]) { x.fillStyle = BCOL[ch]; x.fillRect(i, y, 1, 1); } }));
-  const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }));
-  // Slightly larger so the bubble+heart reads above her head.
-  s.scale.set(0.72, 0.78, 1); s.renderOrder = 998; s.name = 'grandmaIcon'; return s;
+  HEART.forEach((row, y) => [...row].forEach((ch, i) => {
+    if (ch === '.') return;
+    x.fillStyle = ch === 'P' ? '#FF5491' : '#A92D59';
+    x.fillRect(i, y, 1, 1);
+  }));
+  c.style.width = c.width * 3 + 'px'; c.style.height = c.height * 3 + 'px';
+  return c;
+}
+/** Persistent comic speech bubble (white + black outline + tail) with the pink heart inside. */
+function makeHeartBubble() {
+  const el = document.createElement('div'); el.className = 'grandma-heart bubble icon'; el.style.display = 'none';
+  const bb = document.createElement('div'); bb.className = 'bb'; bb.appendChild(heartCanvas()); el.appendChild(bb);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'tail'); svg.setAttribute('width', '1'); svg.setAttribute('height', '1');
+  const fill = document.createElementNS('http://www.w3.org/2000/svg', 'polygon'); fill.setAttribute('class', 'tf');
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); line.setAttribute('class', 'tl');
+  svg.appendChild(fill); svg.appendChild(line); el.appendChild(svg);
+  const layer = document.getElementById('bubbles') || document.body;
+  layer.appendChild(el);
+  return { el, bb, fill, line };
 }
 
-export function initGrandma({ scene, player, getNPCs, dialogue, combat, police }) {
+export function initGrandma({ scene, camera, renderer, player, getNPCs, dialogue, combat, police }) {
   const state = { rescues: 0, tiredSays: 0, cdUntil: 0, shooed: 0, whacks: 0, autos: 0, tiredUntil: 0 };
   let act = null;   // { g, target, t, onHit } while she walks up to slap someone
   const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -102,20 +101,51 @@ export function initGrandma({ scene, player, getNPCs, dialogue, combat, police }
     }
     return !!prevClick?.(n);
   };
-  // per frame: the heart icon, the proximity auto-rescue and her rush-and-slap walk
-  let icon = null, iconOn = null, iconC = null, last = performance.now();
+  // per frame: heart-in-bubble over her head, proximity auto-rescue, rush-and-slap walk
+  let icon = null, iconC = null, last = performance.now();
+  const _hp = new THREE.Vector3();
   const prevR = scene?.onBeforeRender;
   if (scene) scene.onBeforeRender = (...a) => {
     prevR?.apply(scene, a);
     const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
     const g = gran(); if (!g) return;
-    if (!icon) icon = heartSprite();
-    if (iconOn !== g.root) { g.root.add(icon); iconOn = g.root; state.iconH = 0; }
-    if (!state.iconH || iconC !== g.c) { iconC = g.c; const bb = new THREE.Box3().setFromObject(g.c.root); state.iconH = Math.max(1.4, bb.max.y - g.root.position.y) + 0.55; }
+    if (!icon) icon = makeHeartBubble();
+    // Hide while she has a speech/shout bubble, or she's down / off-camera.
+    const speaking = !!(dialogue.bubbles && dialogue.bubbles.has(g));
     const trouble = inTrouble();
-    const k = trouble ? 1 + 0.35 * Math.abs(Math.sin(now * 0.008)) : 1;
-    icon.scale.set(0.72 * k, 0.78 * k, 1); icon.position.set(0, state.iconH + (trouble ? 0.04 * Math.sin(now * 0.016) : 0.03 * Math.sin(now * 0.003)), 0);
-    icon.visible = !g.down; state.iconPulse = trouble;
+    let show = !g.down && !speaking && camera && renderer;
+    if (show) {
+      if (!state.iconH || iconC !== g.c) {
+        iconC = g.c;
+        const box = new THREE.Box3().setFromObject(g.c.root);
+        state.iconH = Math.max(1.4, box.max.y - g.root.position.y) + 0.15;
+      }
+      g.root.getWorldPosition(_hp);
+      _hp.y += state.iconH + (trouble ? 0.04 * Math.sin(now * 0.016) : 0.03 * Math.sin(now * 0.003));
+      _hp.project(camera);
+      const canvas = renderer.domElement;
+      const sx = (_hp.x + 1) / 2 * canvas.clientWidth;
+      const sy = (1 - _hp.y) / 2 * canvas.clientHeight;
+      show = _hp.z < 1 && _hp.z > -1;
+      if (show) {
+        const w = icon.bb.offsetWidth || 36, h = icon.bb.offsetHeight || 36;
+        const TAIL = 14;
+        let x = Math.round(sx - w / 2), y = Math.round(sy - TAIL - h);
+        icon.el.style.display = '';
+        icon.el.style.transform = `translate(${x}px, ${y}px)`;
+        // Tail tip on the head, base under the bubble body (same geometry as dialogue bubbles).
+        const tx = Math.round(sx) - x, ty = Math.round(sy) - y;
+        const bx = Math.max(12, Math.min(w - 12, tx)), by = h - 3, half = 6;
+        const on = ty > by + 4;
+        icon.fill.setAttribute('points', on ? `${bx - half},${by} ${tx},${ty} ${bx + half},${by}` : '');
+        icon.line.setAttribute('points', on ? `${bx - half},${by + 1} ${tx},${ty} ${bx + half},${by + 1}` : '');
+        // Pulse scale while you're in trouble.
+        const k = trouble ? 1 + 0.08 * Math.abs(Math.sin(now * 0.008)) : 1;
+        icon.bb.style.transform = `scale(${k})`;
+      }
+    }
+    if (!show) icon.el.style.display = 'none';
+    state.iconPulse = trouble;
     // auto: you ran into her range while chased
     if (!act && trouble && !g.down && flat(g.root.position, player.position) < GRANDMA.autoR) rescue(g, true);
     const A = act;
@@ -131,5 +161,5 @@ export function initGrandma({ scene, player, getNPCs, dialogue, combat, police }
       }
     }
   };
-  return { state, rescue, get icon() { return icon; }, get acting() { return !!act; }, gran, inTrouble, GRANDMA, get cooldownLeft() { return Math.max(0, state.cdUntil - performance.now() / 1000); } };
+  return { state, rescue, get icon() { return icon?.el || null; }, get acting() { return !!act; }, gran, inTrouble, GRANDMA, get cooldownLeft() { return Math.max(0, state.cdUntil - performance.now() / 1000); } };
 }

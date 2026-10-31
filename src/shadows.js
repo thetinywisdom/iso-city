@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031s';
+import { COMIC } from './palette.js?v=20261031t';
 
 // Contact ("blob") shadows: a flat ellipse at each tracked character's feet.
 // They live on the ground only: depth-tested against the world (so a character,
