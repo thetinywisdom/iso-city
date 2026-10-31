@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 // ---------------------------------------------------------------------------------------------
-// Missions: a shady giver NPC hands out dumb jobs. Data-driven: add an entry to MISSIONS and it
-// shows up in the giver's list (unlocked in order). Each mission gets a fresh state object `S`
-// and the manager `g` (helpers + live refs). Optional hooks:
+// Missions: free-roam jobs are spread across NPCs (see each def.giver). Story mode still uses the
+// shady guy for all paid jobs. Data-driven: add an entry to MISSIONS. Each mission gets a fresh
+// state object `S` and the manager `g` (helpers + live refs). Optional hooks:
 //   start(S, g)  update(S, dt, g)  hud(S, g) -> { progress, lines?, timer? }  target(S, g) -> Vector3|null
 //   onSlap(S, npc, g)  onLine(S, npc, line, g)  pickLine(S, npc, g) -> line|null  onClick(S, npc, g) -> bool
 //   onHitPlayer(S, npc, g)  onCaught(S, npc, g)  cleanup(S, g, result)      result: 'complete'|'fail'|'abort'
@@ -22,7 +22,7 @@ const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 export const MISSIONS = [
   {
     id: 'slap-tour', name: 'SLAP TOUR', goal: 'slap 5 different people in 60s.',
-    offer: 'cardio, but make it assault.',
+    giver: 'giver', offer: 'cardio, but make it assault.',
     start(S) { S.hit = new Set(); S.t = TUNING.slapTour.time; },
     update(S, dt, g) { S.t -= dt; if (S.t <= 0) g.fail('time\'s up. weak wrists.'); },
     onSlap(S, n, g) {
@@ -42,7 +42,7 @@ export const MISSIONS = [
   },
   {
     id: 'rejected', name: 'GET REJECTED', goal: 'collect 5 different rude replies.',
-    offer: 'go talk to people. get dunked on.',
+    giver: 'giver', offer: 'go talk to people. get dunked on.',
     start(S) { S.got = []; S.t = TUNING.rejected.time; },
     update(S, dt, g) { S.t -= dt; if (S.t <= 0) g.fail('nobody hates you enough. yet.'); },
     pickLine(S) {   // while active, people are ruder than usual
@@ -66,7 +66,7 @@ export const MISSIONS = [
   },
   {
     id: 'bully', name: 'POKE THE BULLY', goal: 'slap the bully. run to the park circle.',
-    offer: 'see the big guy? slap him. then RUN.',
+    giver: 'big-deb', offer: "That bully thinks he's tougher than me. Go slap him for me.",
     start(S, g) {
       S.b = g.special('bully'); S.phase = 'poke';
       g.npcs().calm(S.b, 0); S.b.mode = null;
@@ -105,7 +105,7 @@ export const MISSIONS = [
   },
   {
     id: 'ball', name: 'STEAL MBAPPÉ\'S BALL', goal: 'grab the ball. escape (15m or 12s).',
-    offer: 'that french football guy? take his ball.',
+    giver: 'bully', offer: 'that french guy with the ball? steal it. now.',
     start(S, g) {
       S.m = g.special('mbappe'); S.ball = S.m.ball; S.phase = 'grab'; S.t = 0;
       g.resetBall(); S.dir = new THREE.Vector3(0, 0, 1);
@@ -169,7 +169,7 @@ export const MISSIONS = [
   },
   {
     id: 'cap', name: 'KIMATA\'S CAP', goal: 'find kimata\'s cap. bring it back.',
-    offer: 'someone yeeted kimata\'s cap. go fetch.',
+    giver: 'syoya', offer: 'someone yeeted my cap. go fetch it for me?',
     start(S, g) {
       S.s = g.special('syoya'); S.phase = 'find'; S.t = TUNING.cap.time;
       S.s.c.cap.visible = false;
@@ -252,10 +252,12 @@ function artCanvas(kind, s = 3) {
 export function initMissions({ scene, camera, renderer, pixel, city, player, getNPCs, dialogue, combat }) {
   const canvas = renderer.domElement;
   // ---- save ----
-  const blank = () => ({ stars: [], unlocked: 0, turnIn: [], met: false });
+  const blank = () => ({ stars: [], unlocked: MISSIONS.length - 1, turnIn: [], met: false });
   let save = blank();
   if (new URLSearchParams(location.search).get('reset') === '1') { try { localStorage.removeItem(SAVE_KEY); } catch {} }
   try { save = { ...blank(), ...JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') }; } catch {}
+  // Phase 1 multi-giver: every free-roam job is available from its own NPC (no sequential unlock).
+  if (!save.story) save.unlocked = Math.max(save.unlocked ?? 0, MISSIONS.length - 1);
   // play mode: null (title up: nothing shows), 'free' (the old 5-mission tracker + stars, saved), 'story' (paid jobs only,
   // a throwaway in-memory record; the free-roam save is never read or written while the story runs)
   let mode = null;
@@ -318,22 +320,32 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     const c = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 24), ringM); c.rotation.x = -Math.PI / 2; zone.add(c);
   }
 
-  // ---- giver offer ----
-  const available = () => MISSIONS.map((d, i) => ({ d, i })).filter(({ i }) => i <= save.unlocked);
-  let offer = null;   // { idx, line }
-  function openOffer(line) {
-    const list = available();
+  // ---- giver offer (free roam: per-NPC jobs; story: shady guy still offers every job) ----
+  const npcKey = (n) => (n && (n.special || n.cityKey)) || null;
+  const findGiver = (key) => getNPCs()?.list.find((n) => n.special === key || n.cityKey === key) || null;
+  const giverLabel = (key) => { const n = findGiver(key); return (n && (n.tag || n.cityKey || n.special) || key || '?').toString().toUpperCase(); };
+  const missionsFor = (n) => {
+    if (!n || !mode) return [];
+    if (mode === 'story') return n.special === 'giver' ? MISSIONS.map((d, i) => ({ d, i })).filter(({ i }) => i <= save.unlocked) : [];
+    const key = npcKey(n);
+    return MISSIONS.map((d, i) => ({ d, i })).filter(({ d, i }) => d.giver === key && i <= save.unlocked);
+  };
+  const isOfferNpc = (n) => missionsFor(n).length > 0;
+  let offer = null;   // { idx, line, npc }
+  function openOffer(line, npc) {
+    const list = missionsFor(npc);
+    if (!list.length) return;
     const firstNew = mode === 'story' ? list.find(({ d }) => !save.stars.includes(d.id)) || list[Math.floor(Math.random() * list.length)] : list.find(({ d }) => !save.stars.includes(d.id));
-    offer = { idx: (firstNew || list[list.length - 1]).i, line };
+    offer = { idx: (firstNew || list[list.length - 1]).i, line, npc };
     renderOffer();
   }
   function renderOffer() {
     if (!offer) { panel.style.display = 'none'; return; }
-    const d = MISSIONS[offer.idx], job = mode === 'story', done = !job && save.stars.includes(d.id), list = available();
+    const d = MISSIONS[offer.idx], job = mode === 'story', done = !job && save.stars.includes(d.id), list = missionsFor(offer.npc);
     panel.innerHTML = '';
     const q = document.createElement('div'); q.className = 'mo-line'; q.textContent = `"${offer.line}"`; panel.appendChild(q);
-    const t = document.createElement('div'); t.className = 'mo-title';
-    t.textContent = job ? `JOB: ${d.name}` : `#${offer.idx + 1} ${d.name}`; if (done) t.appendChild(artCanvas('star', 2)); panel.appendChild(t);
+    const tit = document.createElement('div'); tit.className = 'mo-title';
+    tit.textContent = job ? `JOB: ${d.name}` : `#${offer.idx + 1} ${d.name}`; if (done) tit.appendChild(artCanvas('star', 2)); panel.appendChild(tit);
     const o = document.createElement('div'); o.className = 'mo-goal'; o.textContent = d.offer; panel.appendChild(o);
     const gl = document.createElement('div'); gl.className = 'mo-goal'; gl.textContent = 'GOAL: ' + d.goal; panel.appendChild(gl);
     const pay = job && hooks.jobPay?.(d); if (pay) { const pd = document.createElement('div'); pd.className = 'mo-goal mo-pay'; pd.textContent = 'PAYS ' + pay; panel.appendChild(pd); }
@@ -346,28 +358,45 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     panel.appendChild(row);
     panel.style.display = 'block';
   }
-  function cycle(dir) { const list = available(); const k = list.findIndex(({ i }) => i === offer.idx); offer.idx = list[(k + dir + list.length) % list.length].i; renderOffer(); }
+  function cycle(dir) { const list = missionsFor(offer.npc); const k = list.findIndex(({ i }) => i === offer.idx); offer.idx = list[(k + dir + list.length) % list.length].i; renderOffer(); }
   function accept() { if (!offer) return; const i = offer.idx; offer = null; renderOffer(); start(MISSIONS[i].id); }
-  function later_() { if (!offer) return; offer = null; renderOffer(); const gv = g.special('giver'); if (gv) dialogue.show(gv, mode === 'story' ? JOB_LINES.later : GIVER_LINES.later, 1800); }
+  function later_() {
+    if (!offer) return;
+    const who = offer.npc; offer = null; renderOffer();
+    if (who) dialogue.show(who, mode === 'story' ? JOB_LINES.later : GIVER_LINES.later, 1800);
+  }
 
   function clickGiver(n) {
+    if (!n || !isOfferNpc(n)) return;
     combat.audio?.unlock?.();
     if (n.mode) { dialogue.shout(n, 'not NOW!', 1200); return; }
     if (active) { dialogue.show(n, GIVER_LINES.busy, 2000); return; }
     const no = hooks.canOffer?.(n);   // story mode: a refusal line (e.g. two jobs a day) instead of an offer
     if (typeof no === 'string') { dialogue.clear(n); dialogue.show(n, no, 2600); getNPCs()?.talk(n, 2.6, player.position); return; }
+    const mine = missionsFor(n);
+    const myTurn = save.turnIn.filter((id) => mine.some(({ d }) => d.id === id));
     let line;
     if (mode === 'story') line = !save.met ? JOB_LINES.first : JOB_LINES.again[Math.floor(Math.random() * JOB_LINES.again.length)];
-    else if (save.turnIn.length) {
-      save.turnIn = [];
-      line = save.stars.length >= MISSIONS.length ? GIVER_LINES.menace : GIVER_LINES.turnIn;
-    } else if (!save.met) line = GIVER_LINES.first;
-    else if (save.stars.length >= MISSIONS.length) line = GIVER_LINES.menace;
-    else line = GIVER_LINES.again[Math.floor(Math.random() * GIVER_LINES.again.length)];
+    else if (myTurn.length) {
+      save.turnIn = save.turnIn.filter((id) => !myTurn.includes(id)); persist();
+      const allDone = save.stars.length >= MISSIONS.length;
+      line = allDone ? GIVER_LINES.menace : GIVER_LINES.turnIn;
+      save.met = true; persist();
+      dialogue.clear(n); getNPCs()?.talk(n, 2.4, player.position); dialogue.show(n, line, 2200); return;
+    } else if (n.special === 'giver') {
+      if (!save.met) line = GIVER_LINES.first;
+      else if (save.stars.length >= MISSIONS.length) line = GIVER_LINES.menace;
+      else line = GIVER_LINES.again[Math.floor(Math.random() * GIVER_LINES.again.length)];
+    } else {
+      // other free-roam givers: speak their job pitch in a comic bubble
+      const pickM = mine.find(({ d }) => !save.stars.includes(d.id)) || mine[0];
+      line = pickM?.d.offer || GIVER_LINES.again[0];
+    }
     save.met = true; persist();
     dialogue.clear(n);
     getNPCs()?.talk(n, 4, player.position);
-    openOffer(line);
+    dialogue.show(n, line, 2800);
+    openOffer(line, n);
   }
 
   // ---- lifecycle ----
@@ -407,7 +436,14 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     banner.appendChild(h);
     if (line) { const l = document.createElement('div'); l.className = 'mb-line'; l.textContent = line; banner.appendChild(l); }
     const s = document.createElement('div'); s.className = 'mb-sub';
-    if (ok) s.textContent = job ? '' : save.stars.length >= MISSIONS.length ? 'ALL STARS. TALK TO THE GUY.' : 'TURN IN AT THE SHADY GUY';
+    if (ok) {
+      if (job) s.textContent = '';
+      else if (save.stars.length >= MISSIONS.length) s.textContent = 'ALL STARS. NICE.';
+      else {
+        const tid = save.turnIn[save.turnIn.length - 1]; const td = MISSIONS.find((mm) => mm.id === tid);
+        s.textContent = td ? ('TURN IN: ' + giverLabel(td.giver)) : 'TURN IN';
+      }
+    }
     else {
       const b = document.createElement('button'); b.className = 'mo-btn mo-yes'; b.textContent = 'RETRY [R]';
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); retry(); });
@@ -481,24 +517,40 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
       parts.push(p);
       for (const l of h.lines || []) { const d = document.createElement('div'); d.className = l.startsWith('-') ? 'mh-line off' : 'mh-line'; d.textContent = l; parts.push(d); }
     } else if (mode === 'free' && (save.stars.length < MISSIONS.length || save.turnIn.length)) {
-      const d = document.createElement('div'); d.className = 'mh-line'; d.textContent = save.turnIn.length ? 'TURN IN: SHADY GUY' : 'FIND THE SHADY GUY (!)'; parts.push(d);
+      const d = document.createElement('div'); d.className = 'mh-line'; d.textContent = (() => {
+        if (save.turnIn.length) {
+          const td = MISSIONS.find((mm) => mm.id === save.turnIn[0]);
+          return td ? ('TURN IN: ' + giverLabel(td.giver)) : 'TURN IN';
+        }
+        const next = MISSIONS.find((mm) => !save.stars.includes(mm.id));
+        return next ? ('FIND ' + giverLabel(next.giver) + ' (!)') : 'FIND A GIVER (!)';
+      })(); parts.push(d);
     }
     const key = parts.map((p) => p.textContent + p.className).join('|');
     if (key !== hud.dataset.key) { hud.replaceChildren(...parts); hud.dataset.key = key; }
     hud.style.display = parts.length ? '' : 'none';
   }
+  function markNpc() {
+    if (mode !== 'free' || active) return null;
+    if (save.turnIn.length) {
+      const td = MISSIONS.find((mm) => mm.id === save.turnIn[0]);
+      return td ? findGiver(td.giver) : null;
+    }
+    const next = MISSIONS.find((mm) => !save.stars.includes(mm.id));
+    return next ? findGiver(next.giver) : null;
+  }
   function renderMarker() {
-    const gv = g.special('giver');
-    const kind = !gv || active || !mode ? null : mode === 'story' ? null : save.turnIn.length ? 'star' : (save.unlocked < MISSIONS.length && MISSIONS.slice(0, save.unlocked + 1).some((d) => !save.stars.includes(d.id))) ? 'bang' : null;
+    const gv = markNpc();
+    const kind = !gv || active || !mode ? null : mode === 'story' ? null : save.turnIn.length ? 'star' : (MISSIONS.some((d) => !save.stars.includes(d.id))) ? 'bang' : null;
     if (kind !== markKind) { markKind = kind; mark.replaceChildren(...(kind ? [artCanvas(kind, 3)] : [])); if (kind) mark.style.left = -Math.round(ART[kind][0].length / 2) * 3 + 'px'; }
     mark.style.display = kind && !offer ? 'block' : 'none';
-    if (!kind) return;
+    if (!kind || !gv) return;
     const s = project(gv.root.getWorldPosition(new THREE.Vector3()), 2.75);
     mark.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px)`;
   }
   const arrowCache = new Map();
   function renderArrow() {
-    const tgt = active?.def.target?.(active.S, g) || (!active && markKind ? g.special('giver')?.root.position : null);
+    const tgt = active?.def.target?.(active.S, g) || (!active && markKind ? markNpc()?.root.position : null);
     if (!tgt) { arrow.style.display = 'none'; return; }
     const s = project(tgt, 1.0), w = canvas.clientWidth, h = canvas.clientHeight, m = 40;
     if (s.x > m && s.x < w - m && s.y > m && s.y < h - m && s.z < 1) { arrow.style.display = 'none'; return; }
@@ -539,7 +591,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     get active() { return active && { id: active.def.id, S: active.S }; },
     get save() { return save; },
     get offer() { return offer; },
-    start, retry, accept, later: later_, openOffer, clickGiver: () => { const n = g.special('giver'); if (n) clickGiver(n); },
+    start, retry, accept, later: later_, openOffer, clickGiver: (n) => { if (n) clickGiver(n); else { const gv = g.special('giver'); if (gv) clickGiver(gv); } },
+    isOfferNpc, missionsFor, npcKey, findGiver,
     complete: (l = 'debug') => g.complete(l), fail: (l = 'debug') => g.fail(l), abort: () => finish('abort'),
     reset() { finish('abort'); save = mode === 'story' ? storyBlank() : (freeSave = blank()); if (mode !== 'story') try { localStorage.removeItem(SAVE_KEY); } catch {} offer = null; renderOffer(); hideBanner(); lastFailed = null; },
     unlockAll() { save.unlocked = MISSIONS.length - 1; persist(); },

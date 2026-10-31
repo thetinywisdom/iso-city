@@ -1,5 +1,5 @@
 // One in-game menu (Esc or the MENU button): CONTROLS · CHARACTERS · CREATOR · STORY/FREE ROAM. The game pauses while it is open.
-import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031q';
+import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031r';
 
 const CONTROLS = [
   ['MOUSE', '— the main controls —'],

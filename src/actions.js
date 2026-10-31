@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261031q';
+import { registerPools } from './french.js?v=20261031r';
 
-// Right-click an NPC -> comic text-bubble ring: Dance-off / Push / Slap / Fart (+ Mission on the giver).
+// Right-click an NPC -> comic text-bubble ring: Dance-off / Push / Slap / Fart (+ Mission on job givers).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
 // Cartoon mayhem: dance battles that can turn into street parties, shoves that domino, stink clouds.
 const MENU_FAR = 9, MENU_DRIFT = 3.5;
@@ -47,7 +47,8 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   const RING_R0 = 96;                     // base radius; grows a bit with more buttons
   function openMenu(npc) {
     menu.innerHTML = '';
-    const items = (npc.menuItems || (npc.special === 'giver' ? [['mission', 'MISSION']] : []).concat(ITEMS)).concat(hooks.extraItems?.(npc) || []);   // cats: just PET; story hunt: + THAT'S WEIRD!
+    const canMission = missions.isOfferNpc?.(npc) || (missions.mode === 'story' && npc.special === 'giver');
+    const items = (npc.menuItems || (canMission ? [['mission', 'MISSION']] : []).concat(ITEMS)).concat(hooks.extraItems?.(npc) || []);   // cats: just PET; story hunt: + THAT'S WEIRD!
     items.forEach(([k, label], i) => {
       const b = document.createElement('button'); b.className = 'nm-btn'; b.dataset.act = k; b.type = 'button';
       b.style.animationDelay = (i * 0.03) + 's';
@@ -115,7 +116,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (hooks.onExtra?.(n, kind)) return;
     combat.audio.unlock();
     if (n.onChoose) { n.onChoose(kind); return; }
-    if (kind === 'mission') { missions.clickGiver(); return; }
+    if (kind === 'mission') { missions.clickGiver(n); return; }
     if (kind === 'slap') { combat.slap(n); return; }
     if (n.down && kind !== 'fart') { dialogue.show(n, '...', 1200); return; }
     combat.approach(n, REACH[kind], (t) => ACT[kind](t));
