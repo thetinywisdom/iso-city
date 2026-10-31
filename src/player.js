@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031ab';
+import { P } from './palette.js?v=20261031ac';
 
 // Silhouette shown only where the player is hidden behind buildings.
 // Thin light rim so the dark fill stays readable on dark roofs; fine on light walls too.
@@ -31,6 +31,8 @@ ghostRimMat.customProgramCacheKey = () => 'ghostRimN2_' + RIM_W;
 export function addGhosts(obj) {
   const meshes = [];
   obj.traverse((o) => { if (o.isMesh && !o.userData.isGhost) meshes.push(o); });
+  const ghosts = obj.userData.ghosts || (obj.userData.ghosts = []);
+  ghosts.length = 0;
   for (const m of meshes) {
     m.castShadow = true;
     m.renderOrder = 3;
@@ -50,7 +52,52 @@ export function addGhosts(obj) {
     g.receiveShadow = false;
     g.frustumCulled = false;
     m.add(g); // inherits transforms + animation of the source mesh
+    ghosts.push(rim, g);
   }
+  // Start off: open-street default. Cull pass enables near buildings (no look change when on).
+  obj.userData.ghostsOn = false;
+  for (let i = 0; i < ghosts.length; i++) ghosts[i].visible = false;
+}
+
+/** Show/hide a character's ghost meshes. No-op when unchanged. Shared materials — visibility only. */
+export function setGhostsOn(obj, on) {
+  const gs = obj && obj.userData && obj.userData.ghosts;
+  if (!gs || obj.userData.ghostsOn === on) return;
+  obj.userData.ghostsOn = on;
+  for (let i = 0; i < gs.length; i++) gs[i].visible = on;
+}
+
+// Proximity pads (world units). ON tighter than OFF → hysteresis, no pop at the threshold.
+const GHOST_PAD_ON = 2.8;
+const GHOST_PAD_OFF = 4.2;
+
+/** Pack building XZ AABBs into a Float32Array [x0,x1,z0,z1, ...] — allocate once at boot. */
+export function buildGhostBounds(buildings) {
+  const n = buildings.length;
+  const a = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    const b = buildings[i], o = i * 4;
+    a[o] = b.x0; a[o + 1] = b.x1; a[o + 2] = b.z0; a[o + 3] = b.z1;
+  }
+  return a;
+}
+
+/** Cheap XZ near-building test. `on` selects hysteresis pad. No allocations. */
+export function ghostNearBuilding(x, z, bounds, nBuildings, on) {
+  const pad = on ? GHOST_PAD_OFF : GHOST_PAD_ON;
+  for (let i = 0; i < nBuildings; i++) {
+    const o = i * 4;
+    if (x >= bounds[o] - pad && x <= bounds[o + 1] + pad && z >= bounds[o + 2] - pad && z <= bounds[o + 3] + pad) return true;
+  }
+  return false;
+}
+
+/** Apply proximity cull to one character root at (x,z). */
+export function cullGhostsAt(obj, x, z, bounds, nBuildings) {
+  if (!obj || !obj.userData || !obj.userData.ghosts) return;
+  const on = !!obj.userData.ghostsOn;
+  const near = ghostNearBuilding(x, z, bounds, nBuildings, on);
+  if (near !== on) setGhostsOn(obj, near);
 }
 
 

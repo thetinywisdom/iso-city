@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261031ab';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031ab';
-import { registerPools } from './french.js?v=20261031ab';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031ab';
+import { addGhosts, buildGhostBounds, cullGhostsAt } from './player.js?v=20261031ac';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031ac';
+import { registerPools } from './french.js?v=20261031ac';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031ac';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -151,6 +151,35 @@ export class NPCs {
       addEventListener('storage', (e) => { if (e.key === STORE_KEY || e.key === PLAYER_KEY || e.key === null) this.syncCustom(); });
     }
     for (const n of this.list) n.root.position.y = city.groundHeight(n.root.position.x, n.root.position.z);
+    // Ghost silhouette cull: only draw GreaterDepth ghosts near buildings (open street = off).
+    this._ghostBounds = buildGhostBounds(city.buildings);
+    this._ghostN = city.buildings.length;
+    this._ghostI = 0;
+    this._cullGhostsAll();
+  }
+  /** One-shot enable/disable ghosts for every NPC from current positions. */
+  _cullGhostsAll() {
+    const b = this._ghostBounds, nb = this._ghostN;
+    if (!b) return;
+    for (const n of this.list) {
+      if (n.removed || !n.c?.root) continue;
+      cullGhostsAt(n.c.root, n.root.position.x, n.root.position.z, b, nb);
+    }
+  }
+  /** Round-robin ~1/4 of NPCs per frame — no alloc, bounded loops. */
+  _cullGhostsStep() {
+    const list = this.list, n = list.length, b = this._ghostBounds, nb = this._ghostN;
+    if (!n || !b) return;
+    const batch = (n + 3) >> 2;
+    let i = this._ghostI;
+    for (let k = 0; k < batch; k++) {
+      const npc = list[i];
+      i++; if (i >= n) i = 0;
+      if (!npc || npc.removed || !npc.c?.root) continue;
+      const p = npc.root.position;
+      cullGhostsAt(npc.c.root, p.x, p.z, b, nb);
+    }
+    this._ghostI = i;
   }
   _walkLoop(n, W) {
     const path = loop(W.c[0], W.c[1], W.L || 6.65), a = path[W.start || 0], b = path[((W.start || 0) + (W.dir || 1) + 4) % 4], t = W.along ?? 0.5;
@@ -204,6 +233,7 @@ export class NPCs {
     n.root.add(c.root); addGhosts(c.root);
     n.c = c; c.update?.(0, 0);
     this.toonify?.(c.root);
+    if (this._ghostBounds) cullGhostsAt(c.root, n.root.position.x, n.root.position.z, this._ghostBounds, this._ghostN);
   }
   /** (Re)spawn the creator's saved characters from localStorage. Returns the number spawned. */
   syncCustom() {
@@ -229,6 +259,7 @@ export class NPCs {
       this.toonify?.(n.root);
     });
     this._wireCouple();
+    if (this._ghostBounds) this._cullGhostsAll();
     return this.customs.length;
   }
   /** FELI + BRIAN share a city stroll (hands held); KOTARO tips along behind. Survives push/slap/banana via return-to-lead. */
@@ -767,6 +798,7 @@ export class NPCs {
       if (n.pairRole === 'tail') n.c.update(dt, { speed: spd, crouch: n.sneakCrouch ? 0.38 : 0.14 });
       else n.c.update(dt, spd);
     }
+    this._cullGhostsStep();
   }
 }
 

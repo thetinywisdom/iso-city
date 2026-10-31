@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261031ab';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031ab';
-import { Player, JUMP } from './player.js?v=20261031ab';
-import { P } from './palette.js?v=20261031ab';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031ab';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031ab';
-import { initExtras } from './extras.js?v=20261031ab';
-import { initGameMenu } from './gamemenu.js?v=20261031ab';
+import { generateCity } from './city.js?v=20261031ac';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031ac';
+import { Player, JUMP, cullGhostsAt } from './player.js?v=20261031ac';
+import { P } from './palette.js?v=20261031ac';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031ac';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031ac';
+import { initExtras } from './extras.js?v=20261031ac';
+import { initGameMenu } from './gamemenu.js?v=20261031ac';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -82,17 +82,19 @@ function applyPlayerChar(force = false) {
   if (def) { try { model = charMod.createCustom(def); } catch (e) { console.warn('custom player failed, using default:', e.message); } }
   if (!model) model = charMod.createMainCharacter();
   player.setModel(model); pixel.toonify(player.root);
+  if (npcs?._ghostBounds && player.model) cullGhostsAt(player.model, player.position.x, player.position.z, npcs._ghostBounds, npcs._ghostN);
   playingAs = model.def ? key : 'default';
   player.heroName = model.def ? String(model.def.name || 'YOU').toUpperCase() : null;
   updatePlayerBtn();
 }
 function updatePlayerBtn() {}
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261031ab')
+import('../characters/characters.js?v=20261031ac')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
     if (mod?.createNPC) { npcs = new NPCs(scene, mod, city); npcs.toonify = (r) => pixel.toonify(r); }
+    if (npcs?._ghostBounds && player.model) cullGhostsAt(player.model, player.position.x, player.position.z, npcs._ghostBounds, npcs._ghostN);
     pixel.toonify(scene);
   })
   .catch((e) => console.info('Character module not loaded, using placeholder:', e.message));
@@ -269,6 +271,10 @@ function tick() {
   camTarget.lerp(fc ? fc.pos : player.position, 1 - Math.exp(-dt * (fc ? 3 : 6)));
   zoomNow += ((fc?.zoom ?? zoom) - zoomNow) * (1 - Math.exp(-dt * 3));
   if (npcs) npcs.update(dt, player.position, RADIUS);
+  // Player ghost cull (same building AABB / hysteresis as NPCs; cheap single test)
+  if (npcs?._ghostBounds && player.model) {
+    cullGhostsAt(player.model, player.position.x, player.position.z, npcs._ghostBounds, npcs._ghostN);
+  }
   pixel.placeCamera(camera, camTarget, camOffset, VIEW / zoomNow); 
 
   // Sun + shadow frustum follow the player (snapped to shadow texels: no crawling)
