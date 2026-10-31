@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031ad';
+import { P } from './palette.js?v=20261031ae';
 
 // Silhouette shown only where the player is hidden behind buildings.
 // Thin light rim so the dark fill stays readable on dark roofs; fine on light walls too.

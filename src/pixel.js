@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031ad';
+import { COMIC } from './palette.js?v=20261031ae';
 
 // ---------------------------------------------------------------------------
 // Full-resolution cartoon pipeline (the old low-res pixel-art pass is gone)
@@ -286,25 +286,76 @@ export class PixelPipeline {
   }
 }
 
-// Fit the sun's shadow ortho to the visible view, then snap its centre to the
-// shadow-map texel grid so hard edges don't crawl while the light follows.
-const _v = new THREE.Vector3(), _dir = new THREE.Vector3(), _right = new THREE.Vector3(), _up = new THREE.Vector3();
-export function placeSnappedSun(sun, target, offset, halfExtent) {
+// Fit the sun's shadow ortho to the visible view every frame.
+// Intersect view rays with y=0 and y=CAST_Y (not raw NDC-cube / not ground-lifted
+// corners) so the iso-skewed visible volume — including tall buildings — sits
+// inside the map. Centering on camTarget alone left a world-fixed diagonal cut-off.
+const _v = new THREE.Vector3(), _p = new THREE.Vector3(), _d = new THREE.Vector3();
+const _vr = new THREE.Vector3(), _vu = new THREE.Vector3();
+const _CAST_Y = 36;
+export function placeSnappedSun(sun, target, offset, viewCam, viewH) {
+  sun.target.position.copy(target);
+  sun.position.copy(target).add(offset);
+  sun.target.updateMatrixWorld();
+  sun.updateMatrixWorld();
   const cam = sun.shadow.camera;
-  const half = halfExtent;
+  // Match WebGLShadowMap: position + lookAt (not light-child matrix).
+  cam.position.copy(sun.position);
+  cam.lookAt(sun.target.position);
+  cam.updateMatrixWorld();
+  const inv = cam.matrixWorldInverse;
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const pushWorld = (wx, wy, wz) => {
+    _v.set(wx, wy, wz).applyMatrix4(inv);
+    if (_v.x < minX) minX = _v.x; if (_v.x > maxX) maxX = _v.x;
+    if (_v.y < minY) minY = _v.y; if (_v.y > maxY) maxY = _v.y;
+  };
+  // View-ray ∩ ground and ∩ building-top plane for each NDC corner.
+  for (const ndy of [-1, 1]) for (const ndx of [-1, 1]) {
+    _p.set(ndx, ndy, -1).unproject(viewCam);
+    _d.set(ndx, ndy, 1).unproject(viewCam).sub(_p);
+    for (const y of [0, _CAST_Y]) {
+      const t = (_d.y !== 0) ? (y - _p.y) / _d.y : 0;
+      pushWorld(_p.x + _d.x * t, y, _p.z + _d.z * t);
+    }
+  }
+  // Casters just outside the view toward the light that still throw into it.
+  const sunLen = Math.hypot(offset.x, offset.z) || 1;
+  const castIn = (_CAST_Y / Math.max(1, offset.y)) * sunLen + 14;
+  const gx = -offset.x / sunLen, gz = -offset.z / sunLen;
+  for (const ndy of [-1, 1]) for (const ndx of [-1, 1]) {
+    _p.set(ndx, ndy, -1).unproject(viewCam);
+    _d.set(ndx, ndy, 1).unproject(viewCam).sub(_p);
+    const t = (_d.y !== 0) ? (0 - _p.y) / _d.y : 0;
+    const wx = _p.x + _d.x * t, wz = _p.z + _d.z * t;
+    pushWorld(wx + gx * castIn, 0, wz + gz * castIn);
+    pushWorld(wx + gx * castIn, _CAST_Y, wz + gz * castIn);
+  }
+
+  const pad = 1.04;
+  const halfX = Math.max(1, (maxX - minX) * 0.5 * pad);
+  const halfY = Math.max(1, (maxY - minY) * 0.5 * pad);
+  const half = Math.max(halfX, halfY) + 2;
+  const midX = (minX + maxX) * 0.5, midY = (minY + maxY) * 0.5;
+
+  _vr.setFromMatrixColumn(cam.matrixWorld, 0);
+  _vu.setFromMatrixColumn(cam.matrixWorld, 1);
+  _p.copy(target).addScaledVector(_vr, midX).addScaledVector(_vu, midY);
+
+  const texel = (2 * half) / sun.shadow.mapSize.x;
+  const a = _p.dot(_vr), b = _p.dot(_vu);
+  _p.addScaledVector(_vr, Math.round(a / texel) * texel - a)
+    .addScaledVector(_vu, Math.round(b / texel) * texel - b);
+
+  sun.target.position.copy(_p);
+  sun.position.copy(_p).add(offset);
+  sun.target.updateMatrixWorld();
+  sun.updateMatrixWorld();
+
   if (cam.right !== half || cam.top !== half) {
     cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
     cam.updateProjectionMatrix();
   }
-  const texel = (2 * half) / sun.shadow.mapSize.x;
-  _dir.copy(offset).normalize();
-  _right.set(0, 1, 0).cross(_dir).normalize();
-  _up.copy(_dir).cross(_right).normalize();
-  _v.copy(target);
-  const a = _v.dot(_right), b = _v.dot(_up);
-  _v.addScaledVector(_right, Math.round(a / texel) * texel - a)
-    .addScaledVector(_up, Math.round(b / texel) * texel - b);
-  sun.target.position.copy(_v);
-  sun.position.copy(_v).add(offset);
-  sun.target.updateMatrixWorld();
+  sun.shadow.needsUpdate = true; // every frame — never leave a frozen map
 }

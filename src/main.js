@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261031ad';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031ad';
-import { Player, JUMP, cullGhostsAt } from './player.js?v=20261031ad';
-import { P } from './palette.js?v=20261031ad';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031ad';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031ad';
-import { initExtras } from './extras.js?v=20261031ad';
-import { initGameMenu } from './gamemenu.js?v=20261031ad';
+import { generateCity } from './city.js?v=20261031ae';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031ae';
+import { Player, JUMP, cullGhostsAt } from './player.js?v=20261031ae';
+import { P } from './palette.js?v=20261031ae';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031ae';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031ae';
+import { initExtras } from './extras.js?v=20261031ae';
+import { initGameMenu } from './gamemenu.js?v=20261031ae';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -89,7 +89,7 @@ function applyPlayerChar(force = false) {
 }
 function updatePlayerBtn() {}
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261031ad')
+import('../characters/characters.js?v=20261031ae')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
@@ -278,11 +278,8 @@ function tick() {
   const viewH = VIEW / zoomNow;
   pixel.placeCamera(camera, camTarget, camOffset, viewH);
 
-  // Shadow frustum covers the whole visible screen (pad for iso + sun angle); centre
-  // snaps by one shadow texel only — no big steps, no shimmer.
-  const aspect = window.innerWidth / Math.max(1, window.innerHeight);
-  const half = Math.max(viewH * aspect, viewH) * 1.25 + 12;
-  placeSnappedSun(sun, camTarget, SUN_OFFSET, half);
+  // Shadow frustum fits the visible view in light space every frame (texel-snapped).
+  placeSnappedSun(sun, camTarget, SUN_OFFSET, camera, viewH);
 
   pixel.render(scene, camera);
   requestAnimationFrame(tick);

@@ -1,26 +1,34 @@
 // Gameplay extras hooked from main.js with one line: contact shadows that show
 // through roofs (task 4), click-to-talk NPC chat bubbles (task 7), and long-press SLAP (combat.js).
-import { ContactShadows } from './shadows.js?v=20261031ad';
-import { initDialogue } from './dialogue.js?v=20261031ad';
-import { initCombat } from './combat.js?v=20261031ad';
-import { initMissions } from './missions.js?v=20261031ad';
-import { initActions } from './actions.js?v=20261031ad';
-import { initChatter } from './chatter.js?v=20261031ad';
-import { initPolice } from './police.js?v=20261031ad';
-import { initBananas } from './bananas.js?v=20261031ad';
-import { initCats } from './cats.js?v=20261031ad';
-import { initHiding } from './hiding.js?v=20261031ad';
-import { initGrandma } from './grandma.js?v=20261031ad';
-import { initStory } from './story.js?v=20261031ad';
+import { ContactShadows } from './shadows.js?v=20261031ae';
+import { initDialogue } from './dialogue.js?v=20261031ae';
+import { initCombat } from './combat.js?v=20261031ae';
+import { initMissions } from './missions.js?v=20261031ae';
+import { initActions } from './actions.js?v=20261031ae';
+import { initChatter } from './chatter.js?v=20261031ae';
+import { initPolice } from './police.js?v=20261031ae';
+import { initBananas } from './bananas.js?v=20261031ae';
+import { initCats } from './cats.js?v=20261031ae';
+import { initHiding } from './hiding.js?v=20261031ae';
+import { initGrandma } from './grandma.js?v=20261031ae';
+import { initStory } from './story.js?v=20261031ae';
 
 export function initExtras({ scene, camera, renderer, pixel, city, player, getNPCs, keys }) {
   const shadows = new ContactShadows(scene, city);
-  shadows.track(player.root, 0.45);
+  const trackChar = (root, r) => {
+    if (!root) return;
+    root.traverse((o) => { if (o.isMesh && !o.userData.isGhost) o.castShadow = true; });
+    shadows.track(root, r);
+  };
+  trackChar(player.root, 0.45);
   let tracked = 0;
   const prev = scene.onBeforeRender;
-  scene.onBeforeRender = (...a) => {   // pick up NPCs once the character module has loaded
+  scene.onBeforeRender = (...a) => {   // pick up NPCs the frame they appear (and any later spawns)
     const npcs = getNPCs();
-    if (npcs && npcs.list.length + (npcs.customGen || 0) * 1000 !== tracked) { for (const r of npcs.roots) shadows.track(r, 0.4); tracked = npcs.list.length + (npcs.customGen || 0) * 1000; }
+    if (npcs && npcs.list.length + (npcs.customGen || 0) * 1000 !== tracked) {
+      for (const r of npcs.roots) trackChar(r, 0.4);
+      tracked = npcs.list.length + (npcs.customGen || 0) * 1000;
+    }
     prev.apply(scene, a);
   };
   const dialogue = initDialogue({ scene, camera, renderer, pixel, player, getNPCs });
