@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261031ac';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031ac';
-import { Player, JUMP, cullGhostsAt } from './player.js?v=20261031ac';
-import { P } from './palette.js?v=20261031ac';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031ac';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031ac';
-import { initExtras } from './extras.js?v=20261031ac';
-import { initGameMenu } from './gamemenu.js?v=20261031ac';
+import { generateCity } from './city.js?v=20261031ad';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031ad';
+import { Player, JUMP, cullGhostsAt } from './player.js?v=20261031ad';
+import { P } from './palette.js?v=20261031ad';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031ad';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031ad';
+import { initExtras } from './extras.js?v=20261031ad';
+import { initGameMenu } from './gamemenu.js?v=20261031ad';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -89,7 +89,7 @@ function applyPlayerChar(force = false) {
 }
 function updatePlayerBtn() {}
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261031ac')
+import('../characters/characters.js?v=20261031ad')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
@@ -275,10 +275,14 @@ function tick() {
   if (npcs?._ghostBounds && player.model) {
     cullGhostsAt(player.model, player.position.x, player.position.z, npcs._ghostBounds, npcs._ghostN);
   }
-  pixel.placeCamera(camera, camTarget, camOffset, VIEW / zoomNow); 
+  const viewH = VIEW / zoomNow;
+  pixel.placeCamera(camera, camTarget, camOffset, viewH);
 
-  // Sun + shadow frustum follow the player (snapped to shadow texels: no crawling)
-  placeSnappedSun(sun, camTarget, SUN_OFFSET);
+  // Shadow frustum covers the whole visible screen (pad for iso + sun angle); centre
+  // snaps by one shadow texel only — no big steps, no shimmer.
+  const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+  const half = Math.max(viewH * aspect, viewH) * 1.25 + 12;
+  placeSnappedSun(sun, camTarget, SUN_OFFSET, half);
 
   pixel.render(scene, camera);
   requestAnimationFrame(tick);

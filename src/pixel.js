@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031ac';
+import { COMIC } from './palette.js?v=20261031ad';
 
 // ---------------------------------------------------------------------------
 // Full-resolution cartoon pipeline (the old low-res pixel-art pass is gone)
@@ -286,18 +286,24 @@ export class PixelPipeline {
   }
 }
 
-// Keep a following directional light's shadow map aligned to its own texel grid
-// so hard shadow edges don't crawl as the light tracks the player.
-const _m = new THREE.Matrix4(), _v = new THREE.Vector3();
-export function placeSnappedSun(sun, target, offset) {
+// Fit the sun's shadow ortho to the visible view, then snap its centre to the
+// shadow-map texel grid so hard edges don't crawl while the light follows.
+const _v = new THREE.Vector3(), _dir = new THREE.Vector3(), _right = new THREE.Vector3(), _up = new THREE.Vector3();
+export function placeSnappedSun(sun, target, offset, halfExtent) {
   const cam = sun.shadow.camera;
-  const texel = (cam.right - cam.left) / sun.shadow.mapSize.x;
-  const dir = offset.clone().normalize();
-  const right = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
-  const up = dir.clone().cross(right).normalize();
+  const half = halfExtent;
+  if (cam.right !== half || cam.top !== half) {
+    cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
+    cam.updateProjectionMatrix();
+  }
+  const texel = (2 * half) / sun.shadow.mapSize.x;
+  _dir.copy(offset).normalize();
+  _right.set(0, 1, 0).cross(_dir).normalize();
+  _up.copy(_dir).cross(_right).normalize();
   _v.copy(target);
-  const a = _v.dot(right), b = _v.dot(up);
-  _v.addScaledVector(right, Math.round(a / texel) * texel - a).addScaledVector(up, Math.round(b / texel) * texel - b);
+  const a = _v.dot(_right), b = _v.dot(_up);
+  _v.addScaledVector(_right, Math.round(a / texel) * texel - a)
+    .addScaledVector(_up, Math.round(b / texel) * texel - b);
   sun.target.position.copy(_v);
   sun.position.copy(_v).add(offset);
   sun.target.updateMatrixWorld();
