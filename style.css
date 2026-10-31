@@ -115,7 +115,7 @@ canvas { image-rendering: pixelated; }
   box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E; -webkit-font-smoothing: none; }
 .mo-btn.mo-yes { background: #FF5491; }
 .mo-btn:hover { background: #292C2E; color: #FFCC3F; }
-.mission-mark { position: absolute; left: -9px; top: -48px; display: none; will-change: transform; }
+.mission-mark { position: absolute; left: 0; top: 0; display: none; will-change: transform; pointer-events: none; }
 .mission-mark canvas { display: block; animation: mark-bob .8s steps(2, end) infinite; }
 @keyframes mark-bob { 0% { translate: 0 0; } 50% { translate: 0 -6px; } }
 #mission-arrow { position: absolute; left: 0; top: 0; width: 33px; height: 33px; display: none; image-rendering: pixelated; animation: mark-bob .6s steps(2, end) infinite; }

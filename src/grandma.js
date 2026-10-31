@@ -13,15 +13,32 @@ const L = {
 };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
-// tiny pixel heart (Comic pinks), 7x6 art pixels
-const HEART = ['.11.11.', '1221111', '1211111', '.11111.', '..111..', '...0...'];
+// Grandma's heart sits inside the game's standard comic speech bubble (white bg, black outline, tail).
+const BUBBLE = [
+  '..XXXXXXXXX..',
+  '.XFFFFFFFFFX.',
+  'XFFFFFFFFFFFX',
+  'XFF.11.11.FFX',
+  'XF1221111.FFX',
+  'XF1211111.FFX',
+  'XFF.11111.FFX',
+  'XFFF..111.FFX',
+  'XFFFF...0.FFX',
+  '.XFFFFFFFFFX.',
+  '..XXXXXXXXX..',
+  '......XX.....',
+  '.....XFX.....',
+  '......X......',
+];
+const BCOL = { X: '#292C2E', F: '#F0F2F4', '0': '#A92D59', '1': '#FF5491', '2': '#F9F0F1' };
 function heartSprite() {
-  const c = document.createElement('canvas'); c.width = 7; c.height = 6; const x = c.getContext('2d');
-  const col = { 0: '#A92D59', 1: '#FF5491', 2: '#F9F0F1' };
-  HEART.forEach((row, y) => [...row].forEach((ch, i) => { if (col[ch]) { x.fillStyle = col[ch]; x.fillRect(i, y, 1, 1); } }));
+  const c = document.createElement('canvas'); c.width = BUBBLE[0].length; c.height = BUBBLE.length;
+  const x = c.getContext('2d');
+  BUBBLE.forEach((row, y) => [...row].forEach((ch, i) => { if (BCOL[ch]) { x.fillStyle = BCOL[ch]; x.fillRect(i, y, 1, 1); } }));
   const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }));
-  s.scale.set(0.46, 0.4, 1); s.renderOrder = 998; s.name = 'grandmaIcon'; return s;   // drawn on top so you can spot her behind buildings
+  // Slightly larger so the bubble+heart reads above her head.
+  s.scale.set(0.72, 0.78, 1); s.renderOrder = 998; s.name = 'grandmaIcon'; return s;
 }
 
 export function initGrandma({ scene, player, getNPCs, dialogue, combat, police }) {
@@ -94,10 +111,10 @@ export function initGrandma({ scene, player, getNPCs, dialogue, combat, police }
     const g = gran(); if (!g) return;
     if (!icon) icon = heartSprite();
     if (iconOn !== g.root) { g.root.add(icon); iconOn = g.root; state.iconH = 0; }
-    if (!state.iconH || iconC !== g.c) { iconC = g.c; const bb = new THREE.Box3().setFromObject(g.c.root); state.iconH = Math.max(1.4, bb.max.y - g.root.position.y) + 0.42; }
+    if (!state.iconH || iconC !== g.c) { iconC = g.c; const bb = new THREE.Box3().setFromObject(g.c.root); state.iconH = Math.max(1.4, bb.max.y - g.root.position.y) + 0.55; }
     const trouble = inTrouble();
     const k = trouble ? 1 + 0.35 * Math.abs(Math.sin(now * 0.008)) : 1;
-    icon.scale.set(0.46 * k, 0.4 * k, 1); icon.position.set(0, state.iconH + (trouble ? 0.04 * Math.sin(now * 0.016) : 0.03 * Math.sin(now * 0.003)), 0);
+    icon.scale.set(0.72 * k, 0.78 * k, 1); icon.position.set(0, state.iconH + (trouble ? 0.04 * Math.sin(now * 0.016) : 0.03 * Math.sin(now * 0.003)), 0);
     icon.visible = !g.down; state.iconPulse = trouble;
     // auto: you ran into her range while chased
     if (!act && trouble && !g.down && flat(g.root.position, player.position) < GRANDMA.autoR) rescue(g, true);

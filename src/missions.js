@@ -101,6 +101,7 @@ export const MISSIONS = [
     hud: (S, g) => S.phase === 'run'
       ? { progress: `RUN! PARK ${Math.max(0, flat(g.player.position, TUNING.bully.safe) - TUNING.bully.safe.r).toFixed(0)}m` }
       : { progress: 'SLAP THE BULLY' },
+    markNpc: (S) => S.b || null,
     target: (S) => (S.phase === 'poke' ? S.b.root.position : new THREE.Vector3(TUNING.bully.safe.x, 0, TUNING.bully.safe.z)),
   },
   {
@@ -165,6 +166,7 @@ export const MISSIONS = [
     },
     hud: (S, g) => S.phase === 'grab' ? { progress: 'GRAB THE BALL' }
       : { progress: `ESCAPE ${Math.min(TUNING.ball.escapeDist, flat(g.player.position, S.m.root.position)).toFixed(0)}/${TUNING.ball.escapeDist}m`, timer: Math.max(0, TUNING.ball.surviveTime - S.t) },
+    markNpc: (S) => S.m || null,
     target: (S) => (S.phase === 'grab' ? S.ball.position : null),
   },
   {
@@ -217,6 +219,8 @@ export const MISSIONS = [
     },
     cleanup(S, g) { S.s.c.cap.visible = true; S.cap.removeFromParent(); window.removeEventListener('keydown', S.onKey); },
     hud: (S) => ({ progress: S.phase === 'find' ? 'GET THE CAP (JUMP / E / CLICK)' : 'BRING IT TO KIMATA', timer: S.t }),
+    // Cap is an object during 'find'; Kimata is the single NPC target once you carry it back.
+    markNpc: (S) => (S.phase === 'carry' || S.phase === 'done') ? (S.s || null) : null,
     target: (S) => (S.phase === 'find' ? S.cap.position : S.s.root.position),
   },
 ];
@@ -235,7 +239,17 @@ const SAVE_KEY = 'isoCity.missions.v1';
 
 // tiny per-pixel art (crisp at any pixel scale)
 const ART = {
-  bang: ['.XXXXX.', 'XXYYYXX', 'XYYYYYX', 'XYYYYYX', 'XYYYYYX', 'XXYYYXX', '.XYYYX.', '.XYYYX.', '.XXYXX.', '..XXX..', '.......', '..XXX..', '.XXYXX.', '.XYYYX.', '.XXYXX.', '..XXX..'],
+  // Floating world marks (comic yellow + black outline). Star/starOff stay for the HUD tracker only.
+  q: [
+    '..XXXXX..', '.XXYYYXX.', 'XXY...YXX', 'XXY...YXX', 'XXY..YYXX',
+    '...XYYX..', '..XYYX...', '..XYY....', '..XYY....', '.........',
+    '..XYYX...', '.XXYYXX..', '..XYYX...',
+  ],
+  bang: [
+    '..XXX..', '.XYYYX.', '.XYYYX.', '.XYYYX.', '.XYYYX.',
+    '.XYYYX.', '..XYX..', '..XYX..', '.......', '..XXX..',
+    '.XYYYX.', '..XYX..',
+  ],
   star: ['....X....', '...XYX...', '...XYX...', 'XXXXYXXXX', 'XYYYYYYYX', '.XYYYYYX.', '..XYYYX..', '.XYYXYYX.', 'XYXX.XXYX', 'XX.....XX'],
   starOff: ['....X....', '...XWX...', '...XWX...', 'XXXXWXXXX', 'XWWWWWWWX', '.XWWWWWX.', '..XWWWX..', '.XWWXWWX.', 'XWXX.XXWX', 'XX.....XX'],
 };
@@ -276,9 +290,32 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   const banner = document.createElement('div'); banner.id = 'mission-banner'; root.appendChild(banner);
   const toastEl = document.createElement('div'); toastEl.id = 'mission-toast'; root.appendChild(toastEl);
   const panel = document.createElement('div'); panel.id = 'mission-offer'; root.appendChild(panel);
-  const mark = document.createElement('div'); mark.className = 'mission-mark'; root.appendChild(mark);
+  // Pool of floating marks: '?' on every giver, '!' on a single-NPC mission target. No floating star.
+  const markPool = [];
+  function acquireMark() {
+    let m = markPool.find((x) => x.free);
+    if (!m) {
+      const el = document.createElement('div'); el.className = 'mission-mark'; root.appendChild(el);
+      m = { el, free: true, kind: null }; markPool.push(m);
+    }
+    m.free = false; return m;
+  }
+  function releaseMarks() {
+    // Hide + free; keep the painted canvas so we do not rebuild glyphs every frame.
+    for (const m of markPool) { m.free = true; m.el.style.display = 'none'; }
+  }
+  function paintMark(m, kind) {
+    if (m.kind === kind && m.el.firstChild) { m.el.style.display = 'block'; return; }
+    m.kind = kind; m.el.replaceChildren();
+    if (!kind) { m.el.style.display = 'none'; return; }
+    const c = artCanvas(kind, 3);
+    m.el.appendChild(c);
+    m.el.style.left = -Math.round(ART[kind][0].length / 2) * 3 + 'px';
+    m.el.style.top = -(ART[kind].length * 3) + 'px';
+    m.el.style.display = 'block';
+  }
   const arrow = document.createElement('canvas'); arrow.id = 'mission-arrow'; arrow.width = arrow.height = 11; root.appendChild(arrow);
-  let markKind = null, bannerTimer = 0, toastTimer = 0;
+  let bannerTimer = 0, toastTimer = 0;
 
   const g = {
     player, city, dialogue, later,
@@ -530,27 +567,53 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     if (key !== hud.dataset.key) { hud.replaceChildren(...parts); hud.dataset.key = key; }
     hud.style.display = parts.length ? '' : 'none';
   }
-  function markNpc() {
-    if (mode !== 'free' || active) return null;
-    if (save.turnIn.length) {
-      const td = MISSIONS.find((mm) => mm.id === save.turnIn[0]);
-      return td ? findGiver(td.giver) : null;
-    }
-    const next = MISSIONS.find((mm) => !save.stars.includes(mm.id));
-    return next ? findGiver(next.giver) : null;
+  function npcHasSpeech(npc) {
+    try { return !!(dialogue.bubbles && dialogue.bubbles.has(npc)); } catch (_) { return false; }
   }
   function renderMarker() {
-    const gv = markNpc();
-    const kind = !gv || active || !mode ? null : mode === 'story' ? null : save.turnIn.length ? 'star' : (MISSIONS.some((d) => !save.stars.includes(d.id))) ? 'bang' : null;
-    if (kind !== markKind) { markKind = kind; mark.replaceChildren(...(kind ? [artCanvas(kind, 3)] : [])); if (kind) mark.style.left = -Math.round(ART[kind][0].length / 2) * 3 + 'px'; }
-    mark.style.display = kind && !offer ? 'block' : 'none';
-    if (!kind || !gv) return;
-    const s = project(gv.root.getWorldPosition(new THREE.Vector3()), 2.75);
-    mark.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px)`;
+    releaseMarks();
+    if (!mode) return;
+    // '?' on every NPC who currently has a mission to give (free-roam givers + story shady).
+    const wantQ = [];
+    for (const n of (getNPCs()?.list || [])) {
+      if (!isOfferNpc(n) || !n.root) continue;
+      if (offer && offer.npc === n) continue;          // talking to them — offer panel owns the moment
+      if (npcHasSpeech(n)) continue;                   // don't sit on top of a comic bubble
+      wantQ.push(n);
+    }
+    // '!' on the one NPC this active mission targets (if any). Cleared when the mission ends.
+    let bangN = active ? (active.def.markNpc?.(active.S, g) || null) : null;
+    if (bangN && (!bangN.root || npcHasSpeech(bangN) || (offer && offer.npc === bangN))) bangN = null;
+    // Target '!' wins over giver '?' on the same head.
+    const qList = bangN ? wantQ.filter((n) => n !== bangN) : wantQ;
+    for (const n of qList) {
+      const m = acquireMark(); paintMark(m, 'q');
+      const s = project(n.root.getWorldPosition(new THREE.Vector3()), 2.75);
+      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px)`;
+    }
+    if (bangN) {
+      const m = acquireMark(); paintMark(m, 'bang');
+      const s = project(bangN.root.getWorldPosition(new THREE.Vector3()), 2.75);
+      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px)`;
+    }
+  }
+  function idleArrowNpc() {
+    // Prefer turn-in giver, else first giver with an open (unstarred) job, else any offer npc.
+    if (save.turnIn.length) {
+      const td = MISSIONS.find((mm) => mm.id === save.turnIn[0]);
+      const gv = td ? findGiver(td.giver) : null;
+      if (gv) return gv;
+    }
+    const next = MISSIONS.find((mm) => !save.stars.includes(mm.id) && findGiver(mm.giver));
+    if (next) return findGiver(next.giver);
+    return (getNPCs()?.list || []).find((n) => isOfferNpc(n)) || null;
   }
   const arrowCache = new Map();
   function renderArrow() {
-    const tgt = active?.def.target?.(active.S, g) || (!active && markKind ? markNpc()?.root.position : null);
+    const bangN = active ? (active.def.markNpc?.(active.S, g) || null) : null;
+    const tgt = active?.def.target?.(active.S, g)
+      || (bangN && bangN.root.position)
+      || (!active && mode ? idleArrowNpc()?.root.position : null);
     if (!tgt) { arrow.style.display = 'none'; return; }
     const s = project(tgt, 1.0), w = canvas.clientWidth, h = canvas.clientHeight, m = 40;
     if (s.x > m && s.x < w - m && s.y > m && s.y < h - m && s.z < 1) { arrow.style.display = 'none'; return; }
@@ -603,7 +666,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
       finish('abort'); offer = null; renderOffer(); hideBanner(); lastFailed = null; zone.visible = false;
       mode = m;
       save = m === 'story' ? storyBlank() : freeSave;
-      hud.dataset.key = ''; markKind = undefined;
+      hud.dataset.key = ''; releaseMarks();
     },
   };
   return api;
