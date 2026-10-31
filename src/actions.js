@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261031o';
+import { registerPools } from './french.js?v=20261031p';
 
-// Right-click an NPC -> Sims-style text-pill ring: Dance-off / Push / Slap / Fart (+ Mission on the giver).
+// Right-click an NPC -> comic text-bubble ring: Dance-off / Push / Slap / Fart (+ Mission on the giver).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
 // Cartoon mayhem: dance battles that can turn into street parties, shoves that domino, stink clouds.
 const MENU_FAR = 9, MENU_DRIFT = 3.5;
@@ -38,20 +38,19 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   function later(sec, fn, tag = null) { timers.push({ t: sec, fn, tag }); }
   function cancelTag(tag) { timers = timers.filter((x) => x.tag !== tag); }
 
-  // ---- the ring menu (Sims-style text pills around the character) ----
+  // ---- the ring menu (comic white text bubbles around the character) ----
   const menu = document.createElement('div'); menu.id = 'npc-menu'; document.body.appendChild(menu);
   let open = null;
   const hooks = {};                       // hooks.pickExtra(x, y) -> a non-NPC thing with its own menu (cats)
   const ITEMS = [['dance', 'Dance-off'], ['push', 'Push'], ['slap', 'Slap'], ['fart', 'Fart']];
   const SHOW = { dance: 'Dance-off', push: 'Push', slap: 'Slap', fart: 'Fart', mission: 'Mission', pet: 'Pet', weird: "That's weird!" };
-  const RING_R0 = 96;                     // base radius; grows a bit with more pills
+  const RING_R0 = 96;                     // base radius; grows a bit with more buttons
   function openMenu(npc) {
     menu.innerHTML = '';
     const items = (npc.menuItems || (npc.special === 'giver' ? [['mission', 'MISSION']] : []).concat(ITEMS)).concat(hooks.extraItems?.(npc) || []);   // cats: just PET; story hunt: + THAT'S WEIRD!
     items.forEach(([k, label], i) => {
       const b = document.createElement('button'); b.className = 'nm-btn'; b.dataset.act = k; b.type = 'button';
       b.style.animationDelay = (i * 0.03) + 's';
-      const knob = document.createElement('span'); knob.className = 'nm-knob'; b.appendChild(knob);
       const txt = document.createElement('span'); txt.className = 'nm-txt'; txt.textContent = SHOW[k] || label; b.appendChild(txt);
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); });
       b.addEventListener('click', (e) => { e.stopPropagation(); choose(k); });
@@ -69,7 +68,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     let cx = (tmp.x + 1) / 2 * w, cy = (1 - tmp.y) / 2 * h;
     const btns = [...menu.querySelectorAll('.nm-btn')], n = btns.length || 1;
     const R = RING_R0 + Math.max(0, n - 4) * 14;
-    // measure pills, then clamp the ring centre so every pill stays on-screen
+    // measure buttons, then clamp the ring centre so every one stays on-screen
     let maxHalfW = 40, maxHalfH = 14;
     for (const b of btns) { maxHalfW = Math.max(maxHalfW, b.offsetWidth / 2); maxHalfH = Math.max(maxHalfH, b.offsetHeight / 2); }
     const pad = 6;
@@ -84,10 +83,6 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
       y = Math.max(pad, Math.min(y, h - bh - pad));
       b.style.left = `${Math.round(x / g) * g}px`;
       b.style.top = `${Math.round(y / g) * g}px`;
-      // knob faces the centre (Sims pie menu)
-      const kn = Math.abs(cos) >= Math.abs(sin) ? (cos > 0 ? 'nm-k-l' : 'nm-k-r') : (sin > 0 ? 'nm-k-t' : 'nm-k-b');
-      const knob = b.querySelector('.nm-knob');
-      if (knob) knob.className = 'nm-knob ' + kn;
     });
   }
   window.addEventListener('pointerdown', (e) => {

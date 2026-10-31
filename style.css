@@ -127,29 +127,20 @@ canvas { image-rendering: pixelated; }
   60% { transform: scale(1.15) translateY(-3px); opacity: 1; }
   100% { transform: scale(1.3) translateY(-8px); opacity: 0; }
 }
-/* ---- right-click NPC pill ring (Sims-style text buttons around the character) ---- */
+/* ---- right-click NPC text ring (comic white bubbles around the character) ---- */
 #npc-menu { position: fixed; left: 0; top: 0; z-index: 8; display: none; width: 0; height: 0;
   pointer-events: none; background: transparent; padding: 0; box-shadow: none; user-select: none; }
-#npc-menu .nm-btn { position: absolute; left: 0; top: 0; height: 28px; border-radius: 14px; border: 0;
-  pointer-events: auto; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font: 8px/28px 'PressStart2P', monospace; -webkit-font-smoothing: none; color: #F0F2F4;
-  background: #2A5B94; padding: 0 12px; white-space: nowrap;
-  box-shadow: 0 -2px 0 0 #B0E9FF, 0 3px 0 0 #203A57, -2px 0 0 0 #3B7EE1, 2px 0 0 0 #3B7EE1;
+#npc-menu .nm-btn { position: absolute; left: 0; top: 0; height: 30px; border-radius: 12px;
+  box-sizing: border-box; border: 3px solid #292C2E; pointer-events: auto; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font: 8px/1 'PressStart2P', monospace; -webkit-font-smoothing: none; color: #292C2E;
+  background: #F0F2F4; padding: 0 10px; white-space: nowrap;
+  box-shadow: 0 3px 0 0 #5B6A7B;
   animation: bubble-pop .18s steps(3, end) backwards; }
-#npc-menu .nm-btn:hover { background: #3B7EE1; color: #FFCC3F; }
-#npc-menu .nm-btn[data-act="mission"] { background: #A92D59; color: #F0F2F4;
-  box-shadow: 0 -2px 0 0 #FF7DAF, 0 3px 0 0 #5B1030, -2px 0 0 0 #FF5491, 2px 0 0 0 #FF5491; }
+#npc-menu .nm-btn:hover { background: #292C2E; color: #F0F2F4; }
+#npc-menu .nm-btn[data-act="mission"] { background: #A92D59; color: #F0F2F4; border-color: #292C2E; }
 #npc-menu .nm-btn[data-act="mission"]:hover { background: #FF5491; color: #F0F2F4; }
 #npc-menu .nm-txt { pointer-events: none; position: relative; z-index: 1; }
-#npc-menu .nm-knob { position: absolute; width: 12px; height: 12px; border-radius: 50%;
-  background: #2A5B94; pointer-events: none; box-shadow: 0 2px 0 0 #203A57; }
-#npc-menu .nm-btn:hover .nm-knob { background: #3B7EE1; }
-#npc-menu .nm-btn[data-act="mission"] .nm-knob { background: #A92D59; box-shadow: 0 2px 0 0 #5B1030; }
-#npc-menu .nm-btn[data-act="mission"]:hover .nm-knob { background: #FF5491; }
-#npc-menu .nm-knob.nm-k-l { left: -5px; top: 50%; transform: translateY(-50%); }
-#npc-menu .nm-knob.nm-k-r { right: -5px; top: 50%; transform: translateY(-50%); }
-#npc-menu .nm-knob.nm-k-t { top: -5px; left: 50%; transform: translateX(-50%); }
-#npc-menu .nm-knob.nm-k-b { bottom: -5px; left: 50%; transform: translateX(-50%); }
 
 /* ---- idle small-talk bubbles (chatter.js): smaller, cool tint, sit under real bubbles ---- */
 

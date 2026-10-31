@@ -1,10 +1,10 @@
 // One in-game menu (Esc or the MENU button): CONTROLS · CHARACTERS · CREATOR. The game pauses while it is open.
-import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031o';
+import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031p';
 
 const CONTROLS = [
   ['MOUSE', '— the main controls —'],
   ['CLICK GROUND', 'walk there'], ['CLICK PERSON', 'talk (far away: walk up first)'], ['DOUBLE-CLICK PERSON', 'push'],
-  ['HOLD CLICK ON PERSON', 'slap'], ['RIGHT-CLICK PERSON', 'pill ring: dance-off, push, slap, fart'], ['RIGHT-CLICK GROUND', 'drop a banana'],
+  ['HOLD CLICK ON PERSON', 'slap'], ['RIGHT-CLICK PERSON', 'action ring: dance-off, push, slap, fart'], ['RIGHT-CLICK GROUND', 'drop a banana'],
   ['CLICK CAT', 'pet'], ['CLICK TRASH BIN', 'hide in / climb out'], ['WHEEL', 'zoom'],
   ['KEYBOARD', '— still works too —'],
   ['WASD / ARROWS', 'walk'], ['SHIFT', 'run'], ['SPACE', 'jump'], ['B', 'drop a banana'], ['E', 'pet cat / hide in bin'],
