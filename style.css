@@ -125,7 +125,10 @@ canvas { image-rendering: pixelated; }
   border: 4px solid #292C2E;
   box-shadow: 0 4px 0 0 #5B6A7B;
   -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
-  animation: bubble-pop .18s steps(3, end) backwards, mark-bob .9s steps(2, end) .18s infinite;
+  /* mark-bob only — never bubble-pop. renderMarker toggles display each frame; pop's
+     `backwards` fill would lock the glyph at scale(.2) forever (tiny unreadble dot). */
+  animation: mark-bob .9s steps(2, end) infinite;
+  transform: none;
 }
 .mission-mark.talk-hint-mark.bang .bb { color: #292C2E; background: #FFCC3F; }
 .mission-mark.talk-hint-mark.ask .bb { color: #292C2E; background: #F0F2F4; }

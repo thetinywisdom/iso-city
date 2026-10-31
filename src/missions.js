@@ -291,12 +291,16 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     m.free = false; return m;
   }
   function releaseMarks() {
-    // Hide + free; keep the painted canvas so we do not rebuild glyphs every frame.
+    // Free + hide (used when leaving a mode / clearing everything).
     for (const m of markPool) { m.free = true; m.el.style.display = 'none'; }
   }
   function paintMark(m, kind) {
-    // kind 'q' → '?' (ask), 'bang' → '!' — same comic bubble look as v=20261031i talk-hints.
-    if (m.kind === kind && m.el.firstChild) { m.el.style.display = 'block'; return; }
+    // kind 'q' → '?' (ask), 'bang' → '!' — big comic bubble. Avoid toggling display when
+    // already showing the same kind so CSS animations are not restarted every frame.
+    if (m.kind === kind && m.el.firstChild) {
+      if (m.el.style.display !== 'block') m.el.style.display = 'block';
+      return;
+    }
     m.kind = kind; m.el.replaceChildren();
     if (!kind) { m.el.className = 'mission-mark'; m.el.style.display = 'none'; return; }
     const glyph = kind === 'bang' ? '!' : '?';
@@ -563,8 +567,9 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     try { return !!(dialogue.bubbles && dialogue.bubbles.has(npc)); } catch (_) { return false; }
   }
   function renderMarker() {
-    releaseMarks();
-    if (!mode) return;
+    // Soft-free only — do NOT display:none marks we are about to reuse (that restarts CSS anims).
+    for (const m of markPool) m.free = true;
+    if (!mode) { for (const m of markPool) m.el.style.display = 'none'; return; }
     // '?' on every NPC who currently has a mission to give (free-roam givers + story shady).
     const wantQ = [];
     for (const n of (getNPCs()?.list || [])) {
@@ -591,6 +596,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
       const s = project(bangN.root.getWorldPosition(new THREE.Vector3()), 2.55);
       m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y - MARK_LIFT)}px) translate(-50%, -100%)`;
     }
+    // Hide leftovers that were not reused this frame.
+    for (const m of markPool) { if (m.free) m.el.style.display = 'none'; }
   }
   function idleArrowNpc() {
     // Prefer turn-in giver, else first giver with an open (unstarred) job, else any offer npc.
