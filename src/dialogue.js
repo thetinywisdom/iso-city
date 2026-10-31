@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { isFrench, frLine } from './french.js?v=20261031t';
+import { isFrench, frLine } from './french.js?v=20261031u';
 
 // Click an NPC -> pixel-art chat bubble with a random line above their head.
 // The listener runs in the capture phase on window, so a click that hits an NPC

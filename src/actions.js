@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261031t';
+import { registerPools } from './french.js?v=20261031u';
 
 // Right-click an NPC -> comic text-bubble ring: Dance-off / Push / Slap / Fart (+ Mission on job givers).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).

@@ -115,18 +115,21 @@ canvas { image-rendering: pixelated; }
   box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E; -webkit-font-smoothing: none; }
 .mo-btn.mo-yes { background: #FF5491; }
 .mo-btn:hover { background: #292C2E; color: #FFCC3F; }
-.mission-mark { position: absolute; left: 0; top: 0; display: none; will-change: transform; pointer-events: none; }
-/* v=20261031i comic talk-hint look: rounded bubble, no tail, bob */
+.mission-mark { position: absolute; left: 0; top: 0; display: none; will-change: transform; pointer-events: none; z-index: 2; }
+/* Big comic ? / ! — screen-pixel size (never shrinks with distance). Glyph ~32px, whole bubble ~ name-tag height+. */
 .mission-mark.talk-hint-mark .bb {
-  display: block; font: 700 14px/14px 'PressStart2P', monospace; padding: 6px 8px 5px; border-radius: 11px;
-  letter-spacing: 0; min-width: 14px; text-align: center; border: 3px solid #292C2E;
-  box-shadow: 0 3px 0 0 #5B6A7B;
-  -webkit-font-smoothing: none; font-smooth: never;
-  animation: bubble-pop .18s steps(3, end) backwards, mark-bob .8s steps(2, end) .18s infinite;
+  display: block; box-sizing: border-box;
+  font: 32px/32px 'PressStart2P', monospace; font-weight: 700;
+  color: #292C2E; padding: 10px 14px 9px; border-radius: 16px;
+  letter-spacing: 0; min-width: 32px; text-align: center;
+  border: 4px solid #292C2E;
+  box-shadow: 0 4px 0 0 #5B6A7B;
+  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
+  animation: bubble-pop .18s steps(3, end) backwards, mark-bob .9s steps(2, end) .18s infinite;
 }
 .mission-mark.talk-hint-mark.bang .bb { color: #292C2E; background: #FFCC3F; }
-.mission-mark.talk-hint-mark.ask .bb { color: #5B6A7B; background: #F0F2F4; }
-@keyframes mark-bob { 0% { translate: 0 0; } 50% { translate: 0 -6px; } }
+.mission-mark.talk-hint-mark.ask .bb { color: #292C2E; background: #F0F2F4; }
+@keyframes mark-bob { 0% { translate: 0 0; } 50% { translate: 0 -8px; } }
 
 /* Grandma Fumiko: persistent heart-in-comic-bubble (same chrome as .bubble.icon) */
 .grandma-heart { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; will-change: transform; }

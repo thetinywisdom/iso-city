@@ -578,15 +578,18 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     if (bangN && (!bangN.root || npcHasSpeech(bangN) || (offer && offer.npc === bangN))) bangN = null;
     // Target '!' wins over giver '?' on the same head.
     const qList = bangN ? wantQ.filter((n) => n !== bangN) : wantQ;
+    // Screen-pixel lift so the mark sits clearly ABOVE the hover name-tag (body+tail+gap),
+    // and still reads above the head when the tag is hidden. Size is CSS px — never shrinks with distance.
+    const MARK_LIFT = 52; // ~tag body (~22) + tail (~14) + gap (~8) + a little air
     for (const n of qList) {
       const m = acquireMark(); paintMark(m, 'q');
       const s = project(n.root.getWorldPosition(new THREE.Vector3()), 2.55);
-      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px) translate(-50%, -100%)`;
+      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y - MARK_LIFT)}px) translate(-50%, -100%)`;
     }
     if (bangN) {
       const m = acquireMark(); paintMark(m, 'bang');
       const s = project(bangN.root.getWorldPosition(new THREE.Vector3()), 2.55);
-      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y)}px) translate(-50%, -100%)`;
+      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y - MARK_LIFT)}px) translate(-50%, -100%)`;
     }
   }
   function idleArrowNpc() {
