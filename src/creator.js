@@ -1,11 +1,11 @@
 // Character creator page (creator.html). Builds custom characters with the same builder + pixel
 // pipeline as the game and saves them to localStorage; the city tab picks them up live.
 import * as THREE from 'three';
-import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261031p';
-import { PixelPipeline, rampUniforms } from './pixel.js?v=20261031p';
-import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY, isBuiltinChar } from './customchars.js?v=20261031p';
-import * as CH from '../characters/characters.js?v=20261031p';
-import { CITY_ROSTER, OVERRIDE_KEY, cityBaseDef, loadOverrides, saveOverride, clearOverride } from './citychars.js?v=20261031p';
+import { CUSTOM, KIMATA_STYLE, customDefaults, normalizeCustom, randomCustom, createCustom } from '../characters/characters.js?v=20261031q';
+import { PixelPipeline, rampUniforms } from './pixel.js?v=20261031q';
+import { HOMES, loadCustom, saveCustom, newId, getPlayerChar, setPlayerChar, PLAYER_KEY, isBuiltinChar } from './customchars.js?v=20261031q';
+import * as CH from '../characters/characters.js?v=20261031q';
+import { CITY_ROSTER, OVERRIDE_KEY, cityBaseDef, loadOverrides, saveOverride, clearOverride } from './citychars.js?v=20261031q';
 
 const MAX = 30;
 const $ = (s) => document.querySelector(s);

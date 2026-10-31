@@ -217,7 +217,7 @@ canvas { image-rendering: pixelated; }
 #story-menu { position: fixed; bottom: 128px; right: 18px; display: none; pointer-events: auto; cursor: pointer; border: 0;
   font: 10px/10px 'PressStart2P', ui-monospace, monospace; -webkit-font-smoothing: none; color: #F0F2F4; background: #5B6A7B; padding: 8px 10px;
   box-shadow: 0 -3px 0 0 #292C2E, 0 3px 0 0 #292C2E, -3px 0 0 0 #292C2E, 3px 0 0 0 #292C2E, 0 6px 0 0 #292C2E; }
-#story-menu.on { display: none; }   /* folded into the game menu (TITLE SCREEN) */
+#story-menu.on { display: none; }   /* folded into the game menu (STORY MODE / FREE ROAM) */
 #story-menu:hover { background: #292C2E; color: #FFCC3F; }
 #story-z { position: absolute; left: 0; top: 0; display: none; pointer-events: auto; cursor: pointer; will-change: transform; }
 #story-z.on { display: block; }

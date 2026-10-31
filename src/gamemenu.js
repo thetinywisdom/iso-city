@@ -1,5 +1,5 @@
-// One in-game menu (Esc or the MENU button): CONTROLS · CHARACTERS · CREATOR. The game pauses while it is open.
-import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031p';
+// One in-game menu (Esc or the MENU button): CONTROLS · CHARACTERS · CREATOR · STORY/FREE ROAM. The game pauses while it is open.
+import { loadCustom, setPlayerChar, playerCharDef } from './customchars.js?v=20261031q';
 
 const CONTROLS = [
   ['MOUSE', '— the main controls —'],
@@ -16,7 +16,7 @@ export function initGameMenu({ onPick, getStory, onOpen }) {
   root.id = 'game-menu';
   root.innerHTML = `<div class="gm-box" role="dialog" aria-label="Menu">
     <div class="gm-top"><span class="gm-h">MENU · PAUSED</span><button class="gm-x" title="Close (Esc)">✕</button></div>
-    <div class="gm-tabs"><button data-tab="controls">CONTROLS</button><button data-tab="chars">CHARACTERS</button><button data-tab="creator">CREATOR</button><button class="gm-title" data-act="title">TITLE SCREEN</button></div>
+    <div class="gm-tabs"><button data-tab="controls">CONTROLS</button><button data-tab="chars">CHARACTERS</button><button data-tab="creator">CREATOR</button><button class="gm-title" data-act="title">STORY MODE</button></div>
     <div class="gm-pane" data-pane="controls"><table class="gm-keys">${CONTROLS.map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}</table></div>
     <div class="gm-pane" data-pane="chars"><p class="gm-note">WHO YOU PLAY AS. MAKE MORE IN THE CREATOR TAB.</p><div class="gm-chars"></div></div>
     <div class="gm-pane" data-pane="creator"><div class="gm-frame"></div><p class="gm-note">saved in this browser. <a href="creator.html" target="isoCityCreator">open in its own tab</a></p></div>
@@ -48,13 +48,24 @@ export function initGameMenu({ onPick, getStory, onOpen }) {
     if (tab === 'creator' && !$('.gm-frame iframe')) {
       const f = document.createElement('iframe'); f.src = 'creator.html?embed=1'; f.title = 'Character creator'; $('.gm-frame').appendChild(f);
     }
-    $('.gm-title').style.display = getStory?.() ? '' : 'none';
+    const stBtn = $('.gm-title'), st = getStory?.();
+    if (!st) { stBtn.style.display = 'none'; }
+    else {
+      stBtn.style.display = '';
+      stBtn.textContent = st.mode === 'story' ? 'FREE ROAM' : 'STORY MODE';
+    }
   }
   function openMenu(t) { open = true; onOpen?.(); root.classList.add('on'); document.body.classList.add('paused'); show(t); }
   function close() { open = false; root.classList.remove('on'); document.body.classList.remove('paused'); btn.blur(); }
   root.querySelectorAll('.gm-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
   $('.gm-x').addEventListener('click', close);
-  $('.gm-title').addEventListener('click', () => { close(); getStory?.()?.showTitle?.(); });
+  $('.gm-title').addEventListener('click', () => {
+    close();
+    const st = getStory?.();
+    if (!st) return;
+    if (st.mode === 'story') st.begin?.('free');
+    else st.showTitle?.();
+  });
   btn.addEventListener('click', (e) => { e.preventDefault(); open ? close() : openMenu(); });
   addEventListener('storage', () => { if (open && tab === 'chars') renderChars(); });
   // Esc: other overlays (story cards, job offers, the right-click menu) get it first

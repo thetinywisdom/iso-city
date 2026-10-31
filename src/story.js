@@ -1,13 +1,13 @@
-// Story mode: "RENT'S DUE" (Phase B core). Title screen (STORY / FREE ROAM), a 7-day rent loop with paid jobs
+// Story mode: "RENT'S DUE" (Phase B core). Default load is free roam; title (STORY / CONTINUE) opens from the menu. 7-day rent loop with paid jobs
 // (2 a day), sleep at the Z on the spawn point, Day 5 / 6 glitches, the Day 7 reset + the choice card, and the
 // oddity hunt ("THAT'S WEIRD!" [Q], 7 of 10 per loop). Free roam is the untouched sandbox.
 // Saves to localStorage isoCity.story.v1. The hidden house + the 7:00 finale come in Phase C.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031p';
-import { initGrowth } from './growth.js?v=20261031p';
-import { initFinale } from './finale.js?v=20261031p';
-import { APARTMENT } from './fill.js?v=20261031p';
-import { initGlitch } from './glitch.js?v=20261031p';
+import { COMIC } from './palette.js?v=20261031q';
+import { initGrowth } from './growth.js?v=20261031q';
+import { initFinale } from './finale.js?v=20261031q';
+import { APARTMENT } from './fill.js?v=20261031q';
+import { initGlitch } from './glitch.js?v=20261031q';
 
 export const STORY_KEY = 'isoCity.story.v1';
 export const RENT = 77777;
@@ -619,12 +619,11 @@ export function initStory({ scene, camera, city, player, getNPCs, dialogue, comb
     const qm = params.get('mode');
     let m = qm === 'story' || qm === 'free' ? qm : null;
     if (!m) try { m = sessionStorage.getItem(MODE_KEY); } catch {}
-    if (!m && navigator.webdriver) m = 'free';   // automated test runs: straight into the sandbox
+    if (!m) m = 'free';   // default: free roam (no title gate on load)
     if (m === 'free') begin('free');
     else if (m === 'story') { let nw = params.get('new') === '1'; try { if (sessionStorage.getItem(NEW_KEY)) { nw = true; sessionStorage.removeItem(NEW_KEY); } } catch {} begin('story', nw); }
-    else showTitle();
   }
-  // story needs the NPC list; the title can go up straight away
+  // story needs the NPC list; free roam starts immediately (title is opened from the game menu)
   boot();
   hud();
 
