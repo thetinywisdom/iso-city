@@ -324,7 +324,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     let m = markPool.find((x) => x.free);
     if (!m) {
       const el = document.createElement('div'); el.className = 'mission-mark'; root.appendChild(el);
-      m = { el, bb: null, fill: null, line: null, free: true, kind: null }; markPool.push(m);
+      m = { el, bb: null, free: true, kind: null }; markPool.push(m);
     }
     m.free = false; return m;
   }
@@ -333,39 +333,29 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     for (const m of markPool) { m.free = true; m.el.style.display = 'none'; }
   }
   function paintMark(m, kind) {
-    // kind 'q' → '?', 'bang' → '!' — SAME .overhead-icon bubble as Grandma's heart (tail + size).
+    // kind 'q' → '?', 'bang' → '!' — SAME .overhead-icon bubble as Grandma's heart (no tail).
     // Avoid toggling display when already showing so CSS anims are not restarted every frame.
     if (m.kind === kind && m.el.firstChild) {
       if (m.el.style.display !== 'block') m.el.style.display = 'block';
       return;
     }
-    m.kind = kind; m.el.replaceChildren(); m.bb = m.fill = m.line = null;
+    m.kind = kind; m.el.replaceChildren(); m.bb = null;
     if (!kind) { m.el.className = 'mission-mark'; m.el.style.display = 'none'; return; }
     const glyphKind = kind === 'bang' ? 'bang' : 'q';
     m.el.className = 'mission-mark overhead-icon ' + (kind === 'bang' ? 'bang' : 'ask');
     const bb = document.createElement('div'); bb.className = 'bb'; bb.appendChild(glyphCanvas(glyphKind));
     m.el.appendChild(bb);
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'tail'); svg.setAttribute('width', '1'); svg.setAttribute('height', '1');
-    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'polygon'); fill.setAttribute('class', 'tf');
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); line.setAttribute('class', 'tl');
-    svg.append(fill, line); m.el.appendChild(svg);
-    m.bb = bb; m.fill = fill; m.line = line;
+    m.bb = bb;
     m.el.style.left = '0'; m.el.style.top = '0';
     m.el.style.display = 'block';
   }
   function placeOverheadMark(m, sx, sy, lift = 0) {
-    // Identical layout to Grandma's heart: body above head, SVG tail tip on the head.
+    // Same layout as Grandma's heart: plain rounded box above the head (no SVG tail).
     // `lift` (CSS px) stacks the bubble above a hover name-tag without overlap.
-    const TAIL = 14;
+    const GAP = 8;
     const w = m.bb?.offsetWidth || 43, h = m.bb?.offsetHeight || 37;
-    const x = snap(sx - w / 2), y = snap(sy - TAIL - h - lift);
+    const x = snap(sx - w / 2), y = snap(sy - GAP - h - lift);
     m.el.style.transform = `translate(${x}px, ${y}px)`;
-    const tx = Math.round(sx) - x, ty = Math.round(sy) - y;
-    const bx = Math.max(12, Math.min(w - 12, tx)), by = h - 3, half = 6;
-    const on = ty > by + 4;
-    m.fill?.setAttribute('points', on ? `${bx - half},${by} ${tx},${ty} ${bx + half},${by}` : '');
-    m.line?.setAttribute('points', on ? `${bx - half},${by + 1} ${tx},${ty} ${bx + half},${by + 1}` : '');
   }
   const arrow = document.createElement('canvas'); arrow.id = 'mission-arrow'; arrow.width = arrow.height = 11; root.appendChild(arrow);
   let bannerTimer = 0, toastTimer = 0;
@@ -640,7 +630,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     if (bangN && (!bangN.root || npcHasSpeech(bangN) || (offer && offer.npc === bangN))) bangN = null;
     // Target '!' wins over giver '?' on the same head.
     const qList = bangN ? wantQ.filter((n) => n !== bangN) : wantQ;
-    // Same layout as Grandma's heart bubble (tail tip on head). When a hover name-tag is on
+    // Same layout as Grandma's heart bubble (plain box, no tail). When a hover name-tag is on
     // that NPC, lift the icon so it stacks cleanly above the tag (no overlap).
     const TAG_STACK = 32; // ~tag body (~21) + gap (~8) + a little air; tag keeps its own tail to the head
     const hover = (() => { try { return dialogue.hover || null; } catch (_) { return null; } })();

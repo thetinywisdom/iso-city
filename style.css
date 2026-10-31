@@ -133,9 +133,7 @@ canvas { image-rendering: pixelated; }
   transform: none;
 }
 .overhead-icon canvas { display: block; image-rendering: pixelated; width: 27px; height: 27px; }
-.overhead-icon svg.tail { position: absolute; left: 0; top: 0; overflow: visible; z-index: 2; pointer-events: none; }
-.overhead-icon .tf { fill: #F0F2F4; }
-.overhead-icon .tl { fill: none; stroke: #292C2E; stroke-width: 3; stroke-linejoin: miter; }
+/* no SVG tail — plain rounded box (outline + shadow only) */
 #mission-arrow { position: absolute; left: 0; top: 0; width: 33px; height: 33px; display: none; image-rendering: pixelated; animation: mark-bob .6s steps(2, end) infinite; }
 /* trip: pixel dust puff */
 .impact.dust > div { left: -36px; top: -28px; width: 72px; height: 42px; animation: dust-puff .6s steps(6, end) forwards; }
