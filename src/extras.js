@@ -1,17 +1,17 @@
 // Gameplay extras hooked from main.js with one line: contact shadows that show
 // through roofs (task 4), click-to-talk NPC chat bubbles (task 7), and long-press SLAP (combat.js).
-import { ContactShadows } from './shadows.js?v=20261031v';
-import { initDialogue } from './dialogue.js?v=20261031v';
-import { initCombat } from './combat.js?v=20261031v';
-import { initMissions } from './missions.js?v=20261031v';
-import { initActions } from './actions.js?v=20261031v';
-import { initChatter } from './chatter.js?v=20261031v';
-import { initPolice } from './police.js?v=20261031v';
-import { initBananas } from './bananas.js?v=20261031v';
-import { initCats } from './cats.js?v=20261031v';
-import { initHiding } from './hiding.js?v=20261031v';
-import { initGrandma } from './grandma.js?v=20261031v';
-import { initStory } from './story.js?v=20261031v';
+import { ContactShadows } from './shadows.js?v=20261031w';
+import { initDialogue } from './dialogue.js?v=20261031w';
+import { initCombat } from './combat.js?v=20261031w';
+import { initMissions } from './missions.js?v=20261031w';
+import { initActions } from './actions.js?v=20261031w';
+import { initChatter } from './chatter.js?v=20261031w';
+import { initPolice } from './police.js?v=20261031w';
+import { initBananas } from './bananas.js?v=20261031w';
+import { initCats } from './cats.js?v=20261031w';
+import { initHiding } from './hiding.js?v=20261031w';
+import { initGrandma } from './grandma.js?v=20261031w';
+import { initStory } from './story.js?v=20261031w';
 
 export function initExtras({ scene, camera, renderer, pixel, city, player, getNPCs, keys }) {
   const shadows = new ContactShadows(scene, city);

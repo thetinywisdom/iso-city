@@ -28,7 +28,7 @@ function heartCanvas() {
 }
 /** Persistent comic speech bubble (white + black outline + tail) with the pink heart inside. */
 function makeHeartBubble() {
-  const el = document.createElement('div'); el.className = 'grandma-heart bubble icon'; el.style.display = 'none';
+  const el = document.createElement('div'); el.className = 'overhead-icon grandma-heart'; el.style.display = 'none';
   const bb = document.createElement('div'); bb.className = 'bb'; bb.appendChild(heartCanvas()); el.appendChild(bb);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'tail'); svg.setAttribute('width', '1'); svg.setAttribute('height', '1');
@@ -128,9 +128,12 @@ export function initGrandma({ scene, camera, renderer, player, getNPCs, dialogue
       const sy = (1 - _hp.y) / 2 * canvas.clientHeight;
       show = _hp.z < 1 && _hp.z > -1;
       if (show) {
-        const w = icon.bb.offsetWidth || 36, h = icon.bb.offsetHeight || 36;
+        const w = icon.bb.offsetWidth || 43, h = icon.bb.offsetHeight || 37;
         const TAIL = 14;
-        let x = Math.round(sx - w / 2), y = Math.round(sy - TAIL - h);
+        // Stack cleanly above the hover name-tag when it is also showing on grandma.
+        let lift = 0;
+        try { if (dialogue.hover === g) lift = 32; } catch (_) {}
+        let x = Math.round(sx - w / 2), y = Math.round(sy - TAIL - h - lift);
         icon.el.style.display = '';
         icon.el.style.transform = `translate(${x}px, ${y}px)`;
         // Tail tip on the head, base under the bubble body (same geometry as dialogue bubbles).

@@ -3,8 +3,8 @@
 //   DAY 6: + the shady guy talks weird, random people get deja vu.
 //   DAY 7: + the shady guy (and the odd stranger) tells you to WAKE UP.
 import * as THREE from 'three';
-import { COMIC } from './palette.js?v=20261031v';
-import { Bucket } from './bucket.js?v=20261031v';
+import { COMIC } from './palette.js?v=20261031w';
+import { Bucket } from './bucket.js?v=20261031w';
 
 const { blues: B, pinks: K, teals: T, yellows: Y } = COMIC;
 const pick = (a) => a[Math.floor(Math.random() * a.length)];

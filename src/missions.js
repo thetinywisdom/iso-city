@@ -282,11 +282,49 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   const panel = document.createElement('div'); panel.id = 'mission-offer'; root.appendChild(panel);
   // Pool of floating marks: '?' on every giver, '!' on a single-NPC mission target. No floating star.
   const markPool = [];
+  // Pixel glyphs for ? / ! — same 9×9 @ 3× (=27px) box as Grandma's heart canvas.
+  const GLYPH = {
+    q: [
+      '..XXXXX..',
+      '.XX...XX.',
+      'XX.....XX',
+      '......XX.',
+      '.....XX..',
+      '....XX...',
+      '.........',
+      '....XX...',
+      '....XX...',
+    ],
+    bang: [
+      '....X....',
+      '...XXX...',
+      '...XXX...',
+      '...XXX...',
+      '...XXX...',
+      '....X....',
+      '.........',
+      '....X....',
+      '....X....',
+    ],
+  };
+  function glyphCanvas(kind) {
+    const rows = GLYPH[kind] || GLYPH.q;
+    const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
+    const x = c.getContext('2d');
+    // ? dark; ! gold/yellow (readable on the white #F0F2F4 bubble)
+    const fill = kind === 'bang' ? '#E6A800' : '#292C2E';
+    rows.forEach((row, y) => [...row].forEach((ch, i) => {
+      if (ch === '.') return;
+      x.fillStyle = fill; x.fillRect(i, y, 1, 1);
+    }));
+    c.style.width = c.width * 3 + 'px'; c.style.height = c.height * 3 + 'px';
+    return c;
+  }
   function acquireMark() {
     let m = markPool.find((x) => x.free);
     if (!m) {
       const el = document.createElement('div'); el.className = 'mission-mark'; root.appendChild(el);
-      m = { el, free: true, kind: null }; markPool.push(m);
+      m = { el, bb: null, fill: null, line: null, free: true, kind: null }; markPool.push(m);
     }
     m.free = false; return m;
   }
@@ -295,20 +333,39 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     for (const m of markPool) { m.free = true; m.el.style.display = 'none'; }
   }
   function paintMark(m, kind) {
-    // kind 'q' → '?' (ask), 'bang' → '!' — big comic bubble. Avoid toggling display when
-    // already showing the same kind so CSS animations are not restarted every frame.
+    // kind 'q' → '?', 'bang' → '!' — SAME .overhead-icon bubble as Grandma's heart (tail + size).
+    // Avoid toggling display when already showing so CSS anims are not restarted every frame.
     if (m.kind === kind && m.el.firstChild) {
       if (m.el.style.display !== 'block') m.el.style.display = 'block';
       return;
     }
-    m.kind = kind; m.el.replaceChildren();
+    m.kind = kind; m.el.replaceChildren(); m.bb = m.fill = m.line = null;
     if (!kind) { m.el.className = 'mission-mark'; m.el.style.display = 'none'; return; }
-    const glyph = kind === 'bang' ? '!' : '?';
-    m.el.className = 'mission-mark talk-hint-mark ' + (kind === 'bang' ? 'bang' : 'ask');
-    const bb = document.createElement('div'); bb.className = 'bb'; bb.textContent = glyph;
+    const glyphKind = kind === 'bang' ? 'bang' : 'q';
+    m.el.className = 'mission-mark overhead-icon ' + (kind === 'bang' ? 'bang' : 'ask');
+    const bb = document.createElement('div'); bb.className = 'bb'; bb.appendChild(glyphCanvas(glyphKind));
     m.el.appendChild(bb);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'tail'); svg.setAttribute('width', '1'); svg.setAttribute('height', '1');
+    const fill = document.createElementNS('http://www.w3.org/2000/svg', 'polygon'); fill.setAttribute('class', 'tf');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline'); line.setAttribute('class', 'tl');
+    svg.append(fill, line); m.el.appendChild(svg);
+    m.bb = bb; m.fill = fill; m.line = line;
     m.el.style.left = '0'; m.el.style.top = '0';
     m.el.style.display = 'block';
+  }
+  function placeOverheadMark(m, sx, sy, lift = 0) {
+    // Identical layout to Grandma's heart: body above head, SVG tail tip on the head.
+    // `lift` (CSS px) stacks the bubble above a hover name-tag without overlap.
+    const TAIL = 14;
+    const w = m.bb?.offsetWidth || 43, h = m.bb?.offsetHeight || 37;
+    const x = snap(sx - w / 2), y = snap(sy - TAIL - h - lift);
+    m.el.style.transform = `translate(${x}px, ${y}px)`;
+    const tx = Math.round(sx) - x, ty = Math.round(sy) - y;
+    const bx = Math.max(12, Math.min(w - 12, tx)), by = h - 3, half = 6;
+    const on = ty > by + 4;
+    m.fill?.setAttribute('points', on ? `${bx - half},${by} ${tx},${ty} ${bx + half},${by}` : '');
+    m.line?.setAttribute('points', on ? `${bx - half},${by + 1} ${tx},${ty} ${bx + half},${by + 1}` : '');
   }
   const arrow = document.createElement('canvas'); arrow.id = 'mission-arrow'; arrow.width = arrow.height = 11; root.appendChild(arrow);
   let bannerTimer = 0, toastTimer = 0;
@@ -583,18 +640,19 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     if (bangN && (!bangN.root || npcHasSpeech(bangN) || (offer && offer.npc === bangN))) bangN = null;
     // Target '!' wins over giver '?' on the same head.
     const qList = bangN ? wantQ.filter((n) => n !== bangN) : wantQ;
-    // Screen-pixel lift so the mark sits clearly ABOVE the hover name-tag (body+tail+gap),
-    // and still reads above the head when the tag is hidden. Size is CSS px — never shrinks with distance.
-    const MARK_LIFT = 52; // ~tag body (~22) + tail (~14) + gap (~8) + a little air
+    // Same layout as Grandma's heart bubble (tail tip on head). When a hover name-tag is on
+    // that NPC, lift the icon so it stacks cleanly above the tag (no overlap).
+    const TAG_STACK = 32; // ~tag body (~21) + gap (~8) + a little air; tag keeps its own tail to the head
+    const hover = (() => { try { return dialogue.hover || null; } catch (_) { return null; } })();
     for (const n of qList) {
       const m = acquireMark(); paintMark(m, 'q');
       const s = project(n.root.getWorldPosition(new THREE.Vector3()), 2.55);
-      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y - MARK_LIFT)}px) translate(-50%, -100%)`;
+      placeOverheadMark(m, s.x, s.y, hover === n ? TAG_STACK : 0);
     }
     if (bangN) {
       const m = acquireMark(); paintMark(m, 'bang');
       const s = project(bangN.root.getWorldPosition(new THREE.Vector3()), 2.55);
-      m.el.style.transform = `translate(${snap(s.x)}px, ${snap(s.y - MARK_LIFT)}px) translate(-50%, -100%)`;
+      placeOverheadMark(m, s.x, s.y, hover === bangN ? TAG_STACK : 0);
     }
     // Hide leftovers that were not reused this frame.
     for (const m of markPool) { if (m.free) m.el.style.display = 'none'; }

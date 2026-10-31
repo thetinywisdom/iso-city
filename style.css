@@ -37,7 +37,8 @@ canvas { image-rendering: pixelated; }
 .bubble.chat .bb { font-size: 8px; line-height: 10px; padding: 4px 7px 3px; border-radius: 9px; max-width: 200px; }
 /* icons (♪ / ♥) */
 .bubble.icon .bb { padding: 5px 8px; line-height: 0; animation: bubble-pop .22s steps(4, end) backwards, icon-bob 1s steps(2, end) .22s infinite; }
-.bubble.icon canvas { display: block; image-rendering: pixelated; }
+.bubble.icon canvas { display: block; image-rendering: pixelated; width: 27px; height: 27px; }
+/* persistent overhead icons (?, !, grandma ♥) opt into .overhead-icon — identical bubble, no pop */
 /* story lines: same bubble, a little roomier */
 .bubble.story { z-index: 4; }
 .bubble.story .bb { max-width: min(480px, 86vw); text-align: left; padding: 8px 11px 7px; }
@@ -116,35 +117,25 @@ canvas { image-rendering: pixelated; }
 .mo-btn.mo-yes { background: #FF5491; }
 .mo-btn:hover { background: #292C2E; color: #FFCC3F; }
 .mission-mark { position: absolute; left: 0; top: 0; display: none; will-change: transform; pointer-events: none; z-index: 2; }
-/* Big comic ? / ! — screen-pixel size (never shrinks with distance). Glyph ~32px, whole bubble ~ name-tag height+. */
-.mission-mark.talk-hint-mark .bb {
-  display: block; box-sizing: border-box;
-  font: 32px/32px 'PressStart2P', monospace; font-weight: 700;
-  color: #292C2E; padding: 10px 14px 9px; border-radius: 16px;
-  letter-spacing: 0; min-width: 32px; text-align: center;
-  border: 4px solid #292C2E;
-  box-shadow: 0 4px 0 0 #5B6A7B;
-  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
-  /* mark-bob only — never bubble-pop. renderMarker toggles display each frame; pop's
-     `backwards` fill would lock the glyph at scale(.2) forever (tiny unreadble dot). */
-  animation: mark-bob .9s steps(2, end) infinite;
-  transform: none;
-}
-.mission-mark.talk-hint-mark.bang .bb { color: #292C2E; background: #FFCC3F; }
-.mission-mark.talk-hint-mark.ask .bb { color: #292C2E; background: #F0F2F4; }
 @keyframes mark-bob { 0% { translate: 0 0; } 50% { translate: 0 -8px; } }
 
-/* Grandma Fumiko: persistent heart-in-comic-bubble (same chrome as .bubble.icon) */
-.grandma-heart { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; will-change: transform; }
-.grandma-heart .bb {
-  display: block; line-height: 0; padding: 5px 8px; border-radius: 12px;
-  background: #F0F2F4; border: 3px solid #292C2E; box-shadow: 0 3px 0 0 #5B6A7B;
-  animation: bubble-pop .22s steps(4, end) backwards, icon-bob 1s steps(2, end) .22s infinite;
+/* RULE: every over-head icon (?, !, ♥, future) uses THIS exact comic bubble.
+   Same size/shape/outline/shadow/tail as Grandma Fumiko's heart. Screen-pixel sized. */
+.overhead-icon {
+  position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; will-change: transform;
 }
-.grandma-heart canvas { display: block; image-rendering: pixelated; }
-.grandma-heart svg.tail { position: absolute; left: 0; top: 0; overflow: visible; z-index: 2; pointer-events: none; }
-.grandma-heart .tf { fill: #F0F2F4; }
-.grandma-heart .tl { fill: none; stroke: #292C2E; stroke-width: 3; stroke-linejoin: miter; }
+.overhead-icon .bb {
+  display: block; line-height: 0; box-sizing: border-box;
+  padding: 5px 8px; border-radius: 12px;
+  background: #F0F2F4; border: 3px solid #292C2E; box-shadow: 0 3px 0 0 #5B6A7B;
+  /* bob only — never bubble-pop (frame reuse would lock scale(.2)) */
+  animation: icon-bob 1s steps(2, end) infinite;
+  transform: none;
+}
+.overhead-icon canvas { display: block; image-rendering: pixelated; width: 27px; height: 27px; }
+.overhead-icon svg.tail { position: absolute; left: 0; top: 0; overflow: visible; z-index: 2; pointer-events: none; }
+.overhead-icon .tf { fill: #F0F2F4; }
+.overhead-icon .tl { fill: none; stroke: #292C2E; stroke-width: 3; stroke-linejoin: miter; }
 #mission-arrow { position: absolute; left: 0; top: 0; width: 33px; height: 33px; display: none; image-rendering: pixelated; animation: mark-bob .6s steps(2, end) infinite; }
 /* trip: pixel dust puff */
 .impact.dust > div { left: -36px; top: -28px; width: 72px; height: 42px; animation: dust-puff .6s steps(6, end) forwards; }
