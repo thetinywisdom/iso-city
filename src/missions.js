@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // state object `S` and the manager `g` (helpers + live refs). Optional hooks:
 //   start(S, g)  update(S, dt, g)  hud(S, g) -> { progress, lines?, timer? }  target(S, g) -> Vector3|null
 //   onSlap(S, npc, g)  onLine(S, npc, line, g)  pickLine(S, npc, g) -> line|null  onClick(S, npc, g) -> bool
-//   onHitPlayer(S, npc, g)  onCaught(S, npc, g)  cleanup(S, g, result)      result: 'complete'|'fail'|'abort'
+//   onHitPlayer(S, npc, g)  onCaught(S, npc, g)  onPush(S, npc, g)  onStink(S, npc, g)  cleanup(S, g, result)      result: 'complete'|'fail'|'abort'
 // Inside a mission call g.complete(line) / g.fail(line). All text: pixel font, swears asterisked.
 // ---------------------------------------------------------------------------------------------
 export const TUNING = {
@@ -15,6 +15,9 @@ export const TUNING = {
   bully: { speed: 6.65, accel: 9, react: 0.55, safe: { x: -11.0, z: 21.5, r: 1.8 } },
   ball: { speed: 5.7, accel: 7, react: 0.75, escapeDist: 15, surviveTime: 12, pickup: 0.95, clickPx: 30 },
   cap: { time: 90, spot: { x: 12.8, y: 2.8, z: -6.3 }, under: { x: 12.8, z: -6.0 }, reach: 1.8, jumpMin: 0.05, clickPx: 46, giveBack: 2.4, clickGive: 4.5 },
+  scareBrian: { flee: 14, completeAt: 2.8 },
+  cats: { need: 5, deliverR: 2.5 },
+  danceNine: { need: 9, nearR: 5.8, chaseSpeed: 3.4, chaseAccel: 7 },
 };
 const RUDE = ['f**k off', 'go away', 'not interested', 'excuse me?', 'who are you?'];
 const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -223,6 +226,163 @@ export const MISSIONS = [
     markNpc: (S) => (S.phase === 'carry' || S.phase === 'done') ? (S.s || null) : null,
     target: (S) => (S.phase === 'find' ? S.cap.position : S.s.root.position),
   },
+
+  // ---- Phase 2 free-roam jobs (custom-char givers) ----
+  {
+    id: 'scare-brian', name: 'SCARE BRIAN AWAY', goal: 'sneak up behind Brian and push him so Kotaro can take his spot.',
+    giver: 'kotaro', offer: 'I want to be with Feli. Scare Brian away for me.',
+    start(S, g) {
+      S.brian = g.named('BRIAN'); S.feli = g.named('FELI'); S.kotaro = g.named('KOTARO');
+      S.phase = 'scare';
+      if (!S.brian || !S.feli || !S.kotaro) g.fail('trio missing. reload?');
+    },
+    _swap(S, g) {
+      const B = S.brian, F = S.feli, K = S.kotaro, npcs = g.npcs();
+      if (!B || !F || !K) return;
+      B.pairRole = null; B.pairLead = null; B.pairMate = null; B.pairHold = false; B.walker = false;
+      K.pairRole = 'lead'; K.pairMate = F; K.pairLead = K;
+      K.walker = true;
+      if (B.path) { K.path = B.path; K.idx = B.idx; K.dir = B.dir; K.speed = B.speed || 1.18; K.wait = 0; }
+      F.pairRole = 'mate'; F.pairLead = K; F.pairMate = null; F.walker = false;
+      npcs._pairHoldArms?.(K, 'R');
+      npcs._pairHoldArms?.(F, 'L');
+      g.dialogue.shout(K, 'finally!', 1800);
+    },
+    onPush(S, n, g) {
+      if (S.phase !== 'scare' || n !== S.brian) return;
+      S.phase = 'yoink';
+      g.dialogue.shout(n, 'AAAAHHH!!!', 2200);
+      this._swap(S, g);
+      g.later(1.6, () => {
+        if (!S.brian || S.brian.removed) return;
+        g.npcs().flee(S.brian, TUNING.scareBrian.flee);
+        g.dialogue.shout(S.brian, 'LEAVE ME ALONE!!', 2000);
+      });
+      g.later(TUNING.scareBrian.completeAt, () => {
+        if (S.phase === 'yoink') g.complete('kotaro got the girl.');
+      });
+    },
+    cleanup(S, g) {
+      // Brian comes back; trio regroups as normal a bit later.
+      g.later(8, () => {
+        try {
+          const npcs = g.npcs();
+          if (S.brian) npcs.calm(S.brian, 0.3);
+          npcs._wireCouple?.();
+        } catch (_) {}
+      });
+    },
+    hud: (S) => ({ progress: S.phase === 'scare' ? 'PUSH BRIAN (DOUBLE-CLICK)' : 'KOTARO\'S TURN...' }),
+    markNpc: (S) => (S.phase === 'scare' ? (S.brian || null) : null),
+    target: (S) => S.brian?.root.position || null,
+  },
+
+  {
+    id: 'bring-cats', name: 'BRING ME 5 CATS', goal: 'pet cats so they follow you, then deliver them to Feli.',
+    giver: 'feli', offer: 'Bring me 5 cats.',
+    start(S, g) {
+      S.feli = g.named('FELI'); S.got = new Set();
+      if (!S.feli) g.fail('feli missing. reload?');
+    },
+    update(S, dt, g) {
+      if (!S.feli || S.feli.removed) return;
+      const catsApi = (typeof window !== 'undefined' && window.__game?.extras?.cats) || null;
+      if (!catsApi?.followers) return;
+      const fp = S.feli.root.position, need = TUNING.cats.need, R = TUNING.cats.deliverR;
+      for (const c of catsApi.followers()) {
+        if (S.got.has(c.id)) continue;
+        if (Math.hypot(c.root.position.x - fp.x, c.root.position.z - fp.z) > R) continue;
+        S.got.add(c.id);
+        c.follow = false; c.mode = 'idle'; c.t = 2.5; c.speed = 0;
+        c.root.position.x = fp.x + (Math.random() - 0.5) * 1.4;
+        c.root.position.z = fp.z + (Math.random() - 0.5) * 1.4;
+        c.root.position.y = g.city.groundHeight(c.root.position.x, c.root.position.z);
+        g.dialogue.show(c, 'mrrp! ♥', 1200);
+        g.toast(`CAT ${S.got.size}/${need}`);
+        if (S.got.size >= need) { g.complete('five cats. she\'s thrilled.'); return; }
+      }
+    },
+    hud: (S) => ({ progress: `CATS ${S.got.size}/${TUNING.cats.need}` }),
+    markNpc: () => null,
+    target: (S) => S.feli?.root.position || null,
+  },
+
+  {
+    id: 'dance-nine', name: 'DANCE-OFF WITH 9', goal: 'recruit a 9-person dance crew (Nayeon counts). slap or fart to make them chase you.',
+    giver: 'nayeon', offer: 'I want to dance with a 9 people group',
+    start(S, g) {
+      S.nayeon = g.named('NAYEON'); S.phase = 'recruit'; S.recruited = new Set(); S.count = 1;
+      if (!S.nayeon) g.fail('nayeon missing. reload?');
+      else { S.nayeon.walker = false; S.nayeon.mode = null; }
+    },
+    _recruit(S, n, g) {
+      if (S.phase !== 'recruit' || !n || n === S.nayeon) return;
+      if (n.special === 'cop' || n.special === 'giver' || n.special === 'bully') return;
+      if (n.down) return;
+      S.recruited.add(n);
+      n.stagger = null; n.chaseCfg = null; n.mode = null;
+      const T = TUNING.danceNine;
+      g.npcs().forceChase(n, { speed: T.chaseSpeed, accel: T.chaseAccel, react: 0.12, chase: ['OI!', 'HEY!', 'WHAT?!'][Math.floor(Math.random() * 3)] });
+    },
+    onSlap(S, n, g) { this._recruit(S, n, g); },
+    onStink(S, n, g) { this._recruit(S, n, g); },
+    onHitPlayer(S, n, g) {
+      // Fun slap — no fail / no cop chaos. Keep them chasing so the crew stays together.
+      if (S.phase !== 'recruit' || !n || n === S.nayeon) return;
+      g.later(0.45, () => {
+        if (S.phase !== 'recruit' || n.down || n.removed) return;
+        this._recruit(S, n, g);
+      });
+    },
+    onCaught() { /* never fail this job on a catch — keep it fun */ },
+    update(S, dt, g) {
+      const n = S.nayeon; if (!n || n.removed) return;
+      const pp = g.player.position, npcs = g.npcs();
+      // Nayeon follows you
+      if (S.phase === 'recruit' && !n.down) {
+        const d = Math.hypot(n.root.position.x - pp.x, n.root.position.z - pp.z);
+        if (d > 1.55 && (!n.mode || n.mode === 'return' || n.mode === 'gather')) {
+          if (n.mode === 'gather') { n.gather.x = pp.x; n.gather.z = pp.z; n.gatherT = 0; }
+          else { n.mode = null; npcs.gatherTo(n, pp.x, pp.z); }
+        }
+      }
+      if (S.phase !== 'recruit') return;
+      const R = TUNING.danceNine.nearR, need = TUNING.danceNine.need;
+      const near = [];
+      for (const o of npcs.list) {
+        if (o.down || o.removed) continue;
+        if (Math.hypot(o.root.position.x - pp.x, o.root.position.z - pp.z) > R) continue;
+        if (o === n || o.mode === 'chase' || o.mode === 'react' || S.recruited.has(o)) near.push(o);
+      }
+      if (!near.includes(n) && Math.hypot(n.root.position.x - pp.x, n.root.position.z - pp.z) <= R) near.push(n);
+      S.count = near.length;
+      if (S.count < need) return;
+      S.phase = 'dance';
+      for (const o of near) {
+        if (o === n) continue;
+        o.chaseCfg = null; o.stagger = null;
+        if (o.mode === 'chase' || o.mode === 'react' || o.mode === 'flee') o.mode = null;
+      }
+      n.mode = null;
+      const acts = (typeof window !== 'undefined' && window.__game?.extras?.actions) || null;
+      try { acts?.danceOff?.(n); } catch (_) {}
+      g.later(1.6, () => { if (S.phase === 'dance') g.complete('that\'s a 9. dance-off!'); });
+    },
+    cleanup(S, g) {
+      const n = S.nayeon; if (!n) return;
+      // Let her stroll again; clear any leftover chase recruits gently.
+      try {
+        const npcs = g.npcs();
+        n.walker = true; n.mode = null;
+        for (const o of (S.recruited || [])) {
+          if (o && !o.removed && (o.mode === 'chase' || o.mode === 'react')) npcs.calm(o, 0.4);
+        }
+      } catch (_) {}
+    },
+    hud: (S) => ({ progress: S.phase === 'recruit' ? `CREW ${Math.min(S.count, TUNING.danceNine.need)}/${TUNING.danceNine.need}` : 'DANCE-OFF!' }),
+    markNpc: () => null,
+    target: (S) => S.nayeon?.root.position || null,
+  },
 ];
 
 const GIVER_LINES = {
@@ -364,6 +524,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     player, city, dialogue, later,
     npcs: getNPCs,
     special: (key) => getNPCs()?.list.find((n) => n.special === key),
+    named: (name) => getNPCs()?.list.find((n) => String(n.tag || '').toUpperCase() === String(name).toUpperCase()),
     toast(text) { toastEl.textContent = text; toastEl.style.display = 'block'; clearTimeout(toastTimer); toastTimer = setTimeout(() => (toastEl.style.display = 'none'), 1400); },
     complete(line) { finish('complete', line); },
     fail(line) { finish('fail', line); },
@@ -401,8 +562,15 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   }
 
   // ---- giver offer (free roam: per-NPC jobs; story: shady guy still offers every job) ----
-  const npcKey = (n) => (n && (n.special || n.cityKey)) || null;
-  const findGiver = (key) => getNPCs()?.list.find((n) => n.special === key || n.cityKey === key) || null;
+  // special / cityKey for built-ins; lowercase tag for custom chars (nayeon, feli, kotaro, brian)
+  const npcKey = (n) => {
+    if (!n) return null;
+    if (n.special) return n.special;
+    if (n.cityKey) return n.cityKey;
+    if (n.custom && n.tag) return String(n.tag).toLowerCase();
+    return null;
+  };
+  const findGiver = (key) => getNPCs()?.list.find((n) => npcKey(n) === key) || null;
   const giverLabel = (key) => { const n = findGiver(key); return (n && (n.tag || n.cityKey || n.special) || key || '?').toString().toUpperCase(); };
   const missionsFor = (n) => {
     if (!n || !mode) return [];
@@ -567,6 +735,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
     npcs.on('hitPlayer', (n) => active?.def.onHitPlayer?.(active.S, n, g));
     npcs.on('caught', (n) => active?.def.onCaught?.(active.S, n, g));
     npcs.on('playerTrip', (n) => active?.def.onTrip?.(active.S, n, g));
+    npcs.on('push', (n) => active?.def.onPush?.(active.S, n, g));
+    npcs.on('stink', (n) => active?.def.onStink?.(active.S, n, g));
   }
 
   window.addEventListener('keydown', (e) => {
