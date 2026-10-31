@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { registerPools } from './french.js?v=20261031ae';
+import { registerPools } from './french.js?v=20261031af';
 
 // Right-click an NPC -> comic text-bubble ring: Dance-off / Push / Slap / Fart (+ Mission on job givers).
 // The player walks up first (combat.approach), then the clip plays with input held (combat.hold).
@@ -119,15 +119,18 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     if (kind === 'mission') { missions.clickGiver(n); return; }
     if (kind === 'slap') { combat.slap(n); return; }
     if (n.down && kind !== 'fart') { dialogue.show(n, '...', 1200); return; }
-    combat.approach(n, REACH[kind], (t) => ACT[kind](t));
+    const fn = ACT[kind], reach = REACH[kind];
+    if (!fn || !(reach > 0)) return;   // unknown menu action — never approach with undefined reach/cb
+    combat.approach(n, reach, (t) => { try { fn(t); } catch (e) { console.error('[act]', kind, e); } });
   }
 
   // ---- DANCE-OFF ----
   // ---- DANCE-OFF + street party ----
   const PARTY_R = 9, CROWD_MIN = 1, BIG_EXTRA = 4.6;   // you + your opponent + 1 more = a party; on-screen folks walk over to clap
   const canJoin = (o) => !o.down && !o.mode && !o.stagger && o.special !== 'bully' && o.special !== 'giver' && o.special !== 'cop' && !(missions.active && o.special);
-  const crowdAt = (c, n) => getNPCs().list.filter((o) => o !== n && canJoin(o) && Math.hypot(o.root.position.x - c.x, o.root.position.z - c.z) < PARTY_R);
+  const crowdAt = (c, n) => getNPCs().list.filter((o) => o !== n && o?.root && canJoin(o) && Math.hypot(o.root.position.x - c.x, o.root.position.z - c.z) < PARTY_R);
   function danceOff(n) {
+    if (!n?.root) return;
     const npcs = getNPCs(), ch = charOf();
     if (n.down) return;
     if (n.special === 'bully') {                 // refuses. violently.
@@ -260,10 +263,12 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
 
   // ---- PUSH ----
   function push(n) {
+    if (!n?.root) return;
     const npcs = getNPCs(), ch = charOf();
     ch?.dance?.('shove');
     combat.hold(0.5, n.root.position);
     later(0.21, () => {
+      if (!n?.root) return;
       const p = player.position, q = n.root.position;
       if (p.distanceTo(q) > REACH.push + 0.9 || n.down) { combat.audio.whoosh(0.5); return; }
       tmp.copy(p).lerp(q, 0.6); tmp.y = q.y + 1.4; combat.burstAt(tmp, 'SHOVE!');
@@ -297,6 +302,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   // ---- FART ----
   const clouds = [];
   function fart(n) {
+    if (!n?.root) return;
     const ch = charOf(), p = player.position, q = n.root.position;
     const away = new THREE.Vector3(p.x * 2 - q.x, 0, p.z * 2 - q.z);    // turn the butt toward them
     ch?.dance?.('squat');
@@ -368,7 +374,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
         Ln.s.material.opacity = fade;
       });
       if (npcs && C.t < C.life - 0.4) for (const n of npcs.list) {
-        if (C.hit.has(n) || n.down) continue;
+        if (!n?.root || C.hit.has(n) || n.down) continue;
         const q = n.root.position;
         if (Math.hypot(q.x - C.at.x, q.z - C.at.z) < R) { C.hit.add(n); stinkReact(n, C.at); }
       }
@@ -376,6 +382,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     }
   }
   function stinkReact(n, at) {
+    if (!n?.root) return;
     const npcs = getNPCs();
     state.stunk++;
     npcs.emit('stink', n);
@@ -410,6 +417,7 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
   function wire(npcs) {
     if (!npcs || wired === npcs) return; wired = npcs;
     npcs.on('land', (n) => {
+      if (!n?.root) return;
       combat.audio.thud(); combat.shakeIt(0.18);
       tmp.copy(n.root.position); tmp.y += 0.25; combat.dustAt(tmp);
       state.lands++;
@@ -442,8 +450,8 @@ export function initActions({ scene, camera, renderer, pixel, player, getNPCs, d
     stepClouds(dt);
     stepParty(dt);
     if (open) {
-      const n = open.npc, p = n.root.position;
-      if (n.down || p.distanceTo(player.position) > MENU_FAR || Math.hypot(p.x - open.at.x, p.z - open.at.z) > MENU_DRIFT) closeMenu();
+      const n = open.npc, p = n?.root?.position;
+      if (!p || n.down || p.distanceTo(player.position) > MENU_FAR || Math.hypot(p.x - open.at.x, p.z - open.at.z) > MENU_DRIFT) closeMenu();
       else placeMenu();
     }
   };

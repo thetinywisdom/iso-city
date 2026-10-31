@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TUNE, NPC_RADIUS } from './npcs.js?v=20261031ae';
+import { TUNE, NPC_RADIUS } from './npcs.js?v=20261031af';
 
 // SLAP: long-press an NPC (dialogue.js fires onLongPress) -> the player walks into
 // reach, winds up and slaps. Impact = pixel "SLAP!" burst, screen shake, a synthesized
@@ -21,8 +21,11 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
   const charOf = () => player.model?.userData?.character || null;
 
   // ---- wiring ----
-  dialogue.onLongPress = (npc) => { audio.unlock(); interrupt(); target = npc; actCb = null; approachT = 0; bestD = Infinity; stuckT = 0; };
-  function approach(npc, reach, cb, slack = 0) { audio.unlock(); interrupt(); target = npc; actCb = cb; actReach = reach; actSlack = slack; approachT = 0; bestD = Infinity; stuckT = 0; }
+  dialogue.onLongPress = (npc) => { if (!npc?.root) return; audio.unlock(); interrupt(); target = npc; actCb = null; approachT = 0; bestD = Infinity; stuckT = 0; };
+  function approach(npc, reach, cb, slack = 0) {
+    if (!npc?.root || !(reach > 0)) return;   // refuse garbage targets (undefined reach / despawned)
+    audio.unlock(); interrupt(); target = npc; actCb = cb; actReach = reach; actSlack = slack; approachT = 0; bestD = Infinity; stuckT = 0;
+  }
   dialogue.approach = approach;         // far-away talks walk up first (dialogue.talkTo)
   function hold(sec, face = null, onCancel = null) { lockT = sec; lockFace = face; lockCancel = onCancel; }
   function interrupt() { const f = lockCancel; lockT = 0; lockCancel = null; f?.(); }
@@ -60,6 +63,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     audio.smack();
   }
   function hitPlayer(n) {
+    if (!n?.root) return;
     const p = player.position, q = n.root.position;
     const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz) || 1;
     interrupt(); charOf()?.stopDance?.(0.1);
@@ -114,7 +118,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     if (!npcs || !player.airborne || stun > 0) return;
     const p = player.position;
     for (const n of npcs.list) {
-      if (n.down) continue;
+      if (!n?.root || n.down) continue;
       const q = n.root.position;
       if (p.y - q.y > 1.75) continue;                  // sailed clean over their head (not with this jump)
       if ((p.x - q.x) ** 2 + (p.z - q.z) ** 2 < TRIP_DIST * TRIP_DIST) { trip(n); return; }
@@ -141,6 +145,7 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
     }
     if (slapping) {
       const n = slapping.npc, ch = charOf();
+      if (!n?.root) { slapping = null; return { lock: true }; }
       slapping.t += dt;
       turnToward(n.root.position, dt, 20);
       if (!slapping.done && slapping.t >= slapping.hitAt) {
@@ -152,8 +157,8 @@ export function initCombat({ scene, camera, renderer, pixel, player, getNPCs, di
       if (slapping.t >= slapping.hitAt + 0.25 || (ch && !ch.slapping && slapping.done)) slapping = null;
       return { lock: true };
     }
-    if (!target) return null;
-    if (keyMoving) { target = null; return null; }   // WASD cancels a pending slap
+    if (!target?.root) { target = null; actCb = null; return null; }   // despawned / bad approach target — never throw in the frame loop
+    if (keyMoving) { target = null; actCb = null; return null; }   // WASD cancels a pending slap
     approachT += dt;
     const p = player.position, q = target.root.position;
     const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);

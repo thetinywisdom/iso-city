@@ -17,7 +17,7 @@ export function initChatter({ scene, player, getNPCs, dialogue }) {
   function scan() {
     const list = getNPCs()?.list.filter(idle) || [];
     const parent = new Map(list.map((n) => [n, n]));
-    const find = (n) => { while (parent.get(n) !== n) n = parent.get(n); return n; };
+    const find = (n) => { let g = 0; while (parent.get(n) !== n) { n = parent.get(n); if (++g > 64) break; } return n; };
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const a = list[i].root.position, b = list[j].root.position;
       if (Math.hypot(a.x - b.x, a.z - b.z) < R) parent.set(find(list[i]), find(list[j]));

@@ -37,10 +37,10 @@ export const MISSIONS = [
     target(S, g) {   // nearest person you haven't slapped yet
       let best = null, bd = Infinity;
       for (const n of g.npcs().list) {
-        if (S.hit.has(n) || n.special === 'giver' || n.special === 'bully') continue;
+        if (!n?.root || n.removed || S.hit.has(n) || n.special === 'giver' || n.special === 'bully') continue;
         const d = flat(n.root.position, g.player.position); if (d < bd) { bd = d; best = n; }
       }
-      return best && best.root.position;
+      return best?.root?.position || null;
     },
   },
   {
@@ -61,10 +61,10 @@ export const MISSIONS = [
     target(S, g) {
       let best = null, bd = Infinity;
       for (const n of g.npcs().list) {
-        if (n.special) continue;
+        if (!n?.root || n.removed || n.special) continue;
         const d = flat(n.root.position, g.player.position); if (d < bd && d > 1.6) { bd = d; best = n; }
       }
-      return best && best.root.position;
+      return best?.root?.position || null;
     },
   },
   {
@@ -72,6 +72,7 @@ export const MISSIONS = [
     giver: 'big-deb', offer: "That bully thinks he's tougher than me. Go slap him for me.",
     start(S, g) {
       S.b = g.special('bully'); S.phase = 'poke';
+      if (!S.b) { g.fail('bully missing. reload?'); return; }
       g.npcs().calm(S.b, 0); S.b.mode = null;
       const s = TUNING.bully.safe; g.safeZone(s.x, s.z, s.r, true);
     },
@@ -99,19 +100,20 @@ export const MISSIONS = [
     },
     cleanup(S, g) {
       g.safeZone(0, 0, 0, false);
-      g.later(1.4, () => g.npcs().calm(S.b, 0.2));
+      g.later(1.4, () => { if (S.b) g.npcs().calm(S.b, 0.2); });
     },
     hud: (S, g) => S.phase === 'run'
       ? { progress: `RUN! PARK ${Math.max(0, flat(g.player.position, TUNING.bully.safe) - TUNING.bully.safe.r).toFixed(0)}m` }
       : { progress: 'SLAP THE BULLY' },
     markNpc: (S) => S.b || null,
-    target: (S) => (S.phase === 'poke' ? S.b.root.position : new THREE.Vector3(TUNING.bully.safe.x, 0, TUNING.bully.safe.z)),
+    target: (S) => (S.phase === 'poke' ? (S.b?.root?.position || null) : new THREE.Vector3(TUNING.bully.safe.x, 0, TUNING.bully.safe.z)),
   },
   {
     id: 'ball', name: 'STEAL MBAPPÉ\'S BALL', goal: 'grab the ball. escape (15m or 12s).',
     giver: 'bully', offer: 'that french guy with the ball? steal it. now.',
     start(S, g) {
-      S.m = g.special('mbappe'); S.ball = S.m.ball; S.phase = 'grab'; S.t = 0;
+      S.m = g.special('mbappe'); S.ball = S.m?.ball; S.phase = 'grab'; S.t = 0;
+      if (!S.m || !S.ball) { g.fail('mbappe missing. reload?'); return; }
       g.resetBall(); S.dir = new THREE.Vector3(0, 0, 1);
     },
     onPointer(S, x, y, g) {                // clicking the ball walks you to it (instead of slapping Mbappe behind it)
@@ -122,6 +124,7 @@ export const MISSIONS = [
     },
     update(S, dt, g) {
       const p = g.player.position, T = TUNING.ball;
+      if (!S.m?.root || !S.ball) return;
       if (S.phase === 'grab') {
         if (flat(p, S.ball.position) < T.pickup) {
           S.phase = 'run'; S.t = 0;
@@ -165,18 +168,19 @@ export const MISSIONS = [
     },
     cleanup(S, g, result) {
       g.resetBall();
-      if (result !== 'complete') g.npcs().calm(S.m, 0.8);
+      if (result !== 'complete' && S.m) g.npcs().calm(S.m, 0.8);
     },
     hud: (S, g) => S.phase === 'grab' ? { progress: 'GRAB THE BALL' }
-      : { progress: `ESCAPE ${Math.min(TUNING.ball.escapeDist, flat(g.player.position, S.m.root.position)).toFixed(0)}/${TUNING.ball.escapeDist}m`, timer: Math.max(0, TUNING.ball.surviveTime - S.t) },
+      : { progress: `ESCAPE ${Math.min(TUNING.ball.escapeDist, flat(g.player.position, S.m?.root?.position || g.player.position)).toFixed(0)}/${TUNING.ball.escapeDist}m`, timer: Math.max(0, TUNING.ball.surviveTime - S.t) },
     markNpc: (S) => S.m || null,
-    target: (S) => (S.phase === 'grab' ? S.ball.position : null),
+    target: (S) => (S.phase === 'grab' ? (S.ball?.position || null) : null),
   },
   {
     id: 'cap', name: 'KIMATA\'S CAP', goal: 'find kimata\'s cap. bring it back.',
     giver: 'syoya', offer: 'someone yeeted my cap. go fetch it for me?',
     start(S, g) {
       S.s = g.special('syoya'); S.phase = 'find'; S.t = TUNING.cap.time;
+      if (!S.s?.c?.cap) { g.fail('kimata missing. reload?'); return; }
       S.s.c.cap.visible = false;
       S.cap = g.spawnCap(S.s.c.cap);
       const c = TUNING.cap.spot; S.cap.position.set(c.x, c.y, c.z);
@@ -224,7 +228,7 @@ export const MISSIONS = [
     hud: (S) => ({ progress: S.phase === 'find' ? 'GET THE CAP (JUMP / E / CLICK)' : 'BRING IT TO KIMATA', timer: S.t }),
     // Cap is an object during 'find'; Kimata is the single NPC target once you carry it back.
     markNpc: (S) => (S.phase === 'carry' || S.phase === 'done') ? (S.s || null) : null,
-    target: (S) => (S.phase === 'find' ? S.cap.position : S.s.root.position),
+    target: (S) => (S.phase === 'find' ? (S.cap?.position || null) : (S.s?.root?.position || null)),
   },
 
   // ---- Phase 2 free-roam jobs (custom-char givers) ----
@@ -241,8 +245,11 @@ export const MISSIONS = [
       if (!B || !F || !K) return;
       B.pairRole = null; B.pairLead = null; B.pairMate = null; B.pairHold = false; B.walker = false;
       K.pairRole = 'lead'; K.pairMate = F; K.pairLead = K;
-      K.walker = true;
-      if (B.path) { K.path = B.path; K.idx = B.idx; K.dir = B.dir; K.speed = B.speed || 1.18; K.wait = 0; }
+      if (B.path && B.path.length) {
+        K.path = B.path;
+        K.idx = (B.idx >= 0 && B.idx < B.path.length) ? B.idx : 0;
+        K.dir = B.dir || 1; K.speed = B.speed || 1.18; K.wait = 0; K.walker = true;
+      } else K.walker = false;
       F.pairRole = 'mate'; F.pairLead = K; F.pairMate = null; F.walker = false;
       npcs._pairHoldArms?.(K, 'R');
       npcs._pairHoldArms?.(F, 'L');
@@ -274,7 +281,7 @@ export const MISSIONS = [
     },
     hud: (S) => ({ progress: S.phase === 'scare' ? 'PUSH BRIAN (DOUBLE-CLICK)' : 'KOTARO\'S TURN...' }),
     markNpc: (S) => (S.phase === 'scare' ? (S.brian || null) : null),
-    target: (S) => S.brian?.root.position || null,
+    target: (S) => S.brian?.root?.position || null,
   },
 
   {
@@ -304,7 +311,7 @@ export const MISSIONS = [
     },
     hud: (S) => ({ progress: `CATS ${S.got.size}/${TUNING.cats.need}` }),
     markNpc: () => null,
-    target: (S) => S.feli?.root.position || null,
+    target: (S) => S.feli?.root?.position || null,
   },
 
   {
@@ -373,7 +380,7 @@ export const MISSIONS = [
       // Let her stroll again; clear any leftover chase recruits gently.
       try {
         const npcs = g.npcs();
-        n.walker = true; n.mode = null;
+        n.walker = !!(n.path && n.path.length); n.mode = null;
         for (const o of (S.recruited || [])) {
           if (o && !o.removed && (o.mode === 'chase' || o.mode === 'react')) npcs.calm(o, 0.4);
         }
@@ -381,7 +388,7 @@ export const MISSIONS = [
     },
     hud: (S) => ({ progress: S.phase === 'recruit' ? `CREW ${Math.min(S.count, TUNING.danceNine.need)}/${TUNING.danceNine.need}` : 'DANCE-OFF!' }),
     markNpc: () => null,
-    target: (S) => S.nayeon?.root.position || null,
+    target: (S) => S.nayeon?.root?.position || null,
   },
 ];
 
@@ -661,7 +668,7 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   function finish(result, line = '') {
     if (!active) return;
     const { def, S } = active; active = null;
-    def.cleanup?.(S, g, result);
+    try { def.cleanup?.(S, g, result); } catch (e) { console.error('[mission-cleanup]', def?.id, e); }
     if (result === 'complete') {
       const i = MISSIONS.indexOf(def);
       if (mode !== 'story' && !save.stars.includes(def.id)) { save.stars.push(def.id); save.turnIn.push(def.id); }
@@ -722,7 +729,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   // ---- hooks into dialogue / npcs ----
   dialogue.preClick = (x, y) => !!(active && active.def.onPointer?.(active.S, x, y, g));
   dialogue.onClick = (n) => {
-    if (n.special === 'giver') { clickGiver(n); return true; }
+    // Left-click: shady guy AND free-roam job givers (Nayeon / Kotaro / Feli / …) open the offer.
+    if (isOfferNpc(n)) { clickGiver(n); return true; }
     return !!(active && active.def.onClick?.(active.S, n, g));
   };
   dialogue.pickLine = (n) => (active && active.def.pickLine ? active.def.pickLine(active.S, n, g) : null);
@@ -832,8 +840,8 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   function renderArrow() {
     const bangN = active ? (active.def.markNpc?.(active.S, g) || null) : null;
     const tgt = active?.def.target?.(active.S, g)
-      || (bangN && bangN.root.position)
-      || (!active && mode ? idleArrowNpc()?.root.position : null);
+      || (bangN?.root?.position || null)
+      || (!active && mode ? (idleArrowNpc()?.root?.position || null) : null);
     if (!tgt) { arrow.style.display = 'none'; return; }
     const s = project(tgt, 1.0), w = canvas.clientWidth, h = canvas.clientHeight, m = 40;
     if (s.x > m && s.x < w - m && s.y > m && s.y < h - m && s.z < 1) { arrow.style.display = 'none'; return; }
@@ -861,12 +869,19 @@ export function initMissions({ scene, camera, renderer, pixel, city, player, get
   scene.onBeforeRender = (...a) => {
     prev.apply(scene, a);
     const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
-    wire();
-    for (const t of timers) { t.t -= dt; if (t.t <= 0) { t.done = true; try { t.fn(); } catch (e) { console.error(e); } } }
-    timers = timers.filter((t) => !t.done);
-    if (active && getNPCs()) active.def.update?.(active.S, dt, g);
-    if (zone.visible) { const s = zone.userData.r * (1 + 0.06 * Math.sin(now * 0.008)); zone.scale.setScalar(s); }
-    renderHud(); renderMarker(); renderArrow();
+    try {
+      wire();
+      for (const t of timers) { t.t -= dt; if (t.t <= 0) { t.done = true; try { t.fn(); } catch (e) { console.error('[mission-timer]', e); } } }
+      timers = timers.filter((t) => !t.done);
+      if (active && getNPCs()) {
+        try { active.def.update?.(active.S, dt, g); }
+        catch (e) { console.error('[mission-update]', active?.def?.id, e); }
+      }
+      if (zone.visible) { const s = zone.userData.r * (1 + 0.06 * Math.sin(now * 0.008)); zone.scale.setScalar(s); }
+      renderHud(); renderMarker(); renderArrow();
+    } catch (e) {
+      console.error('[mission-frame]', e);
+    }
   };
 
   const api = {

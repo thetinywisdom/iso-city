@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { isFrench, frLine } from './french.js?v=20261031ae';
+import { isFrench, frLine } from './french.js?v=20261031af';
 
 // Click an NPC -> pixel-art chat bubble with a random line above their head.
 // The listener runs in the capture phase on window, so a click that hits an NPC
@@ -44,7 +44,7 @@ export function initDialogue({ scene, camera, renderer, getNPCs, player, pixel }
     }
     let line = api.pickLine?.(npc) || null;   // missions may bias the line
     const pool = npc.lines && Math.random() < 0.65 ? npc.lines : LINES;   // named people have their own lines
-    if (!line) do line = pool[Math.floor(Math.random() * pool.length)]; while (line === npc.lastLine && pool.length > 1);
+    if (!line) { let g = 0; do line = pool[Math.floor(Math.random() * pool.length)]; while (line === npc.lastLine && pool.length > 1 && ++g < 8); }
     npc.lastLine = line;
     show(npc, line, SHOW_MS, false);
     getNPCs().talk(npc, SHOW_MS / 1000, player.position);

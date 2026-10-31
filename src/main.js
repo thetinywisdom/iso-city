@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { generateCity } from './city.js?v=20261031ae';
-import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031ae';
-import { Player, JUMP, cullGhostsAt } from './player.js?v=20261031ae';
-import { P } from './palette.js?v=20261031ae';
-import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031ae';
-import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031ae';
-import { initExtras } from './extras.js?v=20261031ae';
-import { initGameMenu } from './gamemenu.js?v=20261031ae';
+import { generateCity } from './city.js?v=20261031af';
+import { loadCustom, STORE_KEY, PLAYER_KEY, setPlayerChar, playerCharDef } from './customchars.js?v=20261031af';
+import { Player, JUMP } from './player.js?v=20261031af';
+import { P } from './palette.js?v=20261031af';
+import { PixelPipeline, placeSnappedSun } from './pixel.js?v=20261031af';
+import { NPCs, NPC_RADIUS } from './npcs.js?v=20261031af';
+import { initExtras } from './extras.js?v=20261031af';
+import { initGameMenu } from './gamemenu.js?v=20261031af';
 
 // ---- Renderer / scene --------------------------------------------------------
 const SKY = new THREE.Color(P.sky);
@@ -82,19 +82,17 @@ function applyPlayerChar(force = false) {
   if (def) { try { model = charMod.createCustom(def); } catch (e) { console.warn('custom player failed, using default:', e.message); } }
   if (!model) model = charMod.createMainCharacter();
   player.setModel(model); pixel.toonify(player.root);
-  if (npcs?._ghostBounds && player.model) cullGhostsAt(player.model, player.position.x, player.position.z, npcs._ghostBounds, npcs._ghostN);
   playingAs = model.def ? key : 'default';
   player.heroName = model.def ? String(model.def.name || 'YOU').toUpperCase() : null;
   updatePlayerBtn();
 }
 function updatePlayerBtn() {}
 addEventListener('storage', (e) => { if (e.key === PLAYER_KEY || e.key === STORE_KEY || e.key === null) applyPlayerChar(); });
-import('../characters/characters.js?v=20261031ae')
+import('../characters/characters.js?v=20261031af')
   .then((mod) => {
     charMod = mod;
     if (mod?.createMainCharacter) applyPlayerChar(true);
     if (mod?.createNPC) { npcs = new NPCs(scene, mod, city); npcs.toonify = (r) => pixel.toonify(r); }
-    if (npcs?._ghostBounds && player.model) cullGhostsAt(player.model, player.position.x, player.position.z, npcs._ghostBounds, npcs._ghostN);
     pixel.toonify(scene);
   })
   .catch((e) => console.info('Character module not loaded, using placeholder:', e.message));
@@ -209,6 +207,7 @@ const clock = new THREE.Clock();
 const move = new THREE.Vector3();
 
 function tick() {
+  try {
   const dt = Math.min(clock.getDelta(), 0.05);
   if (gameMenu.isOpen) { pixel.render(scene, camera); requestAnimationFrame(tick); return; }   // paused
   let running = keys.has('run');
@@ -271,10 +270,6 @@ function tick() {
   camTarget.lerp(fc ? fc.pos : player.position, 1 - Math.exp(-dt * (fc ? 3 : 6)));
   zoomNow += ((fc?.zoom ?? zoom) - zoomNow) * (1 - Math.exp(-dt * 3));
   if (npcs) npcs.update(dt, player.position, RADIUS);
-  // Player ghost cull (same building AABB / hysteresis as NPCs; cheap single test)
-  if (npcs?._ghostBounds && player.model) {
-    cullGhostsAt(player.model, player.position.x, player.position.z, npcs._ghostBounds, npcs._ghostN);
-  }
   const viewH = VIEW / zoomNow;
   pixel.placeCamera(camera, camTarget, camOffset, viewH);
 
@@ -282,6 +277,10 @@ function tick() {
   placeSnappedSun(sun, camTarget, SUN_OFFSET, camera, viewH);
 
   pixel.render(scene, camera);
+  } catch (e) {
+    // One throw used to kill requestAnimationFrame forever (random "freeze" after slap/fart/push/bin).
+    console.error('[tick]', e);
+  }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);

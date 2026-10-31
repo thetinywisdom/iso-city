@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { P } from './palette.js?v=20261031ae';
+import { P } from './palette.js?v=20261031af';
 
 // Silhouette shown only where the player is hidden behind buildings.
 // Thin light rim so the dark fill stays readable on dark roofs; fine on light walls too.
@@ -54,9 +54,10 @@ export function addGhosts(obj) {
     m.add(g); // inherits transforms + animation of the source mesh
     ghosts.push(rim, g);
   }
-  // Start off: open-street default. Cull pass enables near buildings (no look change when on).
-  obj.userData.ghostsOn = false;
-  for (let i = 0; i < ghosts.length; i++) ghosts[i].visible = false;
+  // Always on — GreaterDepth only draws where occluded by a building. Gating by
+  // footprint proximity (ac) missed iso-hidden characters a few metres from the AABB.
+  obj.userData.ghostsOn = true;
+  for (let i = 0; i < ghosts.length; i++) ghosts[i].visible = true;
 }
 
 /** Show/hide a character's ghost meshes. No-op when unchanged. Shared materials — visibility only. */

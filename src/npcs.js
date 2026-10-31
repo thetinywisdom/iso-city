@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts, buildGhostBounds, cullGhostsAt } from './player.js?v=20261031ae';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031ae';
-import { registerPools } from './french.js?v=20261031ae';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031ae';
+import { addGhosts } from './player.js?v=20261031af';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031af';
+import { registerPools } from './french.js?v=20261031af';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031af';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -83,7 +83,7 @@ export class NPCs {
       const a = w.path[w.start], b = w.path[(w.start + w.dir + 4) % 4];
       const t = w.along || 0;
       n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
-      Object.assign(n, { path: w.path, idx: (w.start + w.dir + 4) % 4, dir: w.dir, speed: w.speed, walker: true });
+      Object.assign(n, { path: w.path, idx: (w.start + w.dir + w.path.length) % w.path.length, dir: w.dir, speed: w.speed, walker: true });
       this.list.push(n);
     }
     for (const i of IDLERS) {
@@ -100,7 +100,7 @@ export class NPCs {
       if (w.walk) {
         const W = w.walk, a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4], t = W.along || 0;
         n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
-        Object.assign(n, { path: W.path, idx: (W.start + W.dir + 4) % 4, dir: W.dir, speed: W.speed, walker: true });
+        Object.assign(n, { path: W.path, idx: (W.start + W.dir + W.path.length) % W.path.length, dir: W.dir, speed: W.speed, walker: true });
       } else {
         n.root.position.set(w.pos[0], 0, w.pos[1]);
         n.heading = Math.atan2(w.face[0] - w.pos[0], w.face[1] - w.pos[1]);
@@ -130,7 +130,7 @@ export class NPCs {
         lines: COP_LINES.slice() });
       const a = W.path[W.start], b = W.path[(W.start + W.dir + 4) % 4];
       n.root.position.set(a[0] + (b[0] - a[0]) * W.along, 0, a[1] + (b[1] - a[1]) * W.along);
-      Object.assign(n, { path: W.path, idx: (W.start + W.dir + 4) % 4, dir: W.dir, speed: W.speed, walker: true });
+      Object.assign(n, { path: W.path, idx: (W.start + W.dir + W.path.length) % W.path.length, dir: W.dir, speed: W.speed, walker: true });
       this.list.push(n);
     }
     // variety pedestrians made from the creator's options (held items, body types...)
@@ -151,40 +151,11 @@ export class NPCs {
       addEventListener('storage', (e) => { if (e.key === STORE_KEY || e.key === PLAYER_KEY || e.key === null) this.syncCustom(); });
     }
     for (const n of this.list) n.root.position.y = city.groundHeight(n.root.position.x, n.root.position.z);
-    // Ghost silhouette cull: only draw GreaterDepth ghosts near buildings (open street = off).
-    this._ghostBounds = buildGhostBounds(city.buildings);
-    this._ghostN = city.buildings.length;
-    this._ghostI = 0;
-    this._cullGhostsAll();
-  }
-  /** One-shot enable/disable ghosts for every NPC from current positions. */
-  _cullGhostsAll() {
-    const b = this._ghostBounds, nb = this._ghostN;
-    if (!b) return;
-    for (const n of this.list) {
-      if (n.removed || !n.c?.root) continue;
-      cullGhostsAt(n.c.root, n.root.position.x, n.root.position.z, b, nb);
-    }
-  }
-  /** Round-robin ~1/4 of NPCs per frame — no alloc, bounded loops. */
-  _cullGhostsStep() {
-    const list = this.list, n = list.length, b = this._ghostBounds, nb = this._ghostN;
-    if (!n || !b) return;
-    const batch = (n + 3) >> 2;
-    let i = this._ghostI;
-    for (let k = 0; k < batch; k++) {
-      const npc = list[i];
-      i++; if (i >= n) i = 0;
-      if (!npc || npc.removed || !npc.c?.root) continue;
-      const p = npc.root.position;
-      cullGhostsAt(npc.c.root, p.x, p.z, b, nb);
-    }
-    this._ghostI = i;
   }
   _walkLoop(n, W) {
     const path = loop(W.c[0], W.c[1], W.L || 6.65), a = path[W.start || 0], b = path[((W.start || 0) + (W.dir || 1) + 4) % 4], t = W.along ?? 0.5;
     n.root.position.set(a[0] + (b[0] - a[0]) * t, 0, a[1] + (b[1] - a[1]) * t);
-    Object.assign(n, { path, idx: ((W.start || 0) + (W.dir || 1) + 4) % 4, dir: W.dir || 1, speed: W.speed || 1.3, walker: true });
+    Object.assign(n, { path, idx: ((W.start || 0) + (W.dir || 1) + path.length) % path.length, dir: W.dir || 1, speed: W.speed || 1.3, walker: true });
   }
   _free(x, z, r = 0.4) {
     for (const c of this.city.colliders) if (x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r) return false;
@@ -233,7 +204,6 @@ export class NPCs {
     n.root.add(c.root); addGhosts(c.root);
     n.c = c; c.update?.(0, 0);
     this.toonify?.(c.root);
-    if (this._ghostBounds) cullGhostsAt(c.root, n.root.position.x, n.root.position.z, this._ghostBounds, this._ghostN);
   }
   /** (Re)spawn the creator's saved characters from localStorage. Returns the number spawned. */
   syncCustom() {
@@ -259,7 +229,6 @@ export class NPCs {
       this.toonify?.(n.root);
     });
     this._wireCouple();
-    if (this._ghostBounds) this._cullGhostsAll();
     return this.customs.length;
   }
   /** FELI + BRIAN share a city stroll (hands held); KOTARO tips along behind. Survives push/slap/banana via return-to-lead. */
@@ -410,27 +379,29 @@ export class NPCs {
   _shout(n, key) { const c = n.chaseCfg; this.onShout?.(n, (c && c[key]) || SHOUTS[key]); }
   // ---- mission hooks: tiny event bus (slap, hitPlayer, caught) ----
   on(evt, fn) { (this._ev ||= {})[evt] = ((this._ev[evt]) || []).concat(fn); return () => { this._ev[evt] = this._ev[evt].filter((f) => f !== fn); }; }
-  emit(evt, ...a) { for (const f of (this._ev?.[evt] || [])) f(...a); }
+  emit(evt, ...a) { for (const f of (this._ev?.[evt] || [])) { try { f(...a); } catch (e) { console.error('[npc-emit]', evt, e); } } }
   /** Make an NPC chase the player right now. cfg: {speed, accel, react, noGiveUp, catch, chase, giveUp} (shout overrides). */
   forceChase(n, cfg = {}) {
+    if (!n?.c) return;
     if (n.c.dancing) n.c.stopDance(0.12);
     n.chaseCfg = cfg; n.talkT = 0;
     n.mode = 'react'; n.modeT = cfg.react ?? TUNE.reactDelay; n.chaseT = 0; n.chaseV = 0;
   }
   /** Walk to (x,z) to watch something (emits 'gathered' on arrival). */
   gatherTo(n, x, z) {
-    if (n.down || n.mode || n.stagger) return false;
+    if (!n?.root || n.down || n.mode || n.stagger) return false;
     if (n.c.dancing) n.c.stopDance(0.1);
     n.talkT = 0; n.mode = 'gather'; n.gather = { x, z }; n.gatherT = 0; n.modeT = 99;
     return true;
   }
   /** Walk back to the route / home spot (after being pulled away). */
   goHome(n, standFor = 0.2) {
-    if (n.down) return;
+    if (!n?.root || n.down) return;
     n.chaseCfg = null; n.stagger = null; n.mode = 'return'; n.modeT = standFor; n.target = this._nearestWaypoint(n);
   }
   /** Calm an NPC down: stop chasing/fleeing and walk back to their route/spot. */
   calm(n, standFor = 0.6) {
+    if (!n) return;
     n.chaseCfg = null; n.pendingHit = -1;
     if (!n.mode && !n.stagger) return;
     n.stagger = null; n.mode = 'return'; n.modeT = standFor; n.target = this._nearestWaypoint(n);
@@ -485,6 +456,7 @@ export class NPCs {
   /** Cartoon shove: knocked off their feet, short airborne arc, flailing; lands with a thud (emits 'land').
    *  Anyone they sail into goes down too (domino, emits 'domino'). */
   shove(n, from, power = 7.5, depth = 0) {
+    if (!n?.root || !from) return 0;
     const p = n.root.position;
     const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz) || 1;
     if (n.special === 'bully' || n.special === 'cop') return 0;      // an immovable object
@@ -502,7 +474,7 @@ export class NPCs {
   }
   /** Run away from the player for a few seconds. */
   flee(n, secs = 3 + Math.random() * 2) {
-    if (n.down) return;
+    if (!n?.root || n.down) return;
     if (n.c.dancing) n.c.stopDance(0.12);
     n.talkT = 0; n.mode = 'flee'; n.modeT = secs;
   }
@@ -565,9 +537,15 @@ export class NPCs {
     if (n.pairLead && n.pairRole !== 'lead' && !n.pairLead.removed) {
       const L = n.pairLead.root.position; return { i: -1, x: L.x, z: L.z };
     }
-    if (!n.walker) return { i: -1, x: n.home.x, z: n.home.z };
+    if (!n.walker || !n.path?.length) {
+      const h = n.home || { x: p.x, z: p.z };
+      return { i: -1, x: h.x, z: h.z };
+    }
     let best = 0, bd = Infinity;
-    n.path.forEach((w, i) => { const d = Math.hypot(w[0] - p.x, w[1] - p.z); if (d < bd) { bd = d; best = i; } });
+    for (let i = 0; i < n.path.length; i++) {
+      const w = n.path[i], d = Math.hypot(w[0] - p.x, w[1] - p.z);
+      if (d < bd) { bd = d; best = i; }
+    }
     return { i: best, x: n.path[best][0], z: n.path[best][1] };
   }
 
@@ -680,7 +658,7 @@ export class NPCs {
       if (td < arrive || n.returnT > 25) {
         n.mode = null; n.returnT = 0;
         if (n.pairRole === 'mate' || n.pairRole === 'tail') { /* follow resumes next frame */ }
-        else if (n.walker) { n.idx = t.i; n.wait = 0.5; }
+        else if (n.walker) { n.idx = (t.i >= 0 && n.path && t.i < n.path.length) ? t.i : 0; n.wait = 0.5; }
         else { if (td < 1.5) { p.x = t.x; p.z = t.z; } n.heading = n.home.heading; n.idleT = 0; }
         return 0;
       }
@@ -698,6 +676,8 @@ export class NPCs {
 
   update(dt, playerPos, playerR) {
     for (const n of this.list) {
+      try {
+      if (!n?.root) continue;
       const p = n.root.position;
       let speed = 0;
       if (n.bonkT > 0) n.bonkT -= dt;
@@ -755,21 +735,33 @@ export class NPCs {
       } else if (n.pairRole === 'tail') {
         speed = this._pairFollowTail(n, dt);
       } else if (n.walker) {
-        const tgt = n.path[n.idx];
-        const dx = tgt[0] - p.x, dz = tgt[1] - p.z, dist = Math.hypot(dx, dz);
-        if (dist < 0.08) { n.idx = (n.idx + n.dir + 4) % 4; n.wait = Math.random() < 0.25 ? 0.6 + Math.random() : 0; }
+        const path = n.path;
+        // Guard: walker without a real route used to throw on tgt[0] every frame and kill the render loop.
+        if (!path || !path.length) { n.walker = false; }
         else {
-          const hx = dx / dist, hz = dz / dist;
-          n.targetHeading = Math.atan2(hx, hz);
-          // yield to the player if they stand in the way
-          const px = playerPos.x - p.x, pz = playerPos.z - p.z, pd = Math.hypot(px, pz);
-          const ahead = (px * hx + pz * hz) / (pd || 1);
-          const blocked = pd < NPC_RADIUS + playerR + 0.45 && ahead > 0.3;
-          if (n.wait > 0) n.wait -= dt;
-          else if (!blocked) {
-            speed = n.speed;
-            const step = Math.min(dist, speed * dt);
-            p.x += hx * step; p.z += hz * step;
+          let idx = n.idx | 0;
+          if (idx < 0 || idx >= path.length) idx = n.idx = 0;
+          if (!n.dir) n.dir = 1;
+          const tgt = path[idx];
+          if (!tgt) { n.idx = 0; }
+          else {
+            const dx = tgt[0] - p.x, dz = tgt[1] - p.z, dist = Math.hypot(dx, dz);
+            const plen = path.length;
+            if (dist < 0.08) { n.idx = (idx + n.dir + plen * 4) % plen; n.wait = Math.random() < 0.25 ? 0.6 + Math.random() : 0; }
+            else {
+              const hx = dx / dist, hz = dz / dist;
+              n.targetHeading = Math.atan2(hx, hz);
+              // yield to the player if they stand in the way
+              const px = playerPos.x - p.x, pz = playerPos.z - p.z, pd = Math.hypot(px, pz);
+              const ahead = (px * hx + pz * hz) / (pd || 1);
+              const blocked = pd < NPC_RADIUS + playerR + 0.45 && ahead > 0.3;
+              if (n.wait > 0) n.wait -= dt;
+              else if (!blocked) {
+                speed = n.speed;
+                const step = Math.min(dist, speed * dt);
+                p.x += hx * step; p.z += hz * step;
+              }
+            }
           }
         }
       } else if (n.special) {                 // special idlers: stand at their spot
@@ -797,8 +789,10 @@ export class NPCs {
       // tail: proper gait crouch (whole-rig) — never raw torso bends
       if (n.pairRole === 'tail') n.c.update(dt, { speed: spd, crouch: n.sneakCrouch ? 0.38 : 0.14 });
       else n.c.update(dt, spd);
+      } catch (e) {
+        console.error('[npc-update]', n?.tag || n?.special || n?.cityKey, e);
+      }
     }
-    this._cullGhostsStep();
   }
 }
 
