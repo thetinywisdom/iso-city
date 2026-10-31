@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { mat } from './bucket.js?v=20261031aa';
-import { COMIC } from './palette.js?v=20261031aa';
+import { mat } from './bucket.js?v=20261031ab';
+import { COMIC } from './palette.js?v=20261031ab';
 
 // Street-furniture & vegetation library. Everything is baked into the city's
 // shared vertex-colour Bucket (one draw call) and uses Comic palette colours

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { addGhosts } from './player.js?v=20261031aa';
-import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031aa';
-import { registerPools } from './french.js?v=20261031aa';
-import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031aa';
+import { addGhosts } from './player.js?v=20261031ab';
+import { loadCustom, HOMES, VARIETY, STORE_KEY, PLAYER_KEY, getPlayerChar } from './customchars.js?v=20261031ab';
+import { registerPools } from './french.js?v=20261031ab';
+import { WOMEN, COP_LINES, OVERRIDE_KEY, loadOverrides, cityBaseDef, sameLines } from './citychars.js?v=20261031ab';
 
 // Ambient pedestrians: walkers loop around intersections along the sidewalks and
 // over the crosswalks; a few others idle / chat. They yield to the player.
@@ -295,56 +295,18 @@ export class NPCs {
       c.parts.torso.rotation.x = 0; // kill any leftover broken bend from older builds
     };
   }
-  /** Free follow slot near the lead. Prefer ideal side/back; if blocked, fall behind / other side / ring search. */
-  _pairFreeSlot(lp, h, { side = 0.55, back = 0, prefer = 1 } = {}) {
-    const rx = Math.cos(h), rz = -Math.sin(h); // right
-    const fx = Math.sin(h), fz = Math.cos(h);   // forward
-    const cands = [
-      [lp.x + rx * side * prefer - fx * back, lp.z + rz * side * prefer - fz * back],           // ideal
-      [lp.x - fx * Math.max(0.85, back || 0.9), lp.z - fz * Math.max(0.85, back || 0.9)],       // behind
-      [lp.x + rx * side * -prefer - fx * 0.35, lp.z + rz * side * -prefer - fz * 0.35],         // other side
-      [lp.x + rx * side * prefer - fx * 1.15, lp.z + rz * side * prefer - fz * 1.15],           // side + back
-      [lp.x - fx * 1.5, lp.z - fz * 1.5],
-      [lp.x + rx * 0.3 * prefer, lp.z + rz * 0.3 * prefer],                                     // closer in
-    ];
-    for (const [x, z] of cands) if (!this._blocked(x, z)) return [x, z, true];
-    for (let r = 0.7; r <= 2.2; r += 0.35) {
-      for (let a = 0; a < 10; a++) {
-        const ang = h + (a / 10) * Math.PI * 2;
-        const x = lp.x + Math.sin(ang) * r, z = lp.z + Math.cos(ang) * r;
-        if (!this._blocked(x, z)) return [x, z, false];
-      }
-    }
-    // last resort: behind lead even if tight (caller may soft-warp next)
-    return [lp.x - fx * 0.9, lp.z - fz * 0.9, false];
-  }
-  /** Stuck ~1s with no progress while still far from slot → sidestep / soft-warp to a free spot. */
-  _pairUnstick(n, p, dist, dt, lp, h, slotOpts) {
-    const moved = Math.hypot(p.x - (n._pairLastX ?? p.x), p.z - (n._pairLastZ ?? p.z));
-    n._pairLastX = p.x; n._pairLastZ = p.z;
-    if (dist > 0.3 && moved < 0.012) n._pairStuck = (n._pairStuck || 0) + dt;
-    else n._pairStuck = 0;
-    if ((n._pairStuck || 0) < 1.0) return false;
-    n._pairStuck = 0;
-    const [wx, wz] = this._pairFreeSlot(lp, h, slotOpts);
-    if (this._blocked(wx, wz)) return false;
-    p.x = wx; p.z = wz; p.y = this.city.groundHeight(wx, wz);
-    n._pairLastX = wx; n._pairLastZ = wz;
-    return true;
-  }
   _pairFollowMate(n, dt) {
     const L = n.pairLead; if (!L || L.removed) return 0;
     const lp = L.root.position, p = n.root.position;
     const busy = !!(L.down || L.mode || L.stagger);
     const h = L.root.rotation.y;
-    const slotOpts = { side: 0.55, back: 0, prefer: 1 };
-    const [tx, tz, ideal] = this._pairFreeSlot(lp, h, slotOpts);
+    const rx = Math.cos(h), rz = -Math.sin(h);
+    const tx = lp.x + rx * 0.55, tz = lp.z + rz * 0.55;
     const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz) || 1e-6;
-    // only hold hands when the ideal right-hand slot is free and we're close
-    n.pairHold = !!(ideal) && !busy && !n.mode && dist < 0.9 && !n.c.dancing && n.talkT <= 0 && L.talkT <= 0;
+    n.pairHold = !busy && !n.mode && dist < 0.9 && !n.c.dancing && n.talkT <= 0 && L.talkT <= 0;
     if (n.talkT > 0) return 0; // talking: stand, face player (handled below)
+    // always share BRIAN's facing — never yaw toward the side-slot (that spun when catching up)
     n.targetHeading = h;
-    if (this._pairUnstick(n, p, dist, dt, lp, h, slotOpts)) return L.curSpeed || 0;
     if (dist < 0.06) { p.x = tx; p.z = tz; return L.curSpeed || 0; }
     const spd = busy ? 2.6 : Math.max(L.speed || 1.2, 1.3) * (dist > 1.2 ? 1.5 : 1.15);
     const step = Math.min(dist, spd * dt);
@@ -356,23 +318,24 @@ export class NPCs {
     const L = n.pairLead; if (!L || L.removed) return 0;
     const lp = L.root.position, p = n.root.position;
     const h = L.root.rotation.y;
-    const slotOpts = { side: 0, back: 2.6, prefer: 1 };
-    const [tx, tz] = this._pairFreeSlot(lp, h, slotOpts);
+    const fx = Math.sin(h), fz = Math.cos(h);
+    const back = 2.6;
+    const tx = lp.x - fx * back, tz = lp.z - fz * back;
     const dx = tx - p.x, dz = tz - p.z, dist = Math.hypot(dx, dz) || 1e-6;
     const leadStill = (L.wait > 0) || L.talkT > 0 || (L.curSpeed || 0) < 0.18 || !!L.down || !!L.mode;
     n.sneakCrouch = leadStill; // deeper dip only when the couple stops
     if (n.talkT > 0) { n.sneakCrouch = true; n.sneakLean = 0; return 0; }
+    // whole-root lean: absolute set each frame (cleared when not peeking); never +=
     if (leadStill && dist < 1.6) {
       const peek = Math.atan2(lp.x - p.x, lp.z - p.z);
       let d = peek - h; d = Math.atan2(Math.sin(d), Math.cos(d));
       n.targetHeading = h + Math.max(-0.35, Math.min(0.35, d * 0.3));
-      n.sneakLean = Math.max(-0.08, Math.min(0.08, d * 0.04));
-      n._pairStuck = 0;
+      n.sneakLean = Math.max(-0.08, Math.min(0.08, d * 0.04)); // tiny whole-root tip
       return 0;
     }
     n.sneakLean = 0;
-    if (this._pairUnstick(n, p, dist, dt, lp, h, slotOpts)) { n.targetHeading = h; return 0; }
     if (dist < 0.12) { n.targetHeading = h; return 0; }
+    // tiptoe: a bit slower than the lead
     const spd = Math.min(1.15, (L.speed || 1.2) * 0.85);
     const step = Math.min(dist, spd * dt);
     const [sx, sz] = this._steer(n, dx / dist, dz / dist, 0.9);
@@ -676,10 +639,11 @@ export class NPCs {
       if ((n.pairRole === 'mate' || n.pairRole === 'tail') && n.pairLead && !n.pairLead.removed
           && (n.returnT > 5.5 || td > 14)) {
         const L = n.pairLead, lp = L.root.position, h = L.root.rotation.y;
-        const opts = n.pairRole === 'mate' ? { side: 0.55, back: 0, prefer: 1 } : { side: 0, back: 2.6, prefer: 1 };
-        const [x, z] = this._pairFreeSlot(lp, h, opts);
+        const fx = Math.sin(h), fz = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h);
+        const x = n.pairRole === 'mate' ? lp.x + rx * 0.55 : lp.x - fx * 2.6;
+        const z = n.pairRole === 'mate' ? lp.z + rz * 0.55 : lp.z - fz * 2.6;
         p.x = x; p.z = z; p.y = this.city.groundHeight(x, z);
-        n.mode = null; n.returnT = 0; n.heading = h; n.targetHeading = h; n._pairStuck = 0;
+        n.mode = null; n.returnT = 0; n.heading = h; n.targetHeading = h;
         return 0;
       }
       if (td < arrive || n.returnT > 25) {

@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { Bucket, mat } from './bucket.js?v=20261031aa';
-import { P, SCHEMES, COMIC } from './palette.js?v=20261031aa';
-import { makeProps } from './props.js?v=20261031aa';
-import { resolveFace, faceFrame } from './facing.js?v=20261031aa';
-import { addFill } from './fill.js?v=20261031aa';
-import { markInk } from './pixel.js?v=20261031aa';
+import { Bucket, mat } from './bucket.js?v=20261031ab';
+import { P, SCHEMES, COMIC } from './palette.js?v=20261031ab';
+import { makeProps } from './props.js?v=20261031ab';
+import { resolveFace, faceFrame } from './facing.js?v=20261031ab';
+import { addFill } from './fill.js?v=20261031ab';
+import { markInk } from './pixel.js?v=20261031ab';
 
 // Small art-direction test scene: a main intersection at (0,0) plus two
 // streets on the near (+x / +z) side, so the block nearest the camera has
